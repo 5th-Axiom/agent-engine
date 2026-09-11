@@ -1,0 +1,12 @@
+{
+  "name": "agent-engine-docs-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx start.ts",
+    "verify": "tsx verify.ts"
+  },
+  "dependencies": {
+    "marked": "18.0.12"
+  }
+}
