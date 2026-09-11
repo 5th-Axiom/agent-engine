@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "paths": {
+      "@agent-runtime/sdk": ["./packages/sdk/src/index.ts"],
+      "@agent-runtime/testing": ["./packages/testing/src/index.ts"],
+      "@agent-runtime/debug": ["./packages/debug/src/index.ts"],
+      "@agent-runtime/chat-core": ["./packages/chat-core/src/index.ts"],
+      "@agent-runtime/chat-ui": ["./packages/chat-ui/src/index.ts"],
+      "@agent-runtime/chat-server": ["./packages/chat-server/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/**/*.ts",
+    "tests/**/*.ts",
+    "examples/**/*.ts",
+    "scripts/**/*.ts"
+  ]
+}

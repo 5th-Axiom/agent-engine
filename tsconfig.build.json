@@ -1,0 +1,23 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/sdk"
+    },
+    {
+      "path": "packages/testing"
+    },
+    {
+      "path": "packages/debug"
+    },
+    {
+      "path": "packages/chat-core"
+    },
+    {
+      "path": "packages/chat-ui"
+    },
+    {
+      "path": "packages/chat-server"
+    }
+  ]
+}

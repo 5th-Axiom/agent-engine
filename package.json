@@ -1,0 +1,44 @@
+{
+  "name": "agent-engine-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -b tsconfig.build.json && node scripts/build-chat.mjs",
+    "test": "pnpm build && vitest run",
+    "test:integration": "pnpm build && vitest run tests/integration tests/recovery",
+    "check": "pnpm typecheck && pnpm build && pnpm test",
+    "example": "pnpm build && tsx examples/scenarios.ts",
+    "smoke:provider": "pnpm build && tsx scripts/provider-smoke.ts",
+    "verify:debug": "pnpm build && tsx scripts/verify-debug.ts",
+    "format": "prettier --write packages tests examples scripts *.json *.ts *.yaml",
+    "verify:monitoring": "pnpm build && tsx scripts/verify-monitoring.ts",
+    "playground": "pnpm build && tsx scripts/playground.ts",
+    "verify:playground": "pnpm build && tsx scripts/verify-playground.ts",
+    "verify:chat-ui": "pnpm build && tsx scripts/verify-chat-ui.ts",
+    "pack:chat": "pnpm build && node scripts/pack-chat.mjs",
+    "verify:chat-packages": "pnpm pack:chat && node scripts/verify-chat-packages.mjs"
+  },
+  "devDependencies": {
+    "@agent-runtime/debug": "workspace:*",
+    "@agent-runtime/sdk": "workspace:*",
+    "@agent-runtime/testing": "workspace:*",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.2",
+    "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
+    "pg": "^8.23.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0",
+    "zod": "^4.6.2",
+    "@agent-runtime/chat-core": "workspace:*",
+    "@agent-runtime/chat-ui": "workspace:*",
+    "@agent-runtime/chat-server": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

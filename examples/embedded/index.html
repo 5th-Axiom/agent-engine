@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>IM SDK 接入 · Agent Engine</title>
+    <link rel="stylesheet" href="/embed/app.css" />
+    <script type="module" src="/embed/app.js"></script>
+  </head>
+  <body>
+    <!-- THESIS: An assistant joins the administrator's existing work through a small entry and a focused conversation. OWN-WORLD: Inherit Agent Engine's white work surface, navy text, blue actions, and ruled records; semantic tokens support dark and branded skins. STORY: Configure a skin, open the entry, ask the configured agent, inspect real execution. FIRST VIEWPORT: A narrow admin navigation, inventory work area and a 56px lower-right chat entry; the 420px desktop panel becomes a mobile viewport. FORM: User-specified embedded icon/IM extension of the existing workbench, code-led; no new identity or concept seed. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
+    <header class="host-header">
+      <a href="/">Agent Engine</a><span>管理后台接入示例</span
+      ><a href="/debug/">Debug 调试</a>
+    </header>
+    <div class="host-layout">
+      <nav class="host-nav" aria-label="示例导航">
+        <a href="#workspace" aria-current="page">业务工作台</a
+        ><a href="#inline">嵌入式页面</a><a href="#components">分层组件</a
+        ><a href="/">模型测试页</a>
+      </nav>
+      <main>
+        <section id="workspace">
+          <h1>在工作台里，直接和 Agent 对话</h1>
+          <p class="intro">
+            右下角的图标由前端 SDK
+            提供。打开后即可使用本地已配置的模型；聊天面板与后台页面保持独立。
+          </p>
+          <form class="theme-controls" aria-label="SDK 外观设置">
+            <label
+              >主题<select id="theme">
+                <option value="light">浅色</option>
+                <option value="dark">深色</option>
+                <option value="system">跟随系统</option>
+              </select></label
+            ><label
+              >皮肤<select id="skin">
+                <option value="workbench">工作台</option>
+                <option value="rounded">柔和圆角</option>
+              </select></label
+            ><label
+              >品牌色<input id="accent" type="color" value="#0758a0" /></label
+            ><button id="reset-theme" type="button">恢复默认颜色</button>
+            <p id="theme-feedback" role="status"></p>
+          </form>
+          <div class="section-title">
+            <div>
+              <h2>库存概览</h2>
+              <p>下面是合成示例数据，可让助手调用演示库存工具查询。</p>
+            </div>
+            <button id="open-chat" type="button">打开 AI 助手</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>商品编号</th>
+                  <th>演示商品</th>
+                  <th>可用库存</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>DEMO-1</td>
+                  <td>标准款</td>
+                  <td>24 件</td>
+                  <td>
+                    <button type="button" data-ask="DEMO-1">询问助手</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>DEMO-2</td>
+                  <td>轻量款</td>
+                  <td>7 件</td>
+                  <td>
+                    <button type="button" data-ask="DEMO-2">询问助手</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="note">
+            模型请求会产生真实用量。演示工具只读取合成数据，不访问你的业务系统。
+          </p>
+          <details class="integration">
+            <summary>管理后台如何接入</summary>
+            <pre><code>import { mountChatWidget, createHttpChatTransport } from '@agent-runtime/chat-ui';
+
+const chat = mountChatWidget({
+  transport: createHttpChatTransport({ baseURL: '/api/agent-chat' }),
+  theme: { mode: 'light', skin: 'workbench', accent: '#0758a0' },
+});
+
+// 后台退出登录时卸载；鉴权由你的服务端提供。
+// chat.destroy({ clearSession: true });</code></pre>
+          </details>
+        </section>
+        <section id="inline">
+          <h2>也可以作为页面嵌入</h2>
+          <p>
+            放进现有页面的容器里，使用同一套业务组件和接口。这里是另一个独立实例。
+          </p>
+          <button type="button" id="mount-inline">加载嵌入式聊天页</button>
+          <div id="inline-chat" hidden></div>
+        </section>
+        <section id="components">
+          <h2>从 Token 到页面</h2>
+          <p>下方由 SDK 的公开组件直接生成，演示内容不会发送给模型。</p>
+          <div id="component-gallery"></div>
+          <p class="note">
+            页面组合业务组件；业务组件接收数据和回调；原子组件只负责控件；颜色、排版、间距与圆角由
+            Token 提供。
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

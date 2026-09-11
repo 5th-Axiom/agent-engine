@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-11T07:35:16.384Z",
+  "title": "Design System: Agent Engine Chat UI",
+  "extensions": {
+    "colorMeta": {
+      "white": {
+        "role": "neutral",
+        "displayName": "白色工作面"
+      },
+      "black": {
+        "role": "neutral",
+        "displayName": "品牌色上的黑色文字"
+      },
+      "navy": {
+        "role": "neutral",
+        "displayName": "海军蓝文字"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "蓝灰次级文字"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "记录分隔线"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "次级工作面"
+      },
+      "blue": {
+        "role": "primary",
+        "displayName": "工作台蓝"
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "选中底色"
+      },
+      "error": {
+        "role": "error",
+        "displayName": "错误红"
+      },
+      "dark": {
+        "role": "neutral",
+        "displayName": "深色工作面"
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "深色次级工作面"
+      },
+      "dark-text": {
+        "role": "neutral",
+        "displayName": "深色主题正文"
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "深色主题次级文字"
+      },
+      "dark-line": {
+        "role": "neutral",
+        "displayName": "深色记录分隔线"
+      },
+      "dark-blue": {
+        "role": "primary",
+        "displayName": "浅亮蓝"
+      },
+      "dark-selected": {
+        "role": "neutral",
+        "displayName": "深色选中底色"
+      },
+      "dark-error": {
+        "role": "error",
+        "displayName": "深色主题错误红"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "欢迎标题",
+        "purpose": "空会话欢迎标题。"
+      },
+      "title": {
+        "displayName": "对话标题",
+        "purpose": "对话页头部标题。"
+      },
+      "body": {
+        "displayName": "正文",
+        "purpose": "页面正文、历史条目与助手选项。"
+      },
+      "message": {
+        "displayName": "消息文本",
+        "purpose": "保留换行的用户与助手文本。"
+      },
+      "label": {
+        "displayName": "辅助文字",
+        "purpose": "发送者、状态、执行详情、字符计数与脚注。"
+      },
+      "input": {
+        "displayName": "输入文字",
+        "purpose": "多行输入框。"
+      },
+      "button": {
+        "displayName": "操作文字",
+        "purpose": "三种按钮变体的文字。"
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "motionMs",
+        "value": "160ms",
+        "purpose": "默认对话出现时长；prefers-reduced-motion: reduce 时禁用。"
+      },
+      {
+        "name": "dialog-open-easing",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "原生对话出现曲线。"
+      },
+      {
+        "name": "dialog-open-keyframes",
+        "value": "from{transform:translateY(8px);opacity:.7}to{transform:translateY(0);opacity:1}",
+        "purpose": "共享样式中唯一的关键帧动画。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "page-narrow-container",
+        "value": "480px"
+      },
+      {
+        "name": "widget-mobile-viewport",
+        "value": "600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "主要按钮",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "浅色 workbench 的发送按钮；品牌色、禁用与焦点处理来自同一原子组件。",
+      "html": "<button class=\"ds-button-primary\" type=\"button\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"m4 4 17 8-17 8 3-8-3-8Z M7 12h14\"/></svg><span>发送</span></button>",
+      "css": ".ds-button-primary{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cad4df;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-primary:hover:not(:disabled){background:#f3f6f9;border-color:#0758a0}.ds-button-primary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-primary:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}.ds-icon{width:20px;height:20px;flex:none}.ds-button-primary{background:#0758a0;color:#ffffff;border-color:#0758a0}.ds-button-primary:hover:not(:disabled){background:#0758a0;filter:brightness(.93)}.ds-button-primary:disabled{background:#f3f6f9;color:#48596a;border-color:#cad4df}"
+    },
+    {
+      "name": "次要按钮",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "默认按钮变体；边框和轻底色表达次级操作。",
+      "html": "<button class=\"ds-button-secondary\" type=\"button\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"M12 5v14 M5 12h14\"/></svg><span>新对话</span></button>",
+      "css": ".ds-button-secondary{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cad4df;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-secondary:hover:not(:disabled){background:#f3f6f9;border-color:#0758a0}.ds-button-secondary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-secondary:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}.ds-icon{width:20px;height:20px;flex:none}"
+    },
+    {
+      "name": "安静图标按钮",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "页头关闭操作；视觉图标隐藏于辅助技术，名称来自按钮。",
+      "html": "<button class=\"ds-button-quiet\" type=\"button\" aria-label=\"收起聊天\" title=\"收起聊天\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"m6 6 12 12 M18 6 6 18\"/></svg></button>",
+      "css": ".ds-button-quiet{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cad4df;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-quiet:hover:not(:disabled){background:#f3f6f9;border-color:#0758a0}.ds-button-quiet:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-quiet:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}.ds-icon{width:20px;height:20px;flex:none}.ds-button-quiet{width:44px;padding:8px;border-color:transparent;background:transparent}"
+    },
+    {
+      "name": "消息输入框",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "两行原生 textarea；标签、字数上限和焦点轮廓来自 createTextInput。",
+      "html": "<label class=\"ds-input-label\"><span class=\"ds-visually-hidden\">输入消息…</span><textarea class=\"ds-input\" rows=\"2\" maxlength=\"8000\" placeholder=\"输入消息…\"></textarea></label>",
+      "css": ".ds-input-label{display:block}.ds-visually-hidden{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.ds-input{display:block;width:100%;min-height:68px;max-height:144px;resize:vertical;border:1px solid #cad4df;border-radius:6px;padding:12px;background:#ffffff;color:#172b42;caret-color:#0758a0;font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;touch-action:manipulation}.ds-input::placeholder{color:#48596a}.ds-input::selection{background:#e1edf8;color:#172b42}.ds-input:focus-visible{outline:3px solid #0758a0;outline-offset:3px}"
+    },
+    {
+      "name": "历史会话条目",
+      "kind": "nav",
+      "refersTo": "history-item",
+      "description": "最近对话区域中的当前条目；示例标题仅用于预览。",
+      "html": "<section class=\"ds-history\" aria-label=\"最近对话\"><h3>最近对话</h3><button class=\"ds-history-item\" type=\"button\" aria-current=\"true\">示例对话<small>正在执行</small></button></section>",
+      "css": ".ds-history{max-height:35%;overflow:auto;background:#f3f6f9;padding:12px 16px;border-bottom:1px solid #cad4df;color:#172b42;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-history h3{font-size:15px;margin:0 0 8px}.ds-history-item{display:block;text-align:start;white-space:normal;width:100%;border:0;background:transparent;padding:12px;color:#172b42;border-radius:6px;font:inherit;cursor:pointer;touch-action:manipulation}.ds-history-item:hover,.ds-history-item[aria-current=true]{background:#e1edf8;color:#172b42}.ds-history-item small{display:block;color:#48596a;font-size:12px}.ds-history-item:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-history-item:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}"
+    },
+    {
+      "name": "用户消息",
+      "kind": "custom",
+      "refersTo": "message-self",
+      "description": "靠右、有语义选中底色的用户消息；预览文字不发送给模型。",
+      "html": "<section class=\"ds-message-self\"><p class=\"ds-message-name\">你</p><p class=\"ds-message-text\">请用三句话介绍你能做什么。</p></section>",
+      "css": ".ds-message-self{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:16px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#172b42}.ds-message-name{font-size:12px;color:#48596a;margin:0 0 6px}.ds-message-text{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:15px;line-height:1.7;margin:0;padding:12px 16px;border-radius:12px;background:#e1edf8;color:#172b42}.ds-message-text::selection{background:#e1edf8;color:#172b42}"
+    },
+    {
+      "name": "助手消息",
+      "kind": "custom",
+      "refersTo": "message-agent",
+      "description": "工作面上的平整文本回复；没有卡片底色或富媒体渲染。",
+      "html": "<section class=\"ds-message-agent\"><p class=\"ds-agent-name\">助手</p><p class=\"ds-agent-text\">在这里提问，继续当前工作。</p></section>",
+      "css": ".ds-message-agent{padding:0 2px;margin-bottom:16px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#172b42}.ds-agent-name{font-size:12px;color:#48596a;margin:0 0 6px}.ds-agent-text{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:15px;line-height:1.7;margin:0}.ds-agent-text::selection{background:#e1edf8;color:#172b42}"
+    },
+    {
+      "name": "执行详情",
+      "kind": "custom",
+      "refersTo": "run-details",
+      "description": "原生折叠详情；数值沿用组件展廊的合成样例，不能当作生产用量或业务承诺。",
+      "html": "<details class=\"ds-run-details\" open><summary>执行详情 · 48 Token</summary><p>输入 32 · 输出 16 · 用量完整 · 费用估算不完整</p><p>模型请求 2 · 执行步骤 2</p><div><p class=\"ds-operation\"><strong>demo.inventory</strong> · 已执行 · 结果校验通过</p></div></details>",
+      "css": ".ds-run-details{margin-top:12px;border-top:1px solid #cad4df;font:12px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#48596a}.ds-run-details summary{cursor:pointer;padding:10px 0;min-height:44px;display:list-item}.ds-run-details p{margin:4px 0}.ds-operation{padding:8px 0;overflow-wrap:anywhere}.ds-operation strong{font-weight:600;color:#172b42}.ds-run-details summary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}"
+    },
+    {
+      "name": "聊天入口",
+      "kind": "button",
+      "refersTo": "launcher",
+      "description": "默认圆形入口；预览保留控件造型，视口定位由 mountChatWidget 负责。",
+      "html": "<button class=\"ds-launcher\" type=\"button\" aria-label=\"打开聊天助手\" title=\"打开聊天助手\" aria-haspopup=\"dialog\" aria-expanded=\"false\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"M5 5h14v10H9l-4 4V5Z M9 9h6 M9 12h4\"/></svg></button>",
+      "css": ".ds-launcher{width:56px;height:56px;border-radius:50%;border:1px solid #0758a0;background:#0758a0;color:#ffffff;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;touch-action:manipulation}.ds-launcher .ds-icon{width:26px;height:26px;flex:none}.ds-launcher:hover{filter:brightness(.93)}.ds-launcher:focus-visible{outline:3px solid #0758a0;outline-offset:3px}@media(forced-colors:active){.ds-launcher{border:1px solid ButtonText}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Agent Engine 工作台",
+    "overview": "聊天界面沿用 Agent Engine 的白色工作面、深蓝文字、蓝色操作和细分隔线。内容以平整记录排列，操作保持清楚、安静；悬浮入口让用户在当前工作环境中打开对话。深色主题与柔和圆角皮肤延续同一套层级和控件语义。\n\n本规范覆盖可复用 SDK 的 Token、原子组件、业务组件和页面挂载。默认视觉值来自实现，主题与皮肤通过公开接口替换。管理后台的导航、库存表和介绍区域只是接入示例；合成库存不构成 SDK 的业务能力或生产数据承诺。",
+    "keyCharacteristics": [
+      "语义颜色统一驱动浅色、深色、系统主题和品牌色。",
+      "细边框、留白与文字层级组织记录，不使用投影构造卡片层级。",
+      "悬浮对话与容器页面共享消息、历史、输入和执行详情组件。",
+      "原生控件、清楚的焦点和明确状态支持键盘及触屏操作。",
+      "每个挂载实例在 Shadow DOM 内应用样式，宿主保留自己的视觉身份。"
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Color Rule",
+        "body": "新组件从语义 Token 取色；品牌色变化保留正文、错误、选中和禁用状态的独立角色。",
+        "section": "colors"
+      },
+      {
+        "name": "The Container Boundary Rule",
+        "body": "页面适应被分配的容器；悬浮挂载只通过入口和对话接收指针事件，普通宿主区域保持可操作。",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Record Rule",
+        "body": "记录通过文字、细线和语义底色组织，沿用当前没有投影的组件语言。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** 从语义 Token 取色，并通过主题解析器应用品牌色与皮肤。",
+      "**Do** 让 Token、原子组件、业务组件和页面保持现有职责，业务组件接收数据及回调。",
+      "**Do** 为 inline 容器提供明确尺寸，在宿主真实布局中验证容器与窗口响应。",
+      "**Do** 保留文字状态、用量完整性、可见焦点、输入法保护和用户上翻位置。",
+      "**Do** 在宿主卸载或退出登录时清理挂载，并按控制器归属管理会话记忆。",
+      "**Do** 将库存工作台与组件展廊标明为示例，保留合成数据的性质。"
+    ],
+    "donts": [
+      "**Don't** 把接入示例的导航、库存表或业务内容提升为 SDK 的通用组件契约。",
+      "**Don't** 通过 SDK 主题修改宿主或现有 Playground、Debug 的视觉身份。",
+      "**Don't** 给当前平整记录新增投影卡片层级、位图头像或装饰性素材。",
+      "**Don't** 把收起、卸载或结束重试描述为已取消服务端任务。",
+      "**Don't** 把缺失用量、未知执行结果或降级检测输出表示为已验证成功。",
+      "**Don't** 将模型文字作为 HTML 注入，或让展示组件直接处理模型密钥与网络请求。"
+    ]
+  }
+}

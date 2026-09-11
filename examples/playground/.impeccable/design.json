@@ -1,0 +1,343 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-11T06:21:02.364Z",
+  "title": "Design System: Agent Engine 本地测试",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "深蓝墨色",
+        "tonalRamp": [
+          "oklch(15.00% 0.04994 252.97)",
+          "oklch(26.43% 0.04994 252.97)",
+          "oklch(37.86% 0.04994 252.97)",
+          "oklch(49.29% 0.04994 252.97)",
+          "oklch(60.71% 0.04994 252.97)",
+          "oklch(72.14% 0.04994 252.97)",
+          "oklch(83.57% 0.04994 252.97)",
+          "oklch(95.00% 0.04994 252.97)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "次级灰蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.03495 248.60)",
+          "oklch(26.43% 0.03495 248.60)",
+          "oklch(37.86% 0.03495 248.60)",
+          "oklch(49.29% 0.03495 248.60)",
+          "oklch(60.71% 0.03495 248.60)",
+          "oklch(72.14% 0.03495 248.60)",
+          "oklch(83.57% 0.03495 248.60)",
+          "oklch(95.00% 0.03495 248.60)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "分隔灰蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.01873 250.61)",
+          "oklch(26.43% 0.01873 250.61)",
+          "oklch(37.86% 0.01873 250.61)",
+          "oklch(49.29% 0.01873 250.61)",
+          "oklch(60.71% 0.01873 250.61)",
+          "oklch(72.14% 0.01873 250.61)",
+          "oklch(83.57% 0.01873 250.61)",
+          "oklch(95.00% 0.01873 250.61)"
+        ]
+      },
+      "blue": {
+        "role": "primary",
+        "displayName": "操作蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.13550 252.54)",
+          "oklch(26.43% 0.13550 252.54)",
+          "oklch(37.86% 0.13550 252.54)",
+          "oklch(49.29% 0.13550 252.54)",
+          "oklch(60.71% 0.13550 252.54)",
+          "oklch(72.14% 0.13550 252.54)",
+          "oklch(83.57% 0.13550 252.54)",
+          "oklch(95.00% 0.13550 252.54)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "浅灰工作面",
+        "tonalRamp": [
+          "oklch(15.00% 0.00514 247.88)",
+          "oklch(26.43% 0.00514 247.88)",
+          "oklch(37.86% 0.00514 247.88)",
+          "oklch(49.29% 0.00514 247.88)",
+          "oklch(60.71% 0.00514 247.88)",
+          "oklch(72.14% 0.00514 247.88)",
+          "oklch(83.57% 0.00514 247.88)",
+          "oklch(95.00% 0.00514 247.88)"
+        ]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "错误暗红",
+        "tonalRamp": [
+          "oklch(15.00% 0.15152 22.66)",
+          "oklch(26.43% 0.15152 22.66)",
+          "oklch(37.86% 0.15152 22.66)",
+          "oklch(49.29% 0.15152 22.66)",
+          "oklch(60.71% 0.15152 22.66)",
+          "oklch(72.14% 0.15152 22.66)",
+          "oklch(83.57% 0.15152 22.66)",
+          "oklch(95.00% 0.15152 22.66)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "白色画布",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 0)",
+          "oklch(26.43% 0.00000 0)",
+          "oklch(37.86% 0.00000 0)",
+          "oklch(49.29% 0.00000 0)",
+          "oklch(60.71% 0.00000 0)",
+          "oklch(72.14% 0.00000 0)",
+          "oklch(83.57% 0.00000 0)",
+          "oklch(95.00% 0.00000 0)"
+        ]
+      },
+      "blue-hover": {
+        "role": "primary",
+        "displayName": "深操作蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.11733 252.00)",
+          "oklch(26.43% 0.11733 252.00)",
+          "oklch(37.86% 0.11733 252.00)",
+          "oklch(49.29% 0.11733 252.00)",
+          "oklch(60.71% 0.11733 252.00)",
+          "oklch(72.14% 0.11733 252.00)",
+          "oklch(83.57% 0.11733 252.00)",
+          "oklch(95.00% 0.11733 252.00)"
+        ]
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "选区浅蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.04639 249.34)",
+          "oklch(26.43% 0.04639 249.34)",
+          "oklch(37.86% 0.04639 249.34)",
+          "oklch(49.29% 0.04639 249.34)",
+          "oklch(60.71% 0.04639 249.34)",
+          "oklch(72.14% 0.04639 249.34)",
+          "oklch(83.57% 0.04639 249.34)",
+          "oklch(95.00% 0.04639 249.34)"
+        ]
+      },
+      "scrollbar": {
+        "role": "neutral",
+        "displayName": "滚动条灰蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.02648 250.01)",
+          "oklch(26.43% 0.02648 250.01)",
+          "oklch(37.86% 0.02648 250.01)",
+          "oklch(49.29% 0.02648 250.01)",
+          "oklch(60.71% 0.02648 250.01)",
+          "oklch(72.14% 0.02648 250.01)",
+          "oklch(83.57% 0.02648 250.01)",
+          "oklch(95.00% 0.02648 250.01)"
+        ]
+      },
+      "session-selected": {
+        "role": "primary",
+        "displayName": "当前会话浅蓝",
+        "tonalRamp": [
+          "oklch(15.00% 0.01966 245.64)",
+          "oklch(26.43% 0.01966 245.64)",
+          "oklch(37.86% 0.01966 245.64)",
+          "oklch(49.29% 0.01966 245.64)",
+          "oklch(60.71% 0.01966 245.64)",
+          "oklch(72.14% 0.01966 245.64)",
+          "oklch(83.57% 0.01966 245.64)",
+          "oklch(95.00% 0.01966 245.64)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "brand": {
+        "displayName": "产品名",
+        "purpose": "页头产品标识。"
+      },
+      "headline": {
+        "displayName": "欢迎标题",
+        "purpose": "仅用于空态欢迎标题。"
+      },
+      "title": {
+        "displayName": "区域标题",
+        "purpose": "对话与执行详情标题。"
+      },
+      "section": {
+        "displayName": "分区标题",
+        "purpose": "详情分区与设置摘要。"
+      },
+      "body": {
+        "displayName": "正文",
+        "purpose": "消息与表单正文。"
+      },
+      "label": {
+        "displayName": "输入标签",
+        "purpose": "可见消息输入标签。"
+      },
+      "hint": {
+        "displayName": "说明",
+        "purpose": "帮助、完整性与空态说明。"
+      },
+      "identifier": {
+        "displayName": "运行标识",
+        "purpose": "允许长串换行的运行 ID。"
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "compact-workspace",
+        "value": "1150px"
+      },
+      {
+        "name": "stacked-workspace",
+        "value": "850px"
+      }
+    ],
+    "focus": {
+      "value": "outline: 3px solid var(--blue); outline-offset: 3px;",
+      "purpose": "所有可聚焦元素共用的键盘焦点。"
+    },
+    "provenance": {
+      "sourceFiles": ["index.html", "app.css", "app.js", "server.ts"],
+      "directionContract": "index.html body comment",
+      "incumbentVisualReference": "../../packages/debug/DESIGN.md",
+      "reviewScreenshots": [
+        ".impeccable/review/desktop.png",
+        ".impeccable/review/mobile.png"
+      ],
+      "reviewDisposition": "ship",
+      "materialFixes": [],
+      "scope": "只记录 examples/playground 实际页面；不扩展 Debug 包，不复制会话数据。",
+      "tonalRamps": "仅供设计面板预览的合成 OKLCH 明度阶梯；当前应用未定义或使用这些阶梯。"
+    }
+  },
+  "components": [
+    {
+      "name": "发送按钮",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "唯一实色主操作；空输入、提交或运行期间保留位置并禁用。",
+      "html": "<button class=\"ds-send\" type=\"button\">发送消息</button>",
+      "css": ".ds-send{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:42px;cursor:pointer;border:1px solid var(--line,#cad4df);background:var(--canvas,#fff);color:var(--ink,#172b42);padding:8px 16px;border-radius:5px;} .ds-send:hover:not(:disabled){background:var(--surface,#f3f6f9);border-color:var(--blue,#0758a0);} .ds-send:disabled{cursor:default;opacity:.55;} .ds-send:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;} .ds-send{background:var(--blue,#0758a0);color:var(--canvas,#fff);border-color:var(--blue,#0758a0);} .ds-send:hover:not(:disabled){background:var(--blue-hover,#064a86);}"
+    },
+    {
+      "name": "次操作按钮",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "新对话与停止生成使用白底细边框；停止中通过文字与禁用状态说明。",
+      "html": "<button class=\"ds-secondary\" type=\"button\">新对话</button>",
+      "css": ".ds-secondary{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:42px;cursor:pointer;border:1px solid var(--line,#cad4df);background:var(--canvas,#fff);color:var(--ink,#172b42);padding:8px 16px;border-radius:5px;} .ds-secondary:hover:not(:disabled){background:var(--surface,#f3f6f9);border-color:var(--blue,#0758a0);} .ds-secondary:disabled{cursor:default;opacity:.55;} .ds-secondary:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;}"
+    },
+    {
+      "name": "示例文字按钮",
+      "kind": "button",
+      "refersTo": "button-suggestion",
+      "description": "欢迎区的可执行示例，蓝色下划线保持操作可见。",
+      "html": "<button class=\"ds-suggestion\" type=\"button\">试试普通问答</button>",
+      "css": ".ds-suggestion{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:42px;cursor:pointer;border:1px solid var(--line,#cad4df);background:var(--canvas,#fff);color:var(--ink,#172b42);padding:8px 16px;border-radius:5px;} .ds-suggestion:hover:not(:disabled){background:var(--surface,#f3f6f9);border-color:var(--blue,#0758a0);} .ds-suggestion:disabled{cursor:default;opacity:.55;} .ds-suggestion:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;} .ds-suggestion{padding:8px 0;border:0;color:var(--blue,#0758a0);background:none;font-weight:500;text-decoration:underline;text-underline-offset:4px;}"
+    },
+    {
+      "name": "消息输入框",
+      "kind": "input",
+      "refersTo": "message-input",
+      "description": "可见标签、原生纵向调整与明确字符计数；字段没有自定义 hover 或错误边框。",
+      "html": "<label class=\"ds-message-label\" for=\"ds-message\">输入消息</label><textarea class=\"ds-message-input\" id=\"ds-message\" rows=\"3\" maxlength=\"8000\" placeholder=\"输入你想测试的问题…\"></textarea><p class=\"ds-input-count\">0 / 8000</p>",
+      "css": ".ds-message-label{display:block;font:600 13px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);margin-bottom:8px;}.ds-message-input{display:block;width:100%;box-sizing:border-box;font:15px/1.65 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);resize:vertical;min-height:88px;max-height:240px;padding:12px 14px;border:1px solid var(--line,#cad4df);border-radius:5px;background:var(--canvas,#fff);caret-color:var(--blue,#0758a0);}.ds-message-input::placeholder{color:var(--muted,#48596a);}.ds-input-count{font:11px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-variant-numeric:tabular-nums;color:var(--muted,#48596a);margin:12px 0 0;}.ds-message-input:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;}"
+    },
+    {
+      "name": "模型选择字段",
+      "kind": "input",
+      "refersTo": "select-field",
+      "description": "原生下拉、固定标签和次级提示；会话锁定后由原生 disabled 状态呈现。",
+      "html": "<label class=\"ds-field-label\" for=\"ds-model\">模型</label><select class=\"ds-select\" id=\"ds-model\"><option>演示模型</option></select><p class=\"ds-field-hint\">从本地配置读取，无需填写密钥。</p>",
+      "css": ".ds-field-label{display:block;font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);margin-bottom:8px;}.ds-select{width:100%;min-height:42px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);background:var(--canvas,#fff);border:1px solid var(--line,#cad4df);border-radius:4px;padding:8px;text-overflow:ellipsis;}.ds-field-hint{font:13px/1.65 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--muted,#48596a);margin:8px 0 0;overflow-wrap:anywhere;}.ds-select:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;}"
+    },
+    {
+      "name": "Debug 导航",
+      "kind": "nav",
+      "refersTo": "debug-link",
+      "description": "文字状态与带下划线的 Debug 链接；链接保持原生浏览器导航。",
+      "html": "<nav class=\"ds-nav\" aria-label=\"主导航\"><span class=\"ds-connection\" role=\"status\">本地已连接</span><a class=\"ds-debug-link\" href=\"/debug/\">Debug 调试</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:24px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;}.ds-connection{color:var(--muted,#48596a);font-size:13px;}.ds-debug-link{color:var(--blue,#0758a0);text-decoration:underline;text-underline-offset:4px;}.ds-debug-link:hover{text-decoration-thickness:2px;}.ds-debug-link:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;}@media(max-width:850px){.ds-nav{gap:12px;}.ds-connection{font-size:11px;}.ds-debug-link{font-size:13px;}}"
+    },
+    {
+      "name": "当前会话",
+      "kind": "nav",
+      "refersTo": "session-item-current",
+      "description": "整行按钮、模型副文案和 aria-current；浅蓝背景与字重共同指示当前项。",
+      "html": "<button class=\"ds-session\" type=\"button\" aria-current=\"true\">一条合成示例消息<small class=\"ds-session-profile\">演示模型</small></button>",
+      "css": ".ds-session{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:42px;cursor:pointer;border:1px solid var(--line,#cad4df);background:var(--canvas,#fff);color:var(--ink,#172b42);padding:8px 16px;border-radius:5px;} .ds-session:hover:not(:disabled){background:var(--surface,#f3f6f9);border-color:var(--blue,#0758a0);} .ds-session:disabled{cursor:default;opacity:.55;} .ds-session:focus-visible{outline:3px solid var(--blue,#0758a0);outline-offset:3px;} .ds-session{border:0;text-align:left;width:100%;padding:10px;font-size:13px;font-weight:450;overflow-wrap:anywhere;background:transparent;}.ds-session[aria-current=\"true\"]{color:var(--blue,#0758a0);background:var(--session-selected,#e1edf8);font-weight:600;}.ds-session-profile{display:block;color:var(--muted,#48596a);font-size:11px;margin-top:4px;}"
+    },
+    {
+      "name": "对话轮次",
+      "kind": "custom",
+      "refersTo": "user-message",
+      "description": "用户消息置于浅灰矩形，助手内容回到白色工作面；文字标签与状态始终可见。",
+      "html": "<article class=\"ds-turn\"><div class=\"ds-user\"><p class=\"ds-role\">你</p><p class=\"ds-message\">解释这次执行的结果。</p></div><div class=\"ds-assistant\"><p class=\"ds-role\">Agent</p><p class=\"ds-message\">这里是合成展示内容。</p><p class=\"ds-turn-status\">已完成</p></div></article>",
+      "css": ".ds-turn{max-width:72ch;margin:0 auto 32px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);}.ds-user{padding:14px 16px;background:var(--surface,#f3f6f9);margin-bottom:24px;}.ds-role{font-size:12px;font-weight:650;color:var(--muted,#48596a);margin:0 0 7px;}.ds-assistant{padding:0 2px;}.ds-message{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}.ds-turn-status{color:var(--muted,#48596a);font-size:13px;margin:10px 0 0;}.ds-turn-status.ds-error{color:var(--error,#99252c);}"
+    },
+    {
+      "name": "Token 用量记录",
+      "kind": "custom",
+      "refersTo": "usage-row",
+      "description": "左右对齐的定义列表，合计行加顶线；未知值保留破折号和完整性说明。",
+      "html": "<section class=\"ds-usage\"><h3 class=\"ds-usage-title\">Token 用量</h3><dl class=\"ds-usage-list\"><div class=\"ds-usage-row\"><dt class=\"ds-usage-term\">输入</dt><dd class=\"ds-usage-value\">—</dd></div><div class=\"ds-usage-row\"><dt class=\"ds-usage-term\">输出</dt><dd class=\"ds-usage-value\">—</dd></div><div class=\"ds-usage-row ds-usage-total\"><dt class=\"ds-usage-term\">合计</dt><dd class=\"ds-usage-value\">—</dd></div></dl><p class=\"ds-usage-hint\">运行后显示供应商报告的用量。</p></section>",
+      "css": ".ds-usage{font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);}.ds-usage-title{font-size:15px;font-weight:650;margin:0 0 14px;}.ds-usage-list{margin:16px 0;}.ds-usage-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px;}.ds-usage-term{color:var(--muted,#48596a);}.ds-usage-value{margin:0;font-variant-numeric:tabular-nums;}.ds-usage-total{border-top:1px solid var(--line,#cad4df);padding-top:10px;margin-top:6px;font-weight:650;}.ds-usage-hint{font-size:13px;line-height:1.65;color:var(--muted,#48596a);margin:0;}"
+    },
+    {
+      "name": "工具调用记录",
+      "kind": "custom",
+      "refersTo": "operation-row",
+      "description": "等宽工具名、文字状态和底线；无状态点或装饰图标。",
+      "html": "<ul class=\"ds-operations\"><li class=\"ds-operation\"><code class=\"ds-operation-name\">demo.inventory</code><span class=\"ds-operation-state\">已完成 · 结果校验通过</span></li></ul>",
+      "css": ".ds-operations{list-style:none;margin:0;padding:0;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--ink,#172b42);}.ds-operation{padding:12px 0;border-bottom:1px solid var(--line,#cad4df);overflow-wrap:anywhere;}.ds-operation-name{font-family:monospace;font-size:12px;}.ds-operation-state{display:block;color:var(--muted,#48596a);font-size:12px;margin-top:3px;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Operate",
+    "overview": "沿用 Debug 的朴素开发工作台：白色画布、深蓝正文、蓝色操作和细线记录。对话与执行详情并列，内容和状态成为视觉主体；表单沿用系统字体与原生控件，小幅圆角只用于交互控件。\n\n此文档只记录本地测试页已实现的视觉规则，不扩展 Debug 包的设计系统。依据为 `index.html` 的方向契约、`app.css`、`app.js` 和 `server.ts` 的页面组合；视觉参考为 `../../packages/debug/DESIGN.md`。交接截图位于 `.impeccable/review/desktop.png` 与 `.impeccable/review/mobile.png`，独立完成审查结果为 ship，未要求实现修正。截图提供布局证据，不代表所有运行状态或后端行为均已验证。",
+    "keyCharacteristics": [
+      "白色对话工作面、浅灰设置区和细线执行记录。",
+      "系统字体与原生表单，蓝色同时指示操作、当前位置和键盘焦点。",
+      "桌面三列，窄屏折叠设置并纵向排列对话与执行详情。",
+      "草稿、完成、错误、取消和未知用量都有文字说明。"
+    ],
+    "rules": [
+      {
+        "name": "The Written State Rule",
+        "body": "草稿、取消、失败和用量完整性通过文字表达，颜色不单独承担状态含义。",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Workbench Rule",
+        "body": "保留平面区域与分隔线，不将对话和执行记录改为悬浮卡片。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do 沿用白底、深蓝正文、操作蓝和细线分区。",
+      "Do 保留可见字段标签、键盘焦点、原生折叠与下拉行为。",
+      "Do 用文字区分草稿、完成、失败、取消和未知用量。",
+      "Do 让长消息、会话标题、标识与工具记录自然换行。",
+      "Do 在窄屏将执行详情放到对话下方，并保持设置可展开。"
+    ],
+    "donts": [
+      "Don't 将当前页面扩展为新的品牌体系、营销页面或悬浮卡片界面。",
+      "Don't 添加当前实现没有的装饰图、阴影、渐变、动画、chip 或头像。",
+      "Don't 将未知用量显示成零，或用颜色替代状态说明。",
+      "Don't 在设计记录中复制真实会话、密钥或原生思考内容。"
+    ]
+  }
+}

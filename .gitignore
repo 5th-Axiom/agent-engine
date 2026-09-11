@@ -1,0 +1,27 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Credentials: local use only; never commit real values
+.env
+.env.*
+!.env.example
+!.env.*.example
+.secrets/
+secrets.local.*
+*.pem
+*.key
+
+# Local state, traces and diagnostics can contain private data
+.agent-engine/
+.local/
+*.log
+playwright-report/
+test-results/
+**/.impeccable/review/
+.DS_Store

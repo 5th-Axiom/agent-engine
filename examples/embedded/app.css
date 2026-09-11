@@ -1,0 +1,267 @@
+:root {
+  font:
+    15px/1.65 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #172b42;
+  background: #fff;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+a {
+  color: #0758a0;
+  text-underline-offset: 4px;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+select,
+input[type="color"] {
+  min-height: 44px;
+}
+button {
+  border: 1px solid #cad4df;
+  border-radius: 6px;
+  padding: 8px 14px;
+  background: white;
+  color: #172b42;
+  cursor: pointer;
+}
+button:hover {
+  background: #f3f6f9;
+}
+button:disabled {
+  cursor: default;
+  color: #48596a;
+  background: #f3f6f9;
+}
+:focus-visible {
+  outline: 3px solid #0758a0;
+  outline-offset: 3px;
+}
+.host-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 76px;
+  padding: 16px 28px;
+  border-bottom: 1px solid #cad4df;
+}
+.host-header > a:first-child {
+  font-size: 21px;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+.host-header > span {
+  flex: 1;
+  color: #48596a;
+}
+.host-layout {
+  display: grid;
+  grid-template-columns: 204px minmax(0, 1fr);
+}
+.host-nav {
+  padding: 28px 20px;
+  background: #f3f6f9;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-right: 1px solid #cad4df;
+}
+.host-nav a {
+  padding: 6px;
+  text-decoration: none;
+}
+.host-nav a[aria-current] {
+  font-weight: 650;
+}
+main {
+  max-width: 1120px;
+  min-width: 0;
+  padding: 36px 40px 100px;
+}
+section {
+  scroll-margin-top: 20px;
+}
+h1 {
+  font-size: 30px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+}
+h2 {
+  font-size: 21px;
+  margin: 0 0 8px;
+}
+p {
+  margin: 0 0 16px;
+}
+.intro {
+  max-width: 68ch;
+  color: #48596a;
+}
+.theme-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+  margin: 28px 0 40px;
+  padding: 20px 0;
+  border-block: 1px solid #cad4df;
+}
+.theme-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #48596a;
+  font-size: 13px;
+}
+.theme-controls select {
+  min-width: 120px;
+  border: 1px solid #cad4df;
+  border-radius: 6px;
+  background: #fff;
+  color: #172b42;
+  padding: 8px;
+}
+.theme-controls input {
+  width: 64px;
+  border: 1px solid #cad4df;
+  background: #fff;
+  padding: 4px;
+  border-radius: 6px;
+}
+#theme-feedback {
+  width: 100%;
+  margin: 0;
+  color: #48596a;
+  font-size: 13px;
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+.section-title p {
+  margin: 0;
+  color: #48596a;
+  font-size: 13px;
+}
+.table-scroll {
+  overflow: auto;
+  border: 1px solid #cad4df;
+}
+table {
+  width: 100%;
+  min-width: 510px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+th,
+td {
+  padding: 16px;
+  text-align: left;
+  border-bottom: 1px solid #cad4df;
+}
+th {
+  background: #f3f6f9;
+  font-size: 13px;
+}
+tr:last-child td {
+  border: 0;
+}
+.note {
+  font-size: 13px;
+  color: #48596a;
+  margin: 16px 0;
+}
+.integration {
+  margin-top: 28px;
+  border-bottom: 1px solid #cad4df;
+  padding-bottom: 20px;
+}
+.integration summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+pre {
+  overflow: auto;
+  background: #f3f6f9;
+  padding: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+#inline,
+#components {
+  margin-top: 56px;
+}
+#inline > p,
+#components > p {
+  color: #48596a;
+}
+#inline-chat {
+  height: 680px;
+  margin-top: 20px;
+  border: 1px solid #cad4df;
+  border-radius: 12px;
+  overflow: hidden;
+}
+#component-gallery {
+  margin-top: 24px;
+  border-block: 1px solid #cad4df;
+  padding-block: 24px;
+}
+@media (max-width: 800px) {
+  .host-layout {
+    grid-template-columns: 1fr;
+  }
+  .host-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-right: 0;
+    padding: 12px 16px;
+  }
+  .host-header {
+    gap: 12px;
+    padding: 16px;
+  }
+  .host-header > span {
+    display: none;
+  }
+  .host-header > a:last-child {
+    margin-left: auto;
+  }
+  main {
+    padding: 24px 16px 96px;
+  }
+  h1 {
+    font-size: 26px;
+  }
+  .section-title {
+    align-items: start;
+    flex-direction: column;
+  }
+  .theme-controls {
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  #inline-chat {
+    height: 640px;
+  }
+  .host-nav a {
+    font-size: 13px;
+  }
+}

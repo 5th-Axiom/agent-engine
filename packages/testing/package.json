@@ -1,0 +1,21 @@
+{
+  "name": "@agent-runtime/testing",
+  "version": "0.1.0-dev",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@agent-runtime/sdk": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

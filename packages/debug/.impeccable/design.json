@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-11T03:05:55.594307+00:00",
+  "title": "Design System: Agent Engine Debug",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "深蓝墨色",
+        "tonalRamp": [
+          "oklch(15% 0.055 250)",
+          "oklch(27% 0.055 250)",
+          "oklch(38% 0.055 250)",
+          "oklch(49% 0.055 250)",
+          "oklch(61% 0.055 250)",
+          "oklch(72% 0.055 250)",
+          "oklch(83% 0.055 250)",
+          "oklch(95% 0.055 250)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "次级灰蓝",
+        "tonalRamp": [
+          "oklch(15% 0.035 250)",
+          "oklch(27% 0.035 250)",
+          "oklch(38% 0.035 250)",
+          "oklch(49% 0.035 250)",
+          "oklch(61% 0.035 250)",
+          "oklch(72% 0.035 250)",
+          "oklch(83% 0.035 250)",
+          "oklch(95% 0.035 250)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "分隔灰蓝",
+        "tonalRamp": [
+          "oklch(15% 0.02 250)",
+          "oklch(27% 0.02 250)",
+          "oklch(38% 0.02 250)",
+          "oklch(49% 0.02 250)",
+          "oklch(61% 0.02 250)",
+          "oklch(72% 0.02 250)",
+          "oklch(83% 0.02 250)",
+          "oklch(95% 0.02 250)"
+        ]
+      },
+      "link": {
+        "role": "primary",
+        "displayName": "操作蓝",
+        "tonalRamp": [
+          "oklch(15% 0.14 250)",
+          "oklch(27% 0.14 250)",
+          "oklch(38% 0.14 250)",
+          "oklch(49% 0.14 250)",
+          "oklch(61% 0.14 250)",
+          "oklch(72% 0.14 250)",
+          "oklch(83% 0.14 250)",
+          "oklch(95% 0.14 250)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "浅灰工作面",
+        "tonalRamp": [
+          "oklch(15% 0.012 250)",
+          "oklch(27% 0.012 250)",
+          "oklch(38% 0.012 250)",
+          "oklch(49% 0.012 250)",
+          "oklch(61% 0.012 250)",
+          "oklch(72% 0.012 250)",
+          "oklch(83% 0.012 250)",
+          "oklch(95% 0.012 250)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "白色画布",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(27% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "error": {
+        "role": "semantic",
+        "displayName": "错误暗红",
+        "tonalRamp": [
+          "oklch(15% 0.15 25)",
+          "oklch(27% 0.15 25)",
+          "oklch(38% 0.15 25)",
+          "oklch(49% 0.15 25)",
+          "oklch(61% 0.15 25)",
+          "oklch(72% 0.15 25)",
+          "oklch(83% 0.15 25)",
+          "oklch(95% 0.15 25)"
+        ]
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "选区浅蓝",
+        "tonalRamp": [
+          "oklch(15% 0.055 250)",
+          "oklch(27% 0.055 250)",
+          "oklch(38% 0.055 250)",
+          "oklch(49% 0.055 250)",
+          "oklch(61% 0.055 250)",
+          "oklch(72% 0.055 250)",
+          "oklch(83% 0.055 250)",
+          "oklch(95% 0.055 250)"
+        ]
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Location link",
+      "kind": "nav",
+      "refersTo": "location-link",
+      "description": "Sessions navigation and configuration relation links.",
+      "html": "<nav aria-label=\"Location\"><a class=\"ds-link\" href=\"#sessions\">Sessions</a></nav>",
+      "css": ".ds-link{color:var(--link,#0758a0);text-underline-offset:3px;font:15px/1.55 system-ui,sans-serif}.ds-link:hover{text-decoration-thickness:2px}.ds-link:focus-visible{outline:3px solid #0758a0;outline-offset:4px}"
+    },
+    {
+      "name": "Record table",
+      "kind": "custom",
+      "refersTo": "table-heading",
+      "description": "Scrollable read-only records with explicit relation identifiers.",
+      "html": "<div class=\"ds-table-scroll\" tabindex=\"0\" role=\"region\" aria-label=\"Scrollable records\"><table class=\"ds-table\"><thead><tr><th scope=\"col\">id</th><th scope=\"col\">runId</th><th scope=\"col\">executionStatus</th></tr></thead><tbody><tr><td>operation-example</td><td>run-example</td><td>succeeded</td></tr></tbody></table></div>",
+      "css": ".ds-table-scroll{overflow:auto;border:1px solid var(--line,#cad4df)}.ds-table{width:100%;min-width:720px;border-collapse:collapse;color:var(--ink,#172b42);font:15px/1.55 system-ui,sans-serif;font-variant-numeric:tabular-nums}.ds-table th,.ds-table td{padding:12px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line,#cad4df)}.ds-table th{background:var(--surface,#f3f6f9);font-size:13px}.ds-table td{min-width:12ch;max-width:56ch;overflow-wrap:anywhere}.ds-table tr:last-child td{border:0}.ds-table-scroll:focus-visible{outline:3px solid #0758a0;outline-offset:4px}@media(max-width:640px){.ds-table th,.ds-table td{padding:10px}}"
+    },
+    {
+      "name": "Configuration disclosure",
+      "kind": "custom",
+      "refersTo": "disclosure",
+      "description": "Native keyboard-operable configuration summary.",
+      "html": "<details class=\"ds-details\"><summary class=\"ds-summary\">Version 1 · example-hash</summary><p>Configuration details</p></details>",
+      "css": ".ds-details{margin:16px 0;padding:12px 0;border-bottom:1px solid var(--line,#cad4df);color:var(--ink,#172b42);font:15px/1.55 system-ui,sans-serif}.ds-summary{cursor:pointer;font-weight:600}.ds-summary:focus-visible{outline:3px solid #0758a0;outline-offset:4px}"
+    },
+    {
+      "name": "Code panel",
+      "kind": "custom",
+      "refersTo": "code-panel",
+      "description": "Read-only formatted configuration details.",
+      "html": "<pre class=\"ds-code\">{\n  \"version\": 1\n}</pre>",
+      "css": ".ds-code{font:13px/1.6 ui-monospace,monospace;overflow:auto;padding:16px;background:var(--surface,#f3f6f9);color:var(--ink,#172b42)}"
+    },
+    {
+      "name": "Session empty state",
+      "kind": "custom",
+      "refersTo": "empty-state",
+      "description": "Explains the next application-side action when no Sessions exist.",
+      "html": "<p class=\"ds-empty\">No sessions available. Create a Session through your application, then refresh this page.</p>",
+      "css": ".ds-empty{max-width:70ch;padding:32px 0;color:var(--muted,#48596a);font:15px/1.55 system-ui,sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Operate",
+    "overview": "Operate：朴素、清楚的只读开发运维工作台。白底、深蓝文字、蓝色链接配合细线表格，让配置、执行记录和关系标识成为视觉主体。\n\n采用扁平布局和原生展开交互，不使用装饰性动画、图片、卡片矩阵或营销区块。此文档记录 src/index.ts 的已实现视觉系统；不对后端正确性作验证承诺。",
+    "keyCharacteristics": [
+      "以表格和原生 details 呈现记录。",
+      "白色工作面、深蓝正文、蓝色可访问链接。",
+      "窄屏纵向排列，宽表格在独立区域滚动。"
+    ],
+    "rules": [],
+    "dos": [
+      "Do 保留关系标识、可见链接、空态与错误码。",
+      "Do 保留键盘焦点轮廓和可聚焦的表格滚动区域。",
+      "Do 用文字说明用量完整性，并以文字和暗红色共同标识错误。"
+    ],
+    "donts": [
+      "Don't 在只读界面加入写入操作。",
+      "Don't 用装饰性动画、图片、卡片矩阵或营销区块替代记录表格。",
+      "Don't 声称当前界面有未实现的自定义按钮、搜索输入或筛选控件。"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "default": "primary",
+  "protocolKey": { "secretRef": "PROTOCOL_KEY" },
+  "profiles": {
+    "primary": {
+      "model": {
+        "provider": "openai-compatible",
+        "baseURL": "https://your-model.example/v1",
+        "apiKey": { "secretRef": "MODEL_API_KEY" },
+        "model": "your-model",
+        "limits": { "contextWindowTokens": 32000, "maxOutputTokens": 256 }
+      },
+      "allowPrivateNetwork": false
+    }
+  }
+}

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>本地测试 · Agent Engine</title>
+    <link rel="stylesheet" href="/app.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <!-- THESIS: A working conversation and its execution evidence share one local workspace.
+    OWN-WORLD: Inherit Debug's white canvas, navy text, blue actions and flat ruled records. No new identity.
+    STORY: Pick a configured model, send a message, inspect its actual tool calls and usage, then open Debug.
+    FIRST VIEWPORT: Compact header; 232px session rail; flexible conversation with bottom composer; 280px execution rail. On mobile, collapsible settings and stacked execution details.
+    FORM: Scoped extension of the established Debug workbench; precise user-confirmed controls, code-led; no concept seed required.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
+    <a class="skip-link" href="#prompt">跳到消息输入</a>
+    <header class="app-header">
+      <div class="identity">
+        <span class="brand">Agent Engine</span>
+        <h1>本地测试</h1>
+      </div>
+      <nav aria-label="主导航">
+        <span id="connection" role="status">连接中</span
+        ><a href="/embed/">IM SDK 示例</a><a href="/debug/">Debug 调试</a>
+      </nav>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar" aria-label="测试设置与会话">
+        <details id="settings" open>
+          <summary>会话与设置</summary>
+          <button
+            type="button"
+            id="new-session"
+            class="secondary full"
+            disabled
+          >
+            新对话
+          </button>
+          <div class="field">
+            <label for="model">模型</label
+            ><select id="model" disabled>
+              <option>加载模型配置…</option>
+            </select>
+            <p id="model-hint" class="hint">从本地配置读取，无需填写密钥。</p>
+          </div>
+          <div class="field">
+            <label for="scenario">测试场景</label
+            ><select id="scenario">
+              <option value="chat">自由对话</option>
+              <option value="tool">工具调用</option>
+            </select>
+            <p id="scenario-hint" class="hint">直接与所选模型对话。</p>
+          </div>
+          <p id="session-lock" class="hint" hidden>
+            当前会话已固定模型与场景。切换配置请新建对话。
+          </p>
+          <section class="history-section">
+            <h2>最近对话</h2>
+            <p id="history-empty" class="hint">
+              发送第一条消息后，会话会保存在这里。
+            </p>
+            <ul id="sessions" class="session-list" aria-label="最近对话"></ul>
+          </section>
+        </details>
+        <p class="local-note">仅在本机访问<br />真实调用会产生模型用量</p>
+      </aside>
+      <main class="conversation" aria-label="对话测试">
+        <div class="conversation-heading">
+          <div>
+            <h2 id="conversation-title">新对话</h2>
+            <p id="conversation-meta">选择模型，开始一次测试。</p>
+          </div>
+          <a id="session-debug" href="/debug/" hidden>查看本次 Debug</a>
+        </div>
+        <div id="messages" class="messages" tabindex="0" aria-label="对话记录">
+          <div id="welcome" class="welcome">
+            <h3>从一条消息开始</h3>
+            <p>回答、工具调用和用量都会保留在当前会话中。</p>
+            <div class="suggestions">
+              <button
+                type="button"
+                data-example="请用三句话解释 Agent 的工作流程。"
+              >
+                试试普通问答</button
+              ><button type="button" data-tool-example>试试库存查询工具</button>
+            </div>
+          </div>
+          <div id="turns"></div>
+        </div>
+        <div id="feedback" class="feedback" role="alert" hidden>
+          <span id="feedback-text"></span
+          ><button type="button" id="reconnect" hidden>重新连接</button>
+        </div>
+        <form id="composer" class="composer">
+          <label for="prompt">输入消息</label>
+          <textarea
+            id="prompt"
+            rows="3"
+            maxlength="8000"
+            placeholder="输入你想测试的问题…"
+            required
+            disabled
+          ></textarea>
+          <div class="composer-footer">
+            <p>
+              <span id="input-count">0</span> / 8000
+              <span class="keyboard-hint">· Ctrl / ⌘ + Enter 发送</span>
+            </p>
+            <div class="actions">
+              <button type="button" id="cancel" class="secondary" hidden>
+                停止生成</button
+              ><button type="submit" id="send" class="primary" disabled>
+                发送消息
+              </button>
+            </div>
+          </div>
+        </form>
+      </main>
+      <aside class="inspector" aria-label="执行详情">
+        <h2>本次执行</h2>
+        <p id="run-state" class="run-state" role="status">尚未开始</p>
+        <p id="run-id" class="identifier" hidden></p>
+        <dl class="execution-summary">
+          <div>
+            <dt>模型请求</dt>
+            <dd id="attempt-count">—</dd>
+          </div>
+          <div>
+            <dt>执行步骤</dt>
+            <dd id="step-count">—</dd>
+          </div>
+        </dl>
+        <section>
+          <h3>Token 用量</h3>
+          <dl class="usage">
+            <div>
+              <dt>输入</dt>
+              <dd id="usage-input">—</dd>
+            </div>
+            <div>
+              <dt>输出</dt>
+              <dd id="usage-output">—</dd>
+            </div>
+            <div class="total">
+              <dt>合计</dt>
+              <dd id="usage-total">—</dd>
+            </div>
+          </dl>
+          <p id="usage-note" class="hint">运行后显示供应商报告的用量。</p>
+          <p id="cost-note" class="hint">费用未配置，不显示估算。</p>
+        </section>
+        <section>
+          <h3>工具调用</h3>
+          <p id="tool-empty" class="hint">本次尚无工具调用。</p>
+          <ul id="operations" class="operation-list"></ul>
+        </section>
+        <a class="debug-link" id="detail-debug" href="/debug/"
+          >打开 Debug 调试页</a
+        >
+        <p class="hint">
+          Debug 只读显示配置、运行步骤、调用记录和错误。原生思考内容保持隐藏。
+        </p>
+      </aside>
+    </div>
+  </body>
+</html>
