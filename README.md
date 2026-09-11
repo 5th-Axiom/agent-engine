@@ -10,7 +10,7 @@ Agent Engine 帮你把 AI 模型接进自己的程序：模型负责理解和回
 
 | 你想做什么                     | 看这份文档                                          |
 | ------------------------------ | --------------------------------------------------- |
-| 浏览带聊天助手的官方文档站     | [文档站启动与维护](examples/docs-site/README.md)      |
+| 浏览带聊天助手的官方文档站     | [文档站启动与维护](examples/docs-site/README.md)    |
 | 把 IM 图标接进自己的管理后台   | [前端 SDK 接入教程](docs/frontend-sdk.md)           |
 | 从零安装、启动项目             | [新手上手指南](docs/getting-started.md)             |
 | 聊天、测试工具、查看 Debug     | [测试页面操作手册](docs/local-playground.md)        |
@@ -41,7 +41,7 @@ pnpm playground
 
 ## 打开官方文档站
 
-在模型与数据库已配置的项目目录运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run docs`。打开 <http://127.0.0.1:4320/>，即可搜索文档、按步骤上手，或点击右下角图标询问文档助手。尚未配置模型时，可用 `pnpm run docs --read-only` 阅读和搜索。详细说明见 [文档站使用说明](examples/docs-site/README.md)。
+在模型与数据库已配置的项目目录运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run docs`。打开 <http://127.0.0.1:4320/>，即可按“前端 SDK 接入”或“后端 SDK 接入”路线阅读安装、调用、配置与扩展方法，也可点击右下角图标询问文档助手。尚未配置模型时，可用 `pnpm run docs --read-only` 阅读和搜索。详细说明见 [文档站使用说明](examples/docs-site/README.md)。
 
 ## 开发者入口
 

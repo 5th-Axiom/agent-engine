@@ -2,24 +2,24 @@
 
 先完成项目依赖、模型和数据库配置，然后依次运行：
 
-~~~sh
+```sh
 pnpm install --frozen-lockfile
 pnpm run docs
-~~~
+```
 
 打开 [文档站](http://127.0.0.1:4320/)。默认读取原有模型与集中凭据配置，首次创建独立的 agent_engine_docs 数据库，不占用 Playground 的数据库。按 Ctrl + C 停止本站。
 
 ## 还没配置模型，也能阅读
 
-~~~sh
+```sh
 pnpm run docs --read-only
-~~~
+```
 
 此模式不连接数据库或模型。文档、导航和搜索可正常使用；页面明确提示助手未连接，不会伪装成真实 AI 回答。完成配置后，退出并按默认命令重启。
 
 ## 文档与搜索如何更新
 
-入门文章在 examples/docs-site/content.ts。前端 SDK、服务端 SDK 入门和接口约定直接读取当前 docs 目录的对应 Markdown，不额外复制一份正文。修改后重启文档站，页面与助手检索一起更新。
+文章目录在 examples/docs-site/content.ts，接入教程在 content/ 下，受类型检查的主要示例代码在 snippets/ 下。接口约定和本地示例配置直接读取 docs/ 中对应的手册。修改后重启文档站，页面与助手检索一起更新。
 
 站内搜索在浏览器本地完成，不调用模型。助手的 docs.search 工具只检索本站白名单文章，返回标题、路径和正文片段。来源用于查证，不代表自动证明回答每句话正确。
 

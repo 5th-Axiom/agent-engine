@@ -111,14 +111,14 @@ if (available) {
       launcherLabel: "打开文档助手",
       welcomeTitle: "哪一步需要帮忙？",
       welcomeMessage:
-        "我会优先查阅项目文档，帮你完成安装、配置和接入。也可以和我随便聊聊。",
-      placeholder: "例如：我该把 API Key 放在哪里？",
+        "我会优先查阅接入手册，帮你选择前端或后端 SDK、理解代码和使用规则。也可以随便聊聊。",
+      placeholder: "例如：如何把聊天图标接入我的后台？",
       footnote: "项目问题优先查阅文档。勿发送密钥；提问会交给已配置的模型。",
     },
     suggestions: [
-      "第一次怎么在本地运行？",
-      "API Key 应该放在哪里？",
-      "怎么把聊天图标接入我的后台？",
+      "前端 SDK 怎么接入我的后台？",
+      "后端 SDK 怎么创建会话并续聊？",
+      "如何让助手回答产品使用规则？",
     ],
     onOpenChange: (open) => {
       $("#launcher-hint").hidden = open;
@@ -357,7 +357,7 @@ document.addEventListener("click", async (e) => {
   const ask = target.closest(".ask-article");
   if (ask) {
     openChat(
-      `我正在阅读《${ask.dataset.ask}》（/docs/${document.body.dataset.article}/）。请用适合初学者的步骤解释，我应该先做什么？`,
+      `我正在阅读《${ask.dataset.ask}》（/docs/${document.body.dataset.article}/）。请结合我的项目接入场景，用适合初学者的步骤解释这篇文档怎么用，需要哪些配置？`,
     );
     return;
   }

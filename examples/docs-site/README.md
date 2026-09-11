@@ -1,6 +1,12 @@
 # Agent Engine 文档站
 
-面向初学者的中文文档站，默认接入本项目的 IM SDK 和文档助手。包含 12 篇文章、中文搜索、目录、代码复制、深浅主题和手机布局。
+面向接入方的中文 SDK 使用手册，默认接入本项目的 IM SDK 和文档助手。包含 20 篇文章，主线为前端 SDK 与后端 SDK 两条接入路线；支持中文搜索、代码复制、深浅主题和手机布局。
+
+- 前端路线：安装 → 聊天图标 / 嵌入页 / React / Vue → 后端接口与登录 → 主题和会话管理。
+- 后端路线：安装 → Engine 初始化和真实模型调用 → 配置与续聊 → 业务工具 / 知识库 → 事件与 Debug。
+- 本地 Playground、私有文件配置和本站启动方式放在附录，不作为接入业务项目的前置步骤。
+
+启动后直接查看 [接入总览](http://127.0.0.1:4320/docs/welcome/)、[前端 SDK](http://127.0.0.1:4320/docs/frontend/) 或 [后端 SDK](http://127.0.0.1:4320/docs/sdk/)。
 
 ## 现在就打开
 
@@ -46,7 +52,7 @@ pnpm run docs --read-only
 
 ## 内容维护
 
-`content.ts` 保存入门、配置、操作和排错文章。三份较长教程直接读取 `docs/frontend-sdk.md`、`docs/sdk-quickstart.md`、`docs/sdk-usage.md`；页面与助手共享同一份内容，重启后同步更新。
+文章清单在 content.ts，`content/*.md` 保存按接入任务组织的正文。六份主要示例位于 `snippets/*.ts`，通过正文标记加载，页面显示的代码与 TypeScript 检查的是同一份；需要宿主登录或业务函数的片段会明确说明。docs/sdk-usage.md 与 docs/local-model-configuration.md 作为参考和附录直接同步；页面与助手共享同一份内容，重启后更新。
 
 `render.ts` 通过 Marked 渲染服务端 HTML。外部链接仅允许 HTTP(S)，原始 HTML 作为文本显示，代码转义；静态资源使用精确白名单。没有公开目录遍历或源码下载接口。历史设计、参考项目说明和私有目录不进入检索。
 

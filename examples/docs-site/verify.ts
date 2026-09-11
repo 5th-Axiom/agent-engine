@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { Marked, type Tokens } from "marked";
 import { randomBytes } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
 import {
@@ -10,6 +11,8 @@ import {
 } from "@agent-runtime/testing";
 import { loadArticles, searchArticles } from "./content.js";
 import { renderArticle } from "./render.js";
+import { readSettings } from "./snippets/settings.js";
+import { inventoryTool, inventoryBinding } from "./snippets/tools.js";
 import {
   docsBinding,
   docsAssistant,
@@ -49,6 +52,39 @@ for (const a of articles) {
       match[1],
     );
 }
+for (const [id, files] of [
+  ["frontend", ["frontend.ts"]],
+  ["frontend-server", ["chat-server.ts"]],
+  ["sdk", ["backend.ts", "run.ts"]],
+  ["models", ["settings.ts"]],
+  ["tools", ["tools.ts"]],
+] as const) {
+  const article = articles.find((a) => a.id === id)!;
+  const blocks = new Marked()
+    .lexer(article.markdown)
+    .filter((t): t is Tokens.Code => t.type === "code");
+  for (const file of files) {
+    const source = (
+      await readFile(new URL("./snippets/" + file, import.meta.url), "utf8")
+    ).trimEnd();
+    assert.ok(
+      blocks.some((b) => b.lang === "ts" && b.text === source),
+      id + ": displayed code must exactly match checked source",
+    );
+  }
+}
+assert.ok(
+  renderArticle(
+    articles.find((a) => a.id === "frontend")!,
+    articles,
+  ).toc.some((h) => h.text === "React 中使用"),
+);
+assert.ok(
+  renderArticle(
+    articles.find((a) => a.id === "sdk")!,
+    articles,
+  ).toc.some((h) => h.text.includes("执行并检查结果")),
+);
 const malicious = renderArticle(
   {
     ...articles[0]!,
@@ -61,10 +97,57 @@ assert.ok(!malicious.includes("<script>"));
 assert.ok(!malicious.includes('href="javascript:'));
 assert.ok(!malicious.includes("<img"));
 
+// The rendered snippets share these checked source files; validate real SDK configuration and a host binding.
+const settings = readSettings({
+  DATABASE_URL: "postgresql://example.invalid/docs",
+  MODEL_BASE_URL: "https://model.example.com/v1",
+  MODEL_NAME: "synthetic-model",
+  MODEL_API_KEY: "synthetic-docs-key",
+  PROTOCOL_KEY: "synthetic-docs-protection-key-only",
+});
+assert.equal(settings.config.models.primary?.apiKey.secretRef, "MODEL_API_KEY");
+assert.equal(settings.modelOrigin, "https://model.example.com");
+assert.equal(settings.allowPrivateModelOrigin, false);
+await assert.rejects(settings.secrets.resolve("UNDECLARED"));
+const exampleHarness = await createEngineTestHarness({
+  model: scriptedModel([
+    toolCall("inventory.read", { sku: "A" }),
+    finalText("库存为 24。"),
+    finalText("仍是同一段对话。"),
+  ]),
+  bindings: {
+    "inventory.read.v1": inventoryBinding(async (sku, principal) => {
+      assert.equal(sku, "A");
+      assert.ok(principal.tenantId);
+      return { available: 24 };
+    }),
+  },
+});
+try {
+  const session = await exampleHarness.engine.createSession({
+    config: { ...exampleHarness.modelConfig, tools: [inventoryTool] },
+    requestId: "docs-example-create",
+  });
+  const result = await session.run({
+    input: "查询 A 库存",
+    requestId: "docs-example-first",
+  });
+  assert.equal(result.outputText, "库存为 24。");
+  const restored = await exampleHarness.engine.loadSession(session.id);
+  assert.equal(
+    (await restored.run({ input: "继续对话", requestId: "docs-example-next" }))
+      .outputText,
+    "仍是同一段对话。",
+  );
+  assert.equal(exampleHarness.calls.forBinding("inventory.read.v1").length, 1);
+} finally {
+  await exampleHarness.close();
+}
+
 const model = scriptedModel([
   toolCall("docs.search", { query: "API Key 密钥文件" }),
   finalText(
-    "合成测试回答：模型密钥放在 .secrets/credentials.json，模型连接放在 .local/models.json。参考：模型与密钥 /docs/models/",
+    "合成测试回答：API Key 由服务端 secrets.resolve 读取；本例通过 --env-file 加载 .env。参考：模型配置与密钥管理 /docs/models/",
   ),
   finalText("合成普通聊天回答：你好，今天也可以聊聊你的想法。"),
 ]);
@@ -97,7 +180,13 @@ try {
     page.getByRole("button", { name: "打开文档助手", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "从第一句「你好」开始", exact: true }),
+    page.getByRole("heading", { name: "将 Agent 接入你的产品", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".start-actions").getByRole("link", { name: "前端 SDK 接入" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".start-actions").getByRole("link", { name: "后端 SDK 接入" }),
   ).toBeVisible();
   await page.screenshot({
     path: new URL("desktop.png", captures).pathname,
@@ -106,28 +195,25 @@ try {
   await page.getByRole("button", { name: "搜索文档…" }).click();
   await page.getByRole("searchbox", { name: "搜索文档内容" }).fill("密钥");
   await expect(page.locator("#search-results a").first()).toContainText(
-    "模型与密钥",
+    "模型配置与密钥管理",
   );
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/docs\/models\/$/);
   await expect(
-    page.getByRole("heading", { name: "模型与密钥", exact: true }),
+    page.getByRole("heading", { name: "模型配置与密钥管理", exact: true }),
   ).toBeVisible();
   const firstCopy = page.getByRole("button", { name: "复制代码" }).first();
   await firstCopy.click();
   assert.ok(
     (await page.evaluate(() => navigator.clipboard.readText())).includes(
-      "chmod 700",
+      "MODEL_API_KEY=REPLACE_WITH_YOUR_PROVIDER_KEY",
     ),
   );
-  const keyCommand = await page.locator("pre code").nth(1).textContent();
-  assert.ok(
-    keyCommand?.includes("+ '\\n'"),
-    "generated key command must preserve a JS newline escape",
-  );
+  const settingsCode = await page.locator("pre code").nth(1).textContent();
+  assert.ok(settingsCode?.includes('apiKey: { secretRef: "MODEL_API_KEY" }'));
   await page.getByRole("button", { name: "询问本文", exact: true }).click();
   await expect(page.locator("[data-agent-chat] textarea")).toHaveValue(
-    /模型与密钥/,
+    /模型配置与密钥管理/,
   );
   await page
     .locator("[data-agent-chat] textarea")
@@ -141,7 +227,9 @@ try {
     { timeout: 15000 },
   );
   assert.equal(harness.calls.forBinding("docs.search.v1").length, 1);
-  await expect(page.locator("#assistant-sources")).toContainText("模型与密钥");
+  await expect(page.locator("#assistant-sources")).toContainText(
+    "模型配置与密钥管理",
+  );
   await page.locator("[data-agent-chat] textarea").fill("你好，今天聊点别的");
   await page
     .locator("[data-agent-chat]")
@@ -216,7 +304,7 @@ try {
     .click();
   await page
     .locator(".sidebar")
-    .getByRole("link", { name: "把聊天图标接入你的后台", exact: true })
+    .getByRole("link", { name: "前端 SDK：接入聊天界面", exact: true })
     .click();
   await expect(page).toHaveURL(/\/docs\/frontend\/$/);
   await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
@@ -236,7 +324,7 @@ try {
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("button", { name: "切换浅色模式" }).click();
-  await page.goto(host.url + "/docs/quickstart/");
+  await page.goto(host.url + "/docs/sdk/");
   await page.screenshot({
     path: new URL("desktop-article.png", captures).pathname,
     fullPage: false,
@@ -250,7 +338,7 @@ try {
   await page.getByRole("button", { name: "打开文档目录" }).click();
   await page
     .locator("#mobile-nav")
-    .getByRole("link", { name: "模型与密钥", exact: true })
+    .getByRole("link", { name: "模型配置与密钥管理", exact: true })
     .click();
   await expect(page).toHaveURL(/\/docs\/models\/$/);
   await expect(page.locator("#mobile-nav")).not.toBeVisible();
@@ -301,6 +389,8 @@ try {
       articles: articles.length,
       checks: [
         "render-links",
+        "rendered-code-matches-checked-source",
+        "backend-config-binding-and-session",
         "html-safety",
         "Chinese-search",
         "copy-code",

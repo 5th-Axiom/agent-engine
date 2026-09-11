@@ -23,9 +23,9 @@ try {
   await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
   const widget = page.locator("[data-agent-chat]");
   const questions = [
-    "我第一次使用这个项目，API Key 应该放在哪里？请简短解释。",
+    "我要把聊天图标接入自己的管理后台。前端 SDK 用哪个挂载方法，是否还需要后端？请简短解释。",
     "先不谈项目，请给正在学习新东西的我一句简短的鼓励。",
-    "这个项目现在支持多 Worker 分布式调度吗？包已经发布到公共 npm 了吗？请简短回答。",
+    "我想只接后端 SDK，怎么创建会话、发消息和续聊？是否必须安装前端 SDK？请给准确的方法名并简短回答。",
   ];
   const report = [];
   for (const question of questions) {
@@ -76,8 +76,11 @@ try {
     }
     report.push({ question, ...run, sessionId: session.id });
   }
-  assert.match(report[0]!.output, /credentials\.json/);
-  assert.match(report[2]!.output, /未|没有|不支持|不包括|不属于|不在/);
+  assert.match(report[0]!.output, /mountChatWidget/);
+  assert.match(report[0]!.output, /后端|服务端/);
+  assert.match(report[2]!.output, /createSession/);
+  assert.match(report[2]!.output, /loadSession/);
+  assert.match(report[2]!.output, /无需|不需|不必|不用/);
   for (const run of report)
     assert.ok(
       !run.output.includes("**") && !run.output.includes("```"),
@@ -106,7 +109,7 @@ try {
       questions: report.length,
       docsSearchVerified: true,
       ordinaryChatVerified: true,
-      scopeAnswerVerified: true,
+      integrationAnswersVerified: true,
       sessionId: report[0]!.sessionId,
     }),
   );

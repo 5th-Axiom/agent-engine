@@ -82,7 +82,7 @@
       "kind": "button",
       "refersTo": "button-primary",
       "description": "当前页面的首要操作。",
-      "html": "<button class=\"ds-primary\">开始第一次对话 →</button>",
+      "html": "<button class=\"ds-primary\">前端 SDK 接入 →</button>",
       "css": ".ds-primary{font-family:var(--font,system-ui);font-size:14px;border-radius:6px;min-height:44px;padding:9px 16px;cursor:pointer;background:var(--accent,#0758a0);color:var(--on-accent,#fff);border:0}.ds-primary:hover{filter:brightness(.93)}.ds-primary:focus-visible{outline:3px solid var(--accent,#0758a0);outline-offset:4px}"
     },
     {
@@ -119,9 +119,9 @@
   ],
   "narrative": {
     "northStar": "可以照着做的手册",
-    "overview": "继承现有聊天 SDK 的工作台语言，把阅读和操作放在同一条路径上。白底与深蓝文字适合用户在明亮桌面环境下对照终端操作，深色模式满足另一种阅读环境。标题、分隔线和实际内容构成页面，不依靠营销插画或装饰卡片。",
+    "overview": "继承现有聊天 SDK 的工作台语言，围绕前端、后端两条接入路线组织阅读和操作。白底与深蓝文字适合用户在明亮桌面环境下对照终端操作，深色模式满足另一种阅读环境。标题、分隔线和实际内容构成页面，不依靠营销插画或装饰卡片。",
     "keyCharacteristics": [
-      "先给下一步，再给精确接口。",
+      "先选前端或后端接入路线，再给可用示例、配置与接口。",
       "阅读层级清楚，长内容可以定位和复制。",
       "文章导航与聊天状态彼此独立。"
     ],
@@ -138,7 +138,7 @@
       }
     ],
     "dos": [
-      "每个入门步骤说明操作与成功标志。",
+      "每个接入步骤说明代码位置、前置配置与成功标志。",
       "让表格和代码在自己的区域滚动。",
       "保留清楚的焦点样式和可访问名称。",
       "使用现有 SDK 的公开入口和主题配置。"
