@@ -15,6 +15,8 @@ const paths = {
   stop: "M7 7h10v10H7z",
   plus: "M12 5v14 M5 12h14",
   history: "M4 10a8 8 0 1 1 1 8 M4 4v6h6 M12 7v5l3 2",
+  sidebar: "M4 4h16v16H4z M10 4v16 M6.5 8h1 M6.5 12h1",
+  info: "M12 11v6 M12 7v.1 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
   down: "m6 9 6 6 6-6",
   tool: "m14 5 5 5-9 9-5-5 9-9Z M5 14l-2 7 7-2 M14 5l2-2 5 5-2 2",
 } as const;

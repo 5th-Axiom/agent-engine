@@ -108,6 +108,8 @@ export function mountChatWidget(options: ChatWidgetOptions) {
   launcher.setAttribute("aria-expanded", "false");
   launcher.setAttribute("aria-haspopup", "dialog");
   const dialog = element("dialog", "ae-dialog");
+  // Hosts may position the panel without reaching into SDK implementation classes.
+  dialog.setAttribute("part", "panel");
   dialog.setAttribute("aria-label", copy.title);
   dialog.id = dialogId;
   launcher.setAttribute("aria-controls", dialog.id);

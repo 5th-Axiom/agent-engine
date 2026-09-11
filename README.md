@@ -41,7 +41,7 @@ pnpm playground
 
 ## 打开官方文档站
 
-在模型与数据库已配置的项目目录运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run docs`。打开 <http://127.0.0.1:4320/>，即可按“前端 SDK 接入”或“后端 SDK 接入”路线阅读安装、调用、配置与扩展方法，也可点击右下角图标询问文档助手。尚未配置模型时，可用 `pnpm run docs --read-only` 阅读和搜索。详细说明见 [文档站使用说明](examples/docs-site/README.md)。
+在模型与数据库已配置的项目目录运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run docs`。打开 <http://127.0.0.1:4320/>，默认进入使用本项目 SDK 的 AI 对话模式，可查询文档、API、示例和已提交的公开源码。顶部切换“传统模式”，按前端或后端 SDK 路线阅读手册；两种模式共享会话。尚未配置模型时，可用 `pnpm run docs --read-only` 阅读和搜索。详细说明见 [文档站使用说明](examples/docs-site/README.md)。
 
 ## 开发者入口
 

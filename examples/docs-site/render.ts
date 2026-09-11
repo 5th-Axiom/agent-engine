@@ -1,5 +1,6 @@
 import { Marked } from "marked";
 import { articlePath, type Article } from "./content.js";
+import { modeNavigation } from "./ai-render.js";
 
 export const escapeHTML = (s: string) =>
   s.replace(
@@ -64,6 +65,11 @@ export function renderArticle(article: Article, articles: Article[]) {
         const [path, hash] = href.split("#");
         const mapped = aliases[path!.replace(/^\.\//, "")];
         if (mapped) href = articlePath(mapped) + (hash ? "#" + hash : "");
+        if (
+          article.id === "welcome" &&
+          ["/docs/frontend/", "/docs/sdk/"].includes(href)
+        )
+          return `<a class="button product-action" href="${escapeHTML(href)}">${text}${icon("arrow")}</a>`;
         if (/^https?:\/\//i.test(href))
           return `<a href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">${text}<span class="sr-only">（新标签页）</span></a>`;
         if (
@@ -87,7 +93,8 @@ export function renderArticle(article: Article, articles: Article[]) {
       table(token) {
         const row = (cells: typeof token.header, tag: string) =>
           `<tr>${cells.map((c) => `<${tag}>${this.parser.parseInline(c.tokens)}</${tag}>`).join("")}</tr>`;
-        return `<div class="table-scroll" tabindex="0" role="region" aria-label="数据表"><table><thead>${row(token.header, "th")}</thead><tbody>${token.rows.map((r) => row(r, "td")).join("")}</tbody></table></div>`;
+        const overview = article.id === "welcome";
+        return `<div class="table-scroll${overview ? " product-table" : ""}" tabindex="0" role="region" aria-label="${overview ? "产品形态与使用入口" : "数据表"}"><table><thead>${row(token.header, "th")}</thead><tbody>${token.rows.map((r) => row(r, "td")).join("")}</tbody></table></div>`;
       },
     },
   });
@@ -95,14 +102,11 @@ export function renderArticle(article: Article, articles: Article[]) {
   const index = articles.indexOf(article),
     previous = articles[index - 1],
     next = articles[index + 1];
-  const isHome = article.id === "welcome";
   const html = `<div class="breadcrumb"><a href="/docs/welcome/">文档</a><span>/</span><span>${escapeHTML(article.group)}</span></div>
   <div class="article-heading"><h1 tabindex="-1">${escapeHTML(article.title)}</h1><button type="button" class="button ask-article" data-ask="${escapeHTML(article.title)}">${icon("chat")}询问本文</button></div>
   <p class="lead">${escapeHTML(article.description)}</p>
-  ${isHome ? `<div class="start-actions"><a class="button primary" href="/docs/frontend/">前端 SDK 接入 ${icon("arrow")}</a><a class="button" href="/docs/sdk/">后端 SDK 接入 ${icon("arrow")}</a></div><div class="process" aria-label="前端接入的调用链路"><span>${icon("chat")}前端 SDK</span><i></i><span>${icon("command")}你的后端</span><i></i><span>${icon("book")}模型与工具</span></div>` : ""}
   ${article.source ? '<p class="source-note">与项目源码手册同步。示例中的 /path/to/agent-engine 请替换为你的项目路径。</p>' : ""}
   <div class="prose">${body}</div>
-  <section class="article-help"><div><h2>这一步还不太明白？</h2><p>带着当前文章问一句，继续往下走。</p></div><button class="button ask-article" data-ask="${escapeHTML(article.title)}">${icon("chat")}让助手解释</button></section>
   <nav class="page-turn" aria-label="相邻文章">${previous ? `<a href="${articlePath(previous.id)}"><span>上一篇</span><strong>${escapeHTML(previous.title)}</strong></a>` : "<span></span>"}${next ? `<a href="${articlePath(next.id)}"><span>接下来</span><strong>${escapeHTML(next.title)} ${icon("arrow")}</strong></a>` : "<span></span>"}</nav>`;
   return {
     html,
@@ -117,13 +121,13 @@ export function navigation(articles: Article[], current: string) {
   return [...new Set(articles.map((a) => a.group))]
     .map(
       (group) =>
-        `<section class="nav-group"><h2>${escapeHTML(group)}</h2>${articles
+        `<details class="nav-group" ${articles.some((a) => a.group === group && a.id === current) ? "open" : ""}><summary>${escapeHTML(group)}</summary>${articles
           .filter((a) => a.group === group)
           .map(
             (a) =>
               `<a href="${articlePath(a.id)}" ${a.id === current ? 'aria-current="page"' : ""}>${escapeHTML(a.title)}</a>`,
           )
-          .join("")}</section>`,
+          .join("")}</details>`,
     )
     .join("");
 }
@@ -133,25 +137,23 @@ export function renderPage(
   available: boolean,
 ) {
   const page = renderArticle(article, articles);
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="description" content="${escapeHTML(article.description)}"><meta name="color-scheme" content="light dark"><title>${escapeHTML(article.title)} · Agent Engine 文档</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/style.css"><script src="/assets/theme.js"></script></head><body data-article="${article.id}" data-chat-available="${available}">
-<!-- THESIS: A Chinese integration manual with two entry routes: ready-made frontend SDK or direct backend SDK.
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="description" content="${escapeHTML(article.description)}"><meta name="color-scheme" content="light dark"><title>${escapeHTML(article.title)} · Agent Engine 文档</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ai.css"><script src="/assets/theme.js"></script></head><body data-article="${article.id}" data-chat-available="${available}">
+<!-- THESIS: Introduce the product before its guides: one sentence, core features, then a two-column product and usage table.
 OWN-WORLD: White #ffffff, navy #172b42, blue #0758a0, ruled workbench surfaces, system reading font.
-STORY: Choose a route, install only the needed packages, connect to your application, then configure and extend it. Local demos are appendices.
-FIRST VIEWPORT: 64px header, 240px fixed chapter rail, readable main column and 180px contents rail. Two explicit SDK integration actions beneath the heading. Persistent SDK launcher. Signature: ask this article preserves reading position and fills an editable question. Motion: short reading-view crossfade, reduced-motion respected.
+STORY: Understand what Agent Engine does, choose the frontend or backend SDK, then open the setup and complete example. Local demos are appendices.
+FIRST VIEWPORT: Existing header and chapter rail, introduction and features in the readable main column, product table below with working guide links in the right-hand cells. Persistent SDK launcher. Signature: ask this article preserves reading position and fills an editable question. Existing motion respects reduced-motion.
 FORM: Guided manual with chapter navigation, third structural candidate; seed 46dd2b9c. User requested direct code-led delivery; implementation choice delegated.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
 <a class="skip" href="#main">跳到正文</a>
-<header class="site-header"><a class="brand" href="/docs/welcome/" aria-label="Agent Engine 文档首页"><span class="brand-mark">${icon("command")}</span><strong>Agent Engine</strong><span class="brand-divider"></span><span class="brand-docs">文档</span></a><div class="header-actions"><button class="search-button" data-search>${icon("search")}<span>搜索文档…</span><kbd>⌘ K</kbd></button><button class="icon-button theme-button" aria-label="切换深色模式">${icon("sun")}</button><button class="icon-button mobile-menu" aria-label="打开文档目录">${icon("menu")}</button></div></header>
+<header class="site-header"><a class="brand" href="/docs/welcome/" aria-label="Agent Engine 文档首页"><span class="brand-mark">${icon("command")}</span><strong>Agent Engine</strong><span class="brand-divider"></span><span class="brand-docs">文档</span></a>${modeNavigation("docs")}<div class="header-actions"><button class="search-button" data-search>${icon("search")}<span>搜索文档…</span><kbd>⌘ K</kbd></button><button class="icon-button theme-button" aria-label="切换深色模式">${icon("sun")}</button><button class="icon-button mobile-menu" aria-label="打开文档目录">${icon("menu")}</button></div></header>
 <div class="layout"><aside class="sidebar"><nav aria-label="文档导航">${navigation(articles, article.id)}</nav><div class="sidebar-foot"><span class="version-dot"></span>0.1.0-dev · 本地文档</div></aside>
-<main id="main" tabindex="-1">${page.html}<section id="assistant-sources" hidden aria-label="助手提到的文档"></section><footer class="site-footer">Agent Engine 文档<span>从接入到使用，有例可循。</span></footer></main>
+<main id="main" tabindex="-1">${page.html}<footer class="site-footer">Agent Engine 文档<span>从接入到使用，有例可循。</span></footer></main>
 <aside class="contents"><h2>本文内容</h2><nav id="toc" aria-label="本文目录">${page.toc
     .filter((t) => t.level === 2)
     .map(
       (t) => `<a href="#${encodeURIComponent(t.id)}">${escapeHTML(t.text)}</a>`,
     )
-    .join(
-      "",
-    )}</nav><div class="reading-tip">${icon("chat")}<p>卡在某一步？<br>右下角助手随时帮你。</p><button class="text-action" data-open-chat>问一个问题 ${icon("arrow")}</button></div></aside></div>
+    .join("")}</nav></aside></div>
 <dialog id="search-dialog" aria-label="搜索文档"><div class="search-input-row">${icon("search")}<input id="search-input" type="search" placeholder="搜索问题、功能或错误码" aria-label="搜索文档内容" autocomplete="off"><button class="icon-button" data-close-search aria-label="关闭搜索">${icon("close")}</button></div><p id="search-status" role="status">输入关键词，例如“前端接入”“创建会话”“Debug”。</p><nav id="search-results" aria-label="搜索结果"></nav><div class="search-footer">↑ ↓ 选择 · Enter 打开<span>站内搜索不消耗模型额度</span></div></dialog>
 <dialog id="mobile-nav" aria-label="文档目录"><header><strong>文档目录</strong><button class="icon-button" data-close-menu aria-label="关闭文档目录">${icon("close")}</button></header><nav aria-label="移动文档导航">${navigation(articles, article.id)}</nav></dialog>
 <dialog id="offline-dialog" aria-labelledby="offline-title"><button class="icon-button" data-close-offline aria-label="关闭助手说明">${icon("close")}</button><h2 id="offline-title">文档助手尚未连接</h2><p>本站正在仅阅读模式运行。你可以继续搜索和阅读文档；准备好模型与数据库后，重新启动即可聊天。</p><a class="button primary" href="/docs/docs-site/">查看启动方法 ${icon("arrow")}</a></dialog>

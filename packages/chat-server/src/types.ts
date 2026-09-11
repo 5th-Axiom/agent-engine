@@ -1,8 +1,10 @@
 import type { IncomingMessage } from "node:http";
 import type { AgentEngine } from "@agent-runtime/sdk";
-import type { ChatAssistant } from "@agent-runtime/chat-core";
-export interface ChatAssistantDefinition extends ChatAssistant {
+import type { ChatAssistant, ChatTool } from "@agent-runtime/chat-core";
+export interface ChatAssistantDefinition extends Omit<ChatAssistant, "tools"> {
   config: unknown;
+  /** Optional user-facing copy keyed by configured tool name. Never put private instructions here. */
+  toolDisplay?: Record<string, Pick<ChatTool, "label" | "description">>;
 }
 export interface ChatContext {
   /** Engine must already be scoped to the authenticated caller. Never derive identity from the request body. */

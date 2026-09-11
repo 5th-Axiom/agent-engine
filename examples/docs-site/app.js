@@ -1,8 +1,15 @@
 import {
   mountChatWidget,
   createHttpChatTransport,
-  createSessionMemory,
 } from "/assets/agent-chat.mjs";
+import {
+  preserveDraft,
+  chatMemory,
+  chatTheme,
+  rememberReading,
+  restoreReading,
+  loadReferenceResolver,
+} from "/assets/chat-shared.js";
 
 const $ = (s) => document.querySelector(s);
 const searchDialog = $("#search-dialog"),
@@ -18,10 +25,22 @@ let searchIndex = [],
   chat,
   viewSequence = 0,
   toastTimer,
-  tocObserver;
+  tocObserver,
+  readingPreparedForAI = false,
+  leavingForAI = false;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+// SPA history and cross-mode returns restore their own positions.
+history.scrollRestoration = "manual";
+const aiModeLink = document.querySelector('[data-mode="ai"]');
+const prepareReadingReturn = () => {
+  rememberReading();
+  readingPreparedForAI = true;
+};
+aiModeLink.addEventListener("pointerdown", prepareReadingReturn);
+aiModeLink.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") prepareReadingReturn();
+});
 const footer = main.querySelector(".site-footer").outerHTML;
-const sources = new Map();
 const available = document.body.dataset.chatAvailable === "true";
 const tell = (message) => {
   const toast = $("#toast");
@@ -55,9 +74,8 @@ function updateTheme(theme) {
     theme === "dark" ? "切换浅色模式" : "切换深色模式",
   );
   chat?.updateTheme({
-    mode: theme,
-    skin: "workbench",
-    accent: theme === "dark" ? "#8ec5ff" : "#0758a0",
+    ...chatTheme(),
+    tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 1000 },
   });
 }
 $(".theme-button").addEventListener("click", () =>
@@ -66,22 +84,6 @@ $(".theme-button").addEventListener("click", () =>
   ),
 );
 
-function renderSources() {
-  const section = $("#assistant-sources");
-  if (!section) return;
-  section.replaceChildren();
-  section.hidden = sources.size === 0;
-  if (!sources.size) return;
-  const h = document.createElement("h2");
-  h.textContent = "助手提到的文档";
-  section.append(h);
-  for (const [url, title] of sources) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.textContent = title;
-    section.append(a);
-  }
-}
 function openChat(question) {
   if (chat) {
     chat.open();
@@ -93,19 +95,15 @@ function openChat(question) {
   } else offlineDialog.showModal();
 }
 if (available) {
-  let memory;
-  try {
-    memory = createSessionMemory(localStorage, "docs-site:" + location.origin);
-  } catch {}
+  const getRunSources = await loadReferenceResolver();
   chat = mountChatWidget({
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
-    memory,
+    memory: chatMemory(),
     theme: {
-      mode: document.documentElement.dataset.theme,
-      skin: "workbench",
-      accent: "#0758a0",
-      tokens: { panelWidth: 440, panelHeight: 680 },
+      ...chatTheme(),
+      tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 1000 },
     },
+    getRunSources,
     copy: {
       title: "文档助手",
       launcherLabel: "打开文档助手",
@@ -122,18 +120,10 @@ if (available) {
     ],
     onOpenChange: (open) => {
       $("#launcher-hint").hidden = open;
-    },
-    onStateChange: (state) => {
-      sources.clear();
-      const run = state.session?.runs.at(-1);
-      if (run?.state === "completed")
-        for (const match of run.output.matchAll(/\/docs\/([a-z-]+)\//g)) {
-          const a = searchIndex.find((a) => a.id === match[1]);
-          if (a) sources.set(a.url, a.title);
-        }
-      renderSources();
+      document.body.dataset.chatOpen = String(open);
     },
   });
+  preserveDraft(chat);
   chat.ready.catch(() => tell("助手连接未完成，仍可阅读和搜索文档。"));
 } else {
   $("#offline-launcher").hidden = false;
@@ -260,6 +250,122 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Progressive enhancement: without JavaScript every framework example remains readable.
+let selectFramework;
+function revealFramework(hash) {
+  try {
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    const panel = target?.closest("[data-framework-panel]");
+    if (panel) selectFramework?.(panel.dataset.frameworkPanel, false);
+  } catch {}
+}
+function enhanceArticle() {
+  selectFramework = undefined;
+  document.querySelectorAll(".nav-group").forEach((group) => {
+    group.open = !!group.querySelector('[aria-current="page"]');
+  });
+  if (document.body.dataset.article !== "frontend") return;
+  const prose = main.querySelector(".prose");
+  const headings = [...prose.querySelectorAll(":scope > h2")];
+  const names = ["最小接入：放上聊天图标", "React 中使用", "Vue 中使用"];
+  const targets = names.map((name) =>
+    headings.find((h) => h.textContent.replace(/#$/, "") === name),
+  );
+  if (targets.some((h) => !h)) return;
+  const group = document.createElement("div");
+  group.className = "framework-examples";
+  targets[0].before(group);
+  const steps = document.createElement("nav");
+  steps.className = "setup-steps";
+  steps.setAttribute("aria-label", "前端接入步骤");
+  const list = document.createElement("ol");
+  for (const [label, href] of [
+    ["准备环境", "/docs/installation/"],
+    ["挂载界面", "#" + targets[0].id],
+    ["连接后端并验证对话", "/docs/frontend-server/"],
+  ]) {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = href;
+    link.textContent = label;
+    if (href.startsWith("#")) link.setAttribute("aria-current", "step");
+    item.append(link);
+    list.append(item);
+  }
+  steps.append(list);
+  group.append(steps);
+  const tabs = document.createElement("div");
+  tabs.className = "framework-tabs";
+  tabs.setAttribute("role", "tablist");
+  tabs.setAttribute("aria-label", "选择前端框架");
+  group.append(tabs);
+  const keys = ["javascript", "react", "vue"];
+  const labels = ["JavaScript", "React", "Vue"];
+  const panels = targets.map((heading, i) => {
+    const panel = document.createElement("section");
+    panel.dataset.frameworkPanel = keys[i];
+    panel.id = "example-" + keys[i];
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", "tab-" + keys[i]);
+    panel.tabIndex = 0;
+    let node = heading;
+    while (node) {
+      const next = node.nextElementSibling;
+      panel.append(node);
+      if (!next || next.tagName === "H2") break;
+      node = next;
+    }
+    group.append(panel);
+    return panel;
+  });
+  const buttons = keys.map((key, i) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.id = "tab-" + key;
+    tab.textContent = labels[i];
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", panels[i].id);
+    tab.addEventListener("click", () => selectFramework(key));
+    tab.addEventListener("keydown", (event) => {
+      const next =
+        event.key === "ArrowRight"
+          ? (i + 1) % 3
+          : event.key === "ArrowLeft"
+            ? (i + 2) % 3
+            : event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? 2
+                : undefined;
+      if (next !== undefined) {
+        event.preventDefault();
+        selectFramework(keys[next]);
+        buttons[next].focus();
+      }
+    });
+    tabs.append(tab);
+    return tab;
+  });
+  selectFramework = (key, remember = true) => {
+    const selected = keys.indexOf(key);
+    if (selected < 0) return;
+    panels.forEach((panel, i) => {
+      panel.hidden = i !== selected;
+      buttons[i].setAttribute("aria-selected", String(i === selected));
+      buttons[i].tabIndex = i === selected ? 0 : -1;
+    });
+    if (remember)
+      history.replaceState(
+        history.state,
+        "",
+        "#" + encodeURIComponent(targets[selected].id),
+      );
+  };
+  selectFramework("javascript", false);
+  revealFramework(location.hash);
+}
+window.addEventListener("hashchange", () => revealFramework(location.hash));
+
 function refreshTOC() {
   tocObserver?.disconnect();
   tocObserver = new IntersectionObserver(
@@ -291,6 +397,7 @@ function scrollToLocation(focus = false) {
   if (focus) main.querySelector("h1")?.focus({ preventScroll: true });
 }
 async function navigate(url, push = true, restoreY) {
+  if (push) rememberReading();
   if (push)
     history.replaceState({ scrollY: window.scrollY }, "", location.href);
   const seq = ++viewSequence;
@@ -306,10 +413,7 @@ async function navigate(url, push = true, restoreY) {
     if (seq !== viewSequence) return;
     const apply = () => {
       if (push) history.pushState({}, "", url.pathname + url.hash);
-      main.innerHTML =
-        page.html +
-        '<section id="assistant-sources" hidden aria-label="助手提到的文档"></section>' +
-        footer;
+      main.innerHTML = page.html + footer;
       $("#toc").replaceChildren();
       for (const heading of page.toc.filter((h) => h.level === 2)) {
         const a = document.createElement("a");
@@ -325,7 +429,7 @@ async function navigate(url, push = true, restoreY) {
         if (a.pathname === url.pathname) a.setAttribute("aria-current", "page");
         else a.removeAttribute("aria-current");
       });
-      renderSources();
+      enhanceArticle();
       refreshTOC();
       scrollToLocation(true);
       if (!url.hash && Number.isFinite(restoreY)) window.scrollTo(0, restoreY);
@@ -361,10 +465,6 @@ document.addEventListener("click", async (e) => {
     );
     return;
   }
-  if (target.closest("[data-open-chat]")) {
-    openChat();
-    return;
-  }
   const a = target.closest("a");
   if (
     !a ||
@@ -379,12 +479,20 @@ document.addEventListener("click", async (e) => {
   )
     return;
   const url = new URL(a.href);
+  if (url.origin === location.origin && url.pathname === "/ai/") {
+    if (!readingPreparedForAI) rememberReading();
+    leavingForAI = true;
+    return;
+  }
   if (url.origin !== location.origin || !url.pathname.startsWith("/docs/"))
     return;
   if (searchDialog.open) searchDialog.close();
   if (navDialog.open) navDialog.close();
   if (offlineDialog.open) offlineDialog.close();
-  if (url.pathname === location.pathname && url.hash) return;
+  if (url.pathname === location.pathname && url.hash) {
+    revealFramework(url.hash);
+    return;
+  }
   e.preventDefault();
   await navigate(url);
 });
@@ -392,7 +500,16 @@ window.addEventListener(
   "popstate",
   (e) => void navigate(new URL(location.href), false, e.state?.scrollY),
 );
+enhanceArticle();
 refreshTOC();
+restoreReading();
 window.addEventListener("pagehide", (e) => {
+  if (!leavingForAI) rememberReading();
   if (!e.persisted) chat?.destroy();
+});
+
+window.addEventListener("pageshow", (event) => {
+  readingPreparedForAI = false;
+  leavingForAI = false;
+  if (event.persisted) restoreReading();
 });

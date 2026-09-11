@@ -13,6 +13,11 @@ import {
 } from "../../scripts/lib/local-model-config.js";
 import { loadArticles } from "./content.js";
 import { docsAssistant, docsBinding, startDocsSite } from "./server.js";
+import {
+  createKnowledge,
+  loadProjectSnapshot,
+  knowledgeTools,
+} from "./knowledge.js";
 
 const defaultDatabase =
   "postgresql://postgres@127.0.0.1:55439/agent_engine_docs";
@@ -25,6 +30,7 @@ try {
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("PORT_INVALID");
   const articles = await loadArticles();
+  const knowledge = createKnowledge(articles, await loadProjectSnapshot());
   let cookieSecret: string | Buffer = randomBytes(32),
     assistant;
   if (!readOnly) {
@@ -90,10 +96,17 @@ try {
           ].includes(resource);
         if (action === "model") return resource === local.model.baseURL;
         if (action === "capability")
-          return ["docs.search", "docs.search.v1"].includes(resource);
+          return [
+            "docs.search",
+            "docs.search.v1",
+            ...knowledgeTools.flatMap((t) => [t.name, t.name + ".v1"]),
+          ].includes(resource);
         return true;
       },
-      bindings: { "docs.search.v1": docsBinding(articles) },
+      bindings: {
+        "docs.search.v1": docsBinding(articles),
+        ...knowledge.bindings,
+      },
       limits: { maxConcurrentModelRequests: 2, maxAcceptedRuns: 8 },
       policy: {
         allowedOrigins: [new URL(local.model.baseURL).origin],
@@ -119,13 +132,17 @@ try {
       output >= local.model.limits.contextWindowTokens
     )
       throw new Error("OUTPUT_LIMIT_INVALID");
-    assistant = docsAssistant({
-      ...local.model,
-      limits: { ...local.model.limits, maxOutputTokens: output },
-    });
+    assistant = docsAssistant(
+      {
+        ...local.model,
+        limits: { ...local.model.limits, maxOutputTokens: output },
+      },
+      knowledge,
+    );
   }
   host = await startDocsSite({
     articles,
+    knowledge,
     engine,
     assistant,
     cookieSecret,

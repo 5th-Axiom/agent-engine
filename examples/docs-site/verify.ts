@@ -11,8 +11,11 @@ import {
 } from "@agent-runtime/testing";
 import { loadArticles, searchArticles } from "./content.js";
 import { renderArticle } from "./render.js";
+import { renderSourcePage } from "./ai-render.js";
 import { readSettings } from "./snippets/settings.js";
 import { inventoryTool, inventoryBinding } from "./snippets/tools.js";
+import { createKnowledge, loadProjectSnapshot } from "./knowledge.js";
+import { verifyKnowledge } from "./verify-knowledge.js";
 import {
   docsBinding,
   docsAssistant,
@@ -21,6 +24,8 @@ import {
 } from "./server.js";
 
 const articles = await loadArticles();
+const knowledge = createKnowledge(articles, await loadProjectSnapshot());
+await verifyKnowledge(articles, knowledge);
 assert.equal(new Set(articles.map((a) => a.id)).size, articles.length);
 assert.equal(searchArticles(articles, "API Key 密钥")[0]?.id, "models");
 assert.ok(
@@ -96,6 +101,16 @@ const malicious = renderArticle(
 assert.ok(!malicious.includes("<script>"));
 assert.ok(!malicious.includes('href="javascript:'));
 assert.ok(!malicious.includes("<img"));
+const sourceHTML = renderSourcePage(
+  {
+    path: "packages/sdk/src/fixture.ts",
+    text: '<script>alert("synthetic")</script>\n<img src=x onerror=alert(1)>',
+  },
+  knowledge.snapshot.revision,
+);
+assert.ok(!sourceHTML.includes("<script>alert("));
+assert.ok(!sourceHTML.includes("<img"));
+assert.ok(sourceHTML.includes("&lt;script&gt;"));
 
 // The rendered snippets share these checked source files; validate real SDK configuration and a host binding.
 const settings = readSettings({
@@ -150,16 +165,22 @@ const model = scriptedModel([
     "合成测试回答：API Key 由服务端 secrets.resolve 读取；本例通过 --env-file 加载 .env。参考：模型配置与密钥管理 /docs/models/",
   ),
   finalText("合成普通聊天回答：你好，今天也可以聊聊你的想法。"),
+  toolCall("api.lookup", { query: "mountChatWidget" }),
+  finalText(
+    `合成源码回答：mountChatWidget 是公开挂载入口。参考：/sources/${knowledge.snapshot.revision}/packages/chat-ui/src/pages/mount.ts#L82`,
+  ),
+  finalText("这是第二段独立的合成对话。"),
 ]);
 const harness = await createEngineTestHarness({
   model,
-  bindings: { "docs.search.v1": docsBinding(articles) },
+  bindings: { "docs.search.v1": docsBinding(articles), ...knowledge.bindings },
   authorize: async () => true,
 });
 const host = await startDocsSite({
   articles,
+  knowledge,
   engine: harness.engine,
-  assistant: docsAssistant(harness.modelConfig.models.primary),
+  assistant: docsAssistant(harness.modelConfig.models.primary, knowledge),
   cookieSecret: randomBytes(32),
   port: 0,
 });
@@ -175,23 +196,46 @@ try {
   const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(host.url);
+  await page.goto(host.url + "/docs/welcome/");
   await expect(
     page.getByRole("button", { name: "打开文档助手", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "将 Agent 接入你的产品", exact: true }),
+    page.getByRole("heading", { name: "产品介绍", exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".start-actions").getByRole("link", { name: "前端 SDK 接入" }),
+    page.locator(".product-table").getByRole("link", { name: "使用前端 SDK" }),
   ).toBeVisible();
   await expect(
-    page.locator(".start-actions").getByRole("link", { name: "后端 SDK 接入" }),
+    page.locator(".product-table").getByRole("link", { name: "使用后端 SDK" }),
   ).toBeVisible();
   await page.screenshot({
     path: new URL("desktop.png", captures).pathname,
     fullPage: true,
   });
+  for (const [label, route] of [
+    ["使用前端 SDK", "frontend"],
+    ["使用后端 SDK", "sdk"],
+  ]) {
+    await page
+      .locator(".product-table")
+      .getByRole("link", { name: label, exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/docs/${route}/$`));
+    await expect(page.locator(".code-block").first()).toBeVisible();
+    await page
+      .getByRole("link", { name: "Agent Engine 文档首页", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "产品介绍", exact: true }),
+    ).toBeVisible();
+  }
+  await page.getByRole("button", { name: "切换深色模式" }).click();
+  await page.screenshot({
+    path: new URL("intro-dark.png", captures).pathname,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "切换浅色模式" }).click();
   await page.getByRole("button", { name: "搜索文档…" }).click();
   await page.getByRole("searchbox", { name: "搜索文档内容" }).fill("密钥");
   await expect(page.locator("#search-results a").first()).toContainText(
@@ -227,9 +271,9 @@ try {
     { timeout: 15000 },
   );
   assert.equal(harness.calls.forBinding("docs.search.v1").length, 1);
-  await expect(page.locator("#assistant-sources")).toContainText(
-    "模型配置与密钥管理",
-  );
+  await expect(
+    page.locator("[data-agent-chat] .ae-turn").first().locator(".ae-sources"),
+  ).toContainText("模型配置与密钥管理");
   await page.locator("[data-agent-chat] textarea").fill("你好，今天聊点别的");
   await page
     .locator("[data-agent-chat]")
@@ -240,6 +284,170 @@ try {
     { timeout: 15000 },
   );
   assert.equal(harness.calls.forBinding("docs.search.v1").length, 1);
+  await page.locator("[data-agent-chat] textarea").fill("切换模式后保留的问题");
+  await page.evaluate(() => window.scrollTo(0, 350));
+  const readingY = await page.evaluate(() => window.scrollY);
+  // Click the visible sticky link without Playwright scrolling its DOM position to the top.
+  const modeBox = await page
+    .getByRole("link", { name: "AI 模式", exact: true })
+    .boundingBox();
+  await page.mouse.click(
+    modeBox!.x + modeBox!.width / 2,
+    modeBox!.y + modeBox!.height / 2,
+  );
+  await expect(page).toHaveURL(/\/ai\/$/);
+  await expect(page.locator("#reading-trail a")).toContainText(
+    "模型配置与密钥管理",
+  );
+  await expect(page.locator("[data-agent-chat]")).toHaveAttribute(
+    "data-presentation",
+    "page",
+  );
+  await expect(page.locator("[data-agent-chat] .ae-turn")).toHaveCount(2);
+  await expect(page.locator("[data-agent-chat] textarea")).toHaveValue(
+    "切换模式后保留的问题",
+  );
+  await page.screenshot({ path: new URL("ai-history.png", captures).pathname });
+  // Simulate a pre-upgrade session belonging to this visitor.
+  const remembered = await page.evaluate(() =>
+    localStorage.getItem("agent-chat:session:docs-site:" + location.origin),
+  );
+  const visitorId = (await context.cookies())
+    .find((c) => c.name.startsWith("ae_docs_"))!
+    .value.split(".")[0]!;
+  const owner = harness.engine.forPrincipal({
+    tenantId: "docs-site",
+    subjectId: visitorId,
+  });
+  const old = await owner.readSession(remembered!);
+  const oldConfig = structuredClone(old.config);
+  oldConfig.tools = oldConfig.tools?.filter((t) => t.name === "docs.search");
+  delete oldConfig.metadata!.docsAssistantVersion;
+  await (
+    await owner.loadSession(old.id)
+  ).replaceConfig({ ifVersion: old.version, config: oldConfig });
+  await page
+    .locator("[data-agent-chat] textarea")
+    .fill("查询 mountChatWidget 的源码");
+  await page
+    .locator("[data-agent-chat]")
+    .getByRole("button", { name: "发送", exact: true })
+    .click();
+  await expect(page.locator("[data-agent-chat]")).toContainText(
+    "合成源码回答",
+    { timeout: 15000 },
+  );
+  assert.equal(harness.calls.forBinding("api.lookup.v1").length, 1);
+  const upgraded = await owner.readSession(old.id);
+  assert.equal(upgraded.config.tools?.length, 6);
+  assert.ok(upgraded.config.metadata?.docsAssistantVersion);
+  const sdk = page.locator("[data-agent-chat]");
+  await expect(sdk.locator(".ae-sidebar")).toBeVisible();
+  await expect(sdk.locator(".ae-history-item")).toHaveCount(1);
+  await expect(sdk.locator(".ae-history-item")).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
+  await expect(sdk.locator(".ae-detail-panel")).toContainText(old.id);
+  await page.screenshot({
+    path: new URL("ai-session-details.png", captures).pathname,
+  });
+  await sdk
+    .getByRole("button", { name: "已接入工具（6）", exact: true })
+    .click();
+  await expect(sdk.locator(".ae-tool-item")).toHaveCount(6);
+  await expect(sdk.locator(".ae-tool-item").first()).toContainText("搜索文档");
+  await expect(sdk.locator(".ae-tool-list")).toContainText("code.read");
+  await page.screenshot({ path: new URL("ai-tools.png", captures).pathname });
+  await page.getByRole("button", { name: "切换深色模式" }).click();
+  await page.screenshot({
+    path: new URL("ai-tools-dark.png", captures).pathname,
+  });
+  await page.getByRole("button", { name: "切换浅色模式" }).click();
+  await sdk
+    .locator(".ae-detail-panel")
+    .getByRole("button", {
+      name: "关闭面板",
+      exact: true,
+    })
+    .focus();
+  await page.keyboard.press("Escape");
+  await expect(sdk.locator(".ae-detail-panel")).not.toBeVisible();
+  await expect(
+    sdk.getByRole("button", { name: "已接入工具（6）", exact: true }),
+  ).toBeFocused();
+  await sdk.getByRole("button", { name: "新对话", exact: true }).click();
+  await sdk.locator("textarea").fill("第二个合成问题");
+  await sdk.getByRole("button", { name: "发送", exact: true }).click();
+  await expect(sdk).toContainText("这是第二段独立的合成对话。", {
+    timeout: 15000,
+  });
+  await expect(sdk.locator(".ae-history-item")).toHaveCount(2);
+  await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
+  await sdk.locator(`[data-session-id="${old.id}"]`).click();
+  await expect(sdk.locator(".ae-detail-panel")).toContainText(old.id);
+  await page.keyboard.press("Escape");
+  await expect(sdk.locator(".ae-turn")).toHaveCount(3);
+  await expect(
+    sdk.locator(".ae-turn").last().locator(".ae-sources a"),
+  ).toContainText("mount.ts");
+  const sourceHref = await sdk
+    .locator(".ae-turn")
+    .last()
+    .locator(".ae-sources a")
+    .getAttribute("href");
+  const sourcePage = await context.newPage();
+  await sourcePage.goto(new URL(sourceHref!, host.url).href);
+  await expect(sourcePage.locator(".source-code")).toContainText(
+    "mountChatWidget",
+  );
+  await expect(sourcePage.locator("#L82")).toBeAttached();
+  await sourcePage.close();
+  for (const path of [
+    `/sources/${knowledge.snapshot.revision}/.secrets/credentials.json`,
+    `/sources/${"0".repeat(40)}/packages/sdk/src/index.ts`,
+    `/sources/${knowledge.snapshot.revision}/packages/sdk/src/../../../../.local/models.json`,
+  ])
+    assert.equal((await fetch(host.url + path)).status, 404);
+  await page.locator("[data-agent-chat] textarea").fill("返回文档时也保留草稿");
+  await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(sdk.locator("textarea")).toHaveValue("返回文档时也保留草稿");
+  await page.getByRole("link", { name: "传统模式", exact: true }).click();
+  await expect(page).toHaveURL(/\/docs\/models\/$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(readingY);
+  await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
+  await expect(page.locator("[data-agent-chat] .ae-sidebar")).not.toBeVisible();
+  const readingBox = await page.locator("main").boundingBox();
+  const dockBox = await page.locator("[data-agent-chat] dialog").boundingBox();
+  assert.ok(
+    readingBox!.x + readingBox!.width <= dockBox!.x,
+    "docked assistant must not cover the article",
+  );
+  await page
+    .locator("[data-agent-chat]")
+    .getByRole("button", { name: "对话列表", exact: true })
+    .click();
+  await expect(page.locator("[data-agent-chat] .ae-sidebar")).toBeVisible();
+  await page.screenshot({
+    path: new URL("widget-sidebar.png", captures).pathname,
+  });
+  await page.keyboard.press("Escape");
+  await page
+    .locator("[data-agent-chat]")
+    .getByRole("button", { name: "已接入工具（6）", exact: true })
+    .click();
+  await expect(page.locator("[data-agent-chat] .ae-tool-item")).toHaveCount(6);
+  await page.screenshot({
+    path: new URL("widget-tools.png", captures).pathname,
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-agent-chat] .ae-turn")).toHaveCount(3);
+  await expect(page.locator("[data-agent-chat] textarea")).toHaveValue(
+    "返回文档时也保留草稿",
+  );
+  await page.locator("[data-agent-chat] textarea").fill("");
   const cookies = await context.cookies();
   const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
   assert.ok(cookies.find((c) => c.name.startsWith("ae_docs_"))?.httpOnly);
@@ -248,7 +456,7 @@ try {
       headers: { cookie: cookieHeader },
     })
   ).json()) as { id: string }[];
-  assert.equal(sessions.length, 1);
+  assert.equal(sessions.length, 2);
   assert.equal(
     (await fetch(host.url + "/api/agent-chat/sessions")).status,
     401,
@@ -256,6 +464,64 @@ try {
   const other = await browser.newContext();
   const otherPage = await other.newPage();
   await otherPage.goto(host.url);
+  await expect(otherPage).toHaveURL(/\/ai\/$/);
+  await expect(otherPage.locator("[data-agent-chat]")).toContainText(
+    "你想用 Agent Engine 做什么？",
+  );
+  await expect(
+    otherPage.locator("[data-agent-chat] .ae-welcome h3"),
+  ).toBeInViewport();
+  await expect(
+    otherPage.locator("[data-agent-chat] .ae-suggestions button").last(),
+  ).toBeInViewport({ ratio: 1 });
+  await otherPage.screenshot({
+    path: new URL("ai-desktop.png", captures).pathname,
+  });
+  await otherPage.getByRole("button", { name: "切换深色模式" }).click();
+  await otherPage.screenshot({
+    path: new URL("ai-desktop-dark.png", captures).pathname,
+  });
+  await otherPage.getByRole("button", { name: "切换浅色模式" }).click();
+  for (const width of [320, 390, 768, 1024, 1440]) {
+    await otherPage.setViewportSize({
+      width,
+      height: width <= 390 ? 844 : 900,
+    });
+    assert.equal(
+      await otherPage.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+      `AI overflow at ${width}`,
+    );
+    assert.equal(
+      await otherPage
+        .locator("[data-agent-chat] .ae-transcript")
+        .evaluate((el) => el.scrollWidth > el.clientWidth),
+      false,
+      `SDK transcript overflow at ${width}`,
+    );
+    assert.equal(
+      await otherPage
+        .locator("[data-agent-chat] .ae-transcript")
+        .evaluate((el) => el.scrollTop),
+      0,
+      `empty state starts at the heading at ${width}`,
+    );
+    await expect(
+      otherPage.locator("[data-agent-chat] .ae-suggestions button").last(),
+    ).toBeInViewport({ ratio: 1 });
+    await expect(
+      otherPage.locator("[data-agent-chat] textarea"),
+    ).toBeInViewport();
+    await expect(
+      otherPage.getByRole("link", { name: "传统模式", exact: true }),
+    ).toBeVisible();
+    if (width === 320 || width === 390 || width === 768)
+      await otherPage.screenshot({
+        path: new URL(`ai-${width}.png`, captures).pathname,
+      });
+  }
   const otherCookie = (await other.cookies())
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
@@ -303,10 +569,28 @@ try {
     .getByRole("button", { name: "收起聊天" })
     .click();
   await page
+    .locator(".sidebar .nav-group")
+    .filter({ has: page.locator("summary", { hasText: "前端 SDK" }) })
+    .locator("summary")
+    .click();
+  await page
     .locator(".sidebar")
     .getByRole("link", { name: "前端 SDK：接入聊天界面", exact: true })
     .click();
   await expect(page).toHaveURL(/\/docs\/frontend\/$/);
+  await page.getByRole("tab", { name: "React", exact: true }).click();
+  await expect(page.getByRole("tabpanel")).toHaveCount(1);
+  await expect(page.getByRole("tabpanel")).toContainText("useEffect");
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.getByRole("tab", { name: "Vue", exact: true }),
+  ).toBeFocused();
+  await expect(page.getByRole("tabpanel")).toContainText("onMounted");
+  await page.reload();
+  await expect(
+    page.getByRole("tab", { name: "Vue", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "JavaScript", exact: true }).click();
   await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
   await expect(page.locator("[data-agent-chat]")).toContainText(
     "合成普通聊天回答",
@@ -330,12 +614,29 @@ try {
     fullPage: false,
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(host.url);
+  await page.goto(host.url + "/docs/welcome/");
   await page.screenshot({
     path: new URL("mobile.png", captures).pathname,
     fullPage: true,
   });
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    const table = page.locator(".product-table");
+    assert.equal(
+      await table.evaluate((el) => el.scrollWidth > el.clientWidth),
+      false,
+    );
+    await page.screenshot({
+      path: new URL(`intro-${width}.png`, captures).pathname,
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "打开文档目录" }).click();
+  await page
+    .locator("#mobile-nav summary")
+    .filter({ hasText: "后端 SDK" })
+    .click();
   await page
     .locator("#mobile-nav")
     .getByRole("link", { name: "模型配置与密钥管理", exact: true })
@@ -353,6 +654,44 @@ try {
     path: new URL("mobile-chat.png", captures).pathname,
     fullPage: false,
   });
+  const mobileChat = page.locator("[data-agent-chat]");
+  await expect(mobileChat.locator(".ae-sidebar")).not.toBeVisible();
+  await mobileChat
+    .getByRole("button", { name: "对话列表", exact: true })
+    .click();
+  await expect(mobileChat.locator(".ae-sidebar")).toBeVisible();
+  await page.screenshot({
+    path: new URL("mobile-sidebar.png", captures).pathname,
+  });
+  await mobileChat.locator(`[data-session-id="${old.id}"]`).click();
+  await expect(mobileChat.locator(".ae-sidebar")).not.toBeVisible();
+  await expect(
+    mobileChat.getByRole("button", { name: "对话列表", exact: true }),
+  ).toBeFocused();
+  await mobileChat
+    .getByRole("button", { name: "已接入工具（6）", exact: true })
+    .click();
+  await expect(mobileChat.locator(".ae-tool-item")).toHaveCount(6);
+  await page.screenshot({
+    path: new URL("mobile-tools.png", captures).pathname,
+  });
+  await page.keyboard.press("Tab");
+  const toolRegion = mobileChat.getByRole("region", {
+    name: "已接入工具",
+    exact: true,
+  });
+  await expect(toolRegion).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(mobileChat.locator(".ae-tool-item").last()).toBeInViewport();
+  assert.equal(
+    await toolRegion.evaluate((el) => el.scrollWidth > el.clientWidth),
+    false,
+  );
+  await page.keyboard.press("Escape");
+  await expect(mobileChat.locator("dialog")).toBeVisible();
+  await expect(
+    mobileChat.getByRole("button", { name: "已接入工具（6）", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "打开文档助手", exact: true }),
@@ -372,6 +711,17 @@ try {
   });
   try {
     await page.goto(offline.url);
+    await expect(page).toHaveURL(/\/ai\/$/);
+    await expect(
+      page.getByRole("heading", { name: "文档助手尚未连接" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "阅读文档", exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: new URL("ai-offline.png", captures).pathname,
+    });
+    await page.goto(offline.url + "/docs/welcome/");
     await page
       .getByRole("button", { name: "打开文档助手", exact: true })
       .click();
@@ -407,6 +757,19 @@ try {
         "mobile-chat",
         "5-width-overflow",
         "read-only-mode",
+        "AI-default-SDK-page",
+        "mode-switch-history-and-draft",
+        "six-read-tools-engine-execution",
+        "source-version-lines-and-route-boundary",
+        "committed-allowlist-no-symlinks-or-dirty-files",
+        "lossless-docs-read-pagination",
+        "AI-5-widths-dark-offline",
+        "sidebar-select-and-current-session-details",
+        "public-tool-catalog-and-mobile-panels",
+        "docked-reading-without-overlap",
+        "mode-return-article-scroll-and-draft",
+        "per-reply-allowlisted-references",
+        "framework-keyboard-tabs-and-deep-links",
       ],
       model: "deterministic fixture; no provider calls",
     }),

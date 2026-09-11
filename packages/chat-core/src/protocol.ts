@@ -12,6 +12,14 @@ export const sendMessageSchema = z.strictObject({
   input: z.string().trim().min(1).max(8000),
 });
 export const cancelRunSchema = z.strictObject({ runId: z.uuid() });
+/** Public catalog only. Executor configuration, schemas and credentials stay on the server. */
+export const chatToolSchema = z.object({
+  name: z.string().min(1).max(128),
+  label: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  sideEffect: z.enum(["read", "write"]),
+  permission: z.enum(["allow", "require-approval", "deny"]),
+});
 const usageSchema = z.object({
   input: z.number().nonnegative().optional(),
   output: z.number().nonnegative().optional(),
@@ -56,6 +64,7 @@ export const assistantSchema = z.object({
   id: assistantIdSchema,
   label: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
+  tools: z.array(chatToolSchema).optional(),
 });
 export const configSchema = z.object({
   protocolVersion: z.literal(1),
@@ -79,12 +88,18 @@ export const sessionSchema = z.object({
   totalRuns: z.number().int().nonnegative(),
   snapshotSequence: z.number().int().nonnegative(),
   debugPath: z.string().optional(),
+  createdAt: z.number().optional(),
+  configVersion: z.number().int().positive().optional(),
+  tools: z.array(chatToolSchema).optional(),
+  activeTools: z.array(chatToolSchema).optional(),
+  activeConfigVersion: z.number().int().positive().optional(),
 });
 export const sessionsSchema = z.array(sessionSummarySchema);
 export const createdSchema = z.object({ id: z.uuid() });
 export const sentSchema = z.object({ runId: z.uuid() });
 export const cancelledSchema = z.object({ accepted: z.literal(true) });
 export type ChatAssistant = z.infer<typeof assistantSchema>;
+export type ChatTool = z.infer<typeof chatToolSchema>;
 export type ChatConfig = z.infer<typeof configSchema>;
 export type ChatRun = z.infer<typeof runSchema>;
 export type ChatSession = z.infer<typeof sessionSchema>;

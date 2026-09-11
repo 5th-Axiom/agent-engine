@@ -198,6 +198,13 @@ return [
     label: "办公助手",
     description: "回答工作问题",
     config: serverSideSessionConfig,
+    // 可选：按 config.tools 中的名称提供面向用户的介绍。
+    toolDisplay: {
+      "inventory.lookup": {
+        label: "查询库存",
+        description: "按商品编号查询库存数量。",
+      },
+    },
   },
 ];
 ```
@@ -205,6 +212,8 @@ return [
 `serverSideSessionConfig` 就是后端 SDK 使用的会话配置，包含模型和允许调用的工具。如何创建 Engine/配置模型见 [SDK 入门](sdk-quickstart.md)。密钥通过 `secretRef` 引用，集中配置方法见[模型与凭据配置](local-model-configuration.md)。`id` 和 `namespace` 使用字母开头的 1–64 位字母、数字、下划线、点或连字符。
 
 接入桥会在**每次请求**重新调用身份验证和助手授权；会话同时按应用标识、租户和用户隔离。浏览器只能提交助手 ID 和文本，不能覆盖模型、工具或身份。SDK 返回文本、状态、工具名称和用量；Thinking 原生载荷、凭据、工具原始回执不发给浏览器。
+
+`toolDisplay` 只补充已配置工具的公开名称和说明；它不会注册工具，也不会扩大权限。没有设置时展示工具的代码名称。`label` 最多 100 字符、`description` 最多 500 字符；请填写适合用户阅读的文案。模型使用的原始工具说明、参数 Schema、执行器配置和密钥引用不会自动作为工具介绍返回浏览器。
 
 同源 Cookie 登录是最短接入路径。若宿主使用短期业务令牌，前端可在每次请求时获取最新值：
 
@@ -267,6 +276,16 @@ const page = mountChatPage(target, {
 
 页面会随容器宽度变化；较窄时收起键盘提示并调整间距。挂载多个实例时，默认各自拥有控制器和对话；不会全局复用同一个聊天状态。
 
+### 左侧对话列表和信息面板
+
+聊天容器宽度达到 760px 时默认展示 232px 的左侧对话列表，当前会话有选中标记；较窄时通过标题左侧的按钮展开。需要在桌面浮窗中常驻左栏，可设置 `theme.tokens.panelWidth: 880`。新对话按钮位于左栏顶部，左栏收起时使用页头的加号入口；发送第一条消息后会话才写入列表。手机上选中会话会收起左栏并返回聊天。
+
+顶部的“当前会话”展示 ID、创建时间、状态、轮数和配置版本；“工具”展示该会话配置中的工具及读写、审批状态。两种挂载方式都自带这两个入口，面板可滚动；关闭或在面板内按 Esc 会返回入口，保留草稿。
+
+`ChatTool` 是公开工具数据，包含 `name`、可选 `label` / `description`、`sideEffect` 和 `permission`。`ChatAssistant.tools` 用于创建前的预览；已有会话使用 `ChatSession.tools`，不冒用最新助手的工具列表。`ChatSession.activeTools` / `activeConfigVersion` 描述正在运行的配置快照，与当前配置不同时另列“本轮回答的工具”。最终能否调用仍由服务端授权决定。
+
+以上字段及 `ChatSession.createdAt` / `configVersion` 都是协议 v1 的可选扩展，自定义 `ChatTransport` 可以逐步补充。缺少 `tools` 表示尚未提供清单，`tools: []` 才表示没有接入工具。低层组合可从 `@agent-runtime/chat-ui/components` 导入 `createSessionDetails()`，通过 `update(state, "session" | "tools")` 更新。
+
 单独组合组件时要自行安装样式和主题，并在卸载时移除主题监听：
 
 ```ts
@@ -284,6 +303,12 @@ root.append(message.element);
 ```
 
 完整组件示例见 [`examples/embedded/app.js`](../examples/embedded/app.js)。消息当前按纯文本展示，HTML 不会执行；首版没有 Markdown 富文本、图片/文件上传、语音或群聊。
+
+### 给每条回答附上资料链接
+
+页面和浮窗均接受可选的 `getRunSources(run)` 同步回调，返回 `{ label, href }[]`；低层时间线使用 `createMessageTimeline(copy, { getRunSources })`。宿主应先依据自己的文档或源码白名单核对路径，再返回链接。SDK 只在已完成的回答下方展示最多八项，使用纯文本标签、HTTP(S) 链接和新标签页，不执行模型 HTML；带用户名密码的 URL 不展示，回调失败不影响聊天。
+
+需要让助手停靠在阅读区旁边时，可通过 `[data-agent-chat]::part(panel)` 设置外层面板位置，同时用 `theme.tokens.panelWidth` 和 `breakpoint` 配置宽度及全屏断点。`panel` 是公开的样式入口，避免依赖 Shadow DOM 内部类名。文档站的实现可参考 `examples/docs-site/ai.css`；宿主布局需要给助手留出空间。
 
 ## 8. 生命周期、历史和错误处理
 

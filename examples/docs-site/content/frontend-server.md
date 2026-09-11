@@ -18,6 +18,21 @@
 
 verifyLogin 需要连接你的现有 Cookie 会话或业务 Token 校验。上例只演示一个对授权用户开放的助手；需要不同用户看到不同助手时，在 resolveContext 内按身份筛选 assistants，模型配置仍由服务器提供。
 
+### 给工具面板补充名称与介绍
+
+前端自带“工具”入口。chat-server 会从会话配置中提取工具名称、读写类型和权限状态；想让用户看到更容易理解的介绍，可在上面的助手对象（与 config 同级）增加：
+
+```ts
+toolDisplay: {
+  "inventory.lookup": {
+    label: "查询库存",
+    description: "按商品编号查询库存数量。",
+  },
+},
+```
+
+将 inventory.lookup 换成 config.tools 中实际工具的 name。这个字段只提供公开文案，不会注册工具或扩大权限；未配置的工具不会因此出现在清单。label 最多 100 字符，description 最多 500 字符。原始模型工具说明、参数 Schema、执行器和密钥配置不会自动展示给用户。
+
 ## 2. 接入现有服务启动代码
 
 下面是宿主集成片段，verifyExistingLogin 和 authorizeAgentRequest 来自**你自己的登录与权限模块**，需替换为实际实现；它们不是 SDK 内置方法。

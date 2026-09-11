@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-11T07:35:16.384Z",
+  "generatedAt": "2026-09-11T12:14:54.561796+00:00",
   "title": "Design System: Agent Engine Chat UI",
   "extensions": {
     "colorMeta": {
@@ -84,7 +84,7 @@
       },
       "body": {
         "displayName": "正文",
-        "purpose": "页面正文、历史条目与助手选项。"
+        "purpose": "页面正文与助手选项。"
       },
       "message": {
         "displayName": "消息文本",
@@ -101,6 +101,26 @@
       "button": {
         "displayName": "操作文字",
         "purpose": "三种按钮变体的文字。"
+      },
+      "toolbar": {
+        "displayName": "工具栏操作",
+        "purpose": "新对话、当前会话与工具数量入口。"
+      },
+      "detail-note": {
+        "displayName": "详情说明",
+        "purpose": "配置说明与工具描述；错误反馈沿用相同字号及页面行高。"
+      },
+      "panel-title": {
+        "displayName": "面板标题",
+        "purpose": "左侧会话列表与右侧详情标题。"
+      },
+      "history-title": {
+        "displayName": "会话条目标题",
+        "purpose": "最多两行的会话标题，完整文字保留在按钮 title。"
+      },
+      "identifier": {
+        "displayName": "配置标识符",
+        "purpose": "使用本机等宽字体的会话 ID 与工具名称。"
       }
     },
     "shadows": [],
@@ -123,7 +143,11 @@
     ],
     "breakpoints": [
       {
-        "name": "page-narrow-container",
+        "name": "page-wide-root",
+        "value": "760px"
+      },
+      {
+        "name": "page-narrow-main",
         "value": "480px"
       },
       {
@@ -139,7 +163,7 @@
       "refersTo": "button-primary",
       "description": "浅色 workbench 的发送按钮；品牌色、禁用与焦点处理来自同一原子组件。",
       "html": "<button class=\"ds-button-primary\" type=\"button\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"m4 4 17 8-17 8 3-8-3-8Z M7 12h14\"/></svg><span>发送</span></button>",
-      "css": ".ds-button-primary{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cad4df;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-primary:hover:not(:disabled){background:#f3f6f9;border-color:#0758a0}.ds-button-primary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-primary:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}.ds-icon{width:20px;height:20px;flex:none}.ds-button-primary{background:#0758a0;color:#ffffff;border-color:#0758a0}.ds-button-primary:hover:not(:disabled){background:#0758a0;filter:brightness(.93)}.ds-button-primary:disabled{background:#f3f6f9;color:#48596a;border-color:#cad4df}"
+      "css": ".ds-button-primary{font:500 16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #dce2e8;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-primary:hover:not(:disabled){background:#f6f8fa;border-color:#0758a0}.ds-button-primary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-primary:disabled{cursor:default;background:#f6f8fa;color:#48596a;border-color:#dce2e8}.ds-icon{width:20px;height:20px;flex:none}.ds-button-primary{background:#0758a0;color:#ffffff;border-color:#0758a0}.ds-button-primary:hover:not(:disabled){background:#0758a0;filter:brightness(.93)}.ds-button-primary:disabled{background:#f6f8fa;color:#48596a;border-color:#dce2e8}"
     },
     {
       "name": "次要按钮",
@@ -147,7 +171,7 @@
       "refersTo": "button-secondary",
       "description": "默认按钮变体；边框和轻底色表达次级操作。",
       "html": "<button class=\"ds-button-secondary\" type=\"button\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"M12 5v14 M5 12h14\"/></svg><span>新对话</span></button>",
-      "css": ".ds-button-secondary{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cad4df;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-secondary:hover:not(:disabled){background:#f3f6f9;border-color:#0758a0}.ds-button-secondary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-secondary:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}.ds-icon{width:20px;height:20px;flex:none}"
+      "css": ".ds-button-secondary{font:500 16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #dce2e8;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-secondary:hover:not(:disabled){background:#f6f8fa;border-color:#0758a0}.ds-button-secondary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-secondary:disabled{cursor:default;background:#f6f8fa;color:#48596a;border-color:#dce2e8}.ds-icon{width:20px;height:20px;flex:none}"
     },
     {
       "name": "安静图标按钮",
@@ -155,7 +179,7 @@
       "refersTo": "button-quiet",
       "description": "页头关闭操作；视觉图标隐藏于辅助技术，名称来自按钮。",
       "html": "<button class=\"ds-button-quiet\" type=\"button\" aria-label=\"收起聊天\" title=\"收起聊天\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"m6 6 12 12 M18 6 6 18\"/></svg></button>",
-      "css": ".ds-button-quiet{font:600 15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #cad4df;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-quiet:hover:not(:disabled){background:#f3f6f9;border-color:#0758a0}.ds-button-quiet:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-quiet:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}.ds-icon{width:20px;height:20px;flex:none}.ds-button-quiet{width:44px;padding:8px;border-color:transparent;background:transparent}"
+      "css": ".ds-button-quiet{font:500 16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:44px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #dce2e8;border-radius:6px;background:#ffffff;color:#172b42;white-space:nowrap;cursor:pointer;touch-action:manipulation}.ds-button-quiet:hover:not(:disabled){background:#f6f8fa;border-color:#0758a0}.ds-button-quiet:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-button-quiet:disabled{cursor:default;background:#f6f8fa;color:#48596a;border-color:#dce2e8}.ds-icon{width:20px;height:20px;flex:none}.ds-button-quiet{width:44px;padding:8px;border-color:transparent;background:transparent}"
     },
     {
       "name": "消息输入框",
@@ -163,15 +187,15 @@
       "refersTo": "input",
       "description": "两行原生 textarea；标签、字数上限和焦点轮廓来自 createTextInput。",
       "html": "<label class=\"ds-input-label\"><span class=\"ds-visually-hidden\">输入消息…</span><textarea class=\"ds-input\" rows=\"2\" maxlength=\"8000\" placeholder=\"输入消息…\"></textarea></label>",
-      "css": ".ds-input-label{display:block}.ds-visually-hidden{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.ds-input{display:block;width:100%;min-height:68px;max-height:144px;resize:vertical;border:1px solid #cad4df;border-radius:6px;padding:12px;background:#ffffff;color:#172b42;caret-color:#0758a0;font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;touch-action:manipulation}.ds-input::placeholder{color:#48596a}.ds-input::selection{background:#e1edf8;color:#172b42}.ds-input:focus-visible{outline:3px solid #0758a0;outline-offset:3px}"
+      "css": ".ds-input-label{display:block}.ds-visually-hidden{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.ds-input{display:block;width:100%;min-height:60px;max-height:144px;resize:vertical;border:1px solid #dce2e8;border-radius:6px;padding:12px;background:#ffffff;color:#172b42;caret-color:#0758a0;font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;touch-action:manipulation}.ds-input::placeholder{color:#48596a}.ds-input::selection{background:#e1edf8;color:#172b42}.ds-input:focus-visible{outline:3px solid #0758a0;outline-offset:3px}"
     },
     {
-      "name": "历史会话条目",
+      "name": "左侧会话列表",
       "kind": "nav",
       "refersTo": "history-item",
-      "description": "最近对话区域中的当前条目；示例标题仅用于预览。",
-      "html": "<section class=\"ds-history\" aria-label=\"最近对话\"><h3>最近对话</h3><button class=\"ds-history-item\" type=\"button\" aria-current=\"true\">示例对话<small>正在执行</small></button></section>",
-      "css": ".ds-history{max-height:35%;overflow:auto;background:#f3f6f9;padding:12px 16px;border-bottom:1px solid #cad4df;color:#172b42;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-history h3{font-size:15px;margin:0 0 8px}.ds-history-item{display:block;text-align:start;white-space:normal;width:100%;border:0;background:transparent;padding:12px;color:#172b42;border-radius:6px;font:inherit;cursor:pointer;touch-action:manipulation}.ds-history-item:hover,.ds-history-item[aria-current=true]{background:#e1edf8;color:#172b42}.ds-history-item small{display:block;color:#48596a;font-size:12px}.ds-history-item:focus-visible{outline:3px solid #0758a0;outline-offset:3px}.ds-history-item:disabled{cursor:default;background:#f3f6f9;color:#48596a;border-color:#cad4df}"
+      "description": "宽容器内的 232px 常驻左栏，只有一个列表标题；当前项高亮，标题最多两行。预览标题为合成内容。",
+      "html": "<aside class=\"ds-sidebar\" aria-label=\"对话列表\"><div class=\"ds-sidebar-header\"><h2>对话列表</h2></div><section class=\"ds-history\" aria-label=\"对话列表\"><button class=\"ds-history-item\" type=\"button\" aria-current=\"true\" title=\"示例对话：查看合成库存\"><span class=\"ds-history-title-text\">示例对话：查看合成库存</span><small>正在执行</small></button><button class=\"ds-history-item\" type=\"button\" aria-current=\"false\" title=\"另一条示例对话\"><span class=\"ds-history-title-text\">另一条示例对话</span><small>示例助手</small></button></section></aside>",
+      "css": ".ds-sidebar{width:232px;max-width:100%;height:320px;display:flex;flex-direction:column;background:var(--ae-chat-surface,#f6f8fa);border-right:1px solid var(--ae-chat-border,#dce2e8);color:var(--ae-chat-text,#172b42);font:16px/1.6 var(--ae-chat-font-family,system-ui)}.ds-sidebar-header{display:flex;align-items:center;padding:12px var(--ae-chat-space,16px);min-height:64px}.ds-sidebar-header h2{font-size:16px;font-weight:650;margin:0}.ds-history{flex:1;min-height:0;overflow:auto;padding:0 8px 12px;scrollbar-color:var(--ae-chat-border,#dce2e8) var(--ae-chat-surface,#f6f8fa);scrollbar-width:thin}.ds-history-item{display:block;text-align:start;white-space:normal;width:100%;border:0;background:transparent;padding:12px;margin-bottom:4px;color:var(--ae-chat-text,#172b42);border-radius:var(--ae-chat-control-radius,6px);font:inherit;cursor:pointer;touch-action:manipulation}.ds-history-item:hover,.ds-history-item[aria-current=true]{background:var(--ae-chat-user-background,#e1edf8);color:var(--ae-chat-user-text,#172b42)}.ds-history-title-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-weight:550}.ds-history-item small{display:block;margin-top:6px;color:var(--ae-chat-muted,#48596a);font-size:var(--ae-chat-small-font-size,12px)}.ds-history-item:focus-visible{outline:3px solid var(--ae-chat-focus,#0758a0);outline-offset:3px}.ds-history-item:disabled{cursor:default;background:var(--ae-chat-surface,#f6f8fa);color:var(--ae-chat-muted,#48596a)}"
     },
     {
       "name": "用户消息",
@@ -179,7 +203,7 @@
       "refersTo": "message-self",
       "description": "靠右、有语义选中底色的用户消息；预览文字不发送给模型。",
       "html": "<section class=\"ds-message-self\"><p class=\"ds-message-name\">你</p><p class=\"ds-message-text\">请用三句话介绍你能做什么。</p></section>",
-      "css": ".ds-message-self{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:16px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#172b42}.ds-message-name{font-size:12px;color:#48596a;margin:0 0 6px}.ds-message-text{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:15px;line-height:1.7;margin:0;padding:12px 16px;border-radius:12px;background:#e1edf8;color:#172b42}.ds-message-text::selection{background:#e1edf8;color:#172b42}"
+      "css": ".ds-message-self{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:16px;font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#172b42}.ds-message-name{font-size:12px;color:#48596a;margin:0 0 6px}.ds-message-text{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:15px;line-height:1.7;margin:0;padding:12px 16px;border-radius:12px;background:#e1edf8;color:#172b42}.ds-message-text::selection{background:#e1edf8;color:#172b42}"
     },
     {
       "name": "助手消息",
@@ -187,7 +211,7 @@
       "refersTo": "message-agent",
       "description": "工作面上的平整文本回复；没有卡片底色或富媒体渲染。",
       "html": "<section class=\"ds-message-agent\"><p class=\"ds-agent-name\">助手</p><p class=\"ds-agent-text\">在这里提问，继续当前工作。</p></section>",
-      "css": ".ds-message-agent{padding:0 2px;margin-bottom:16px;font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#172b42}.ds-agent-name{font-size:12px;color:#48596a;margin:0 0 6px}.ds-agent-text{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:15px;line-height:1.7;margin:0}.ds-agent-text::selection{background:#e1edf8;color:#172b42}"
+      "css": ".ds-message-agent{padding:0 2px;margin-bottom:16px;font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#172b42}.ds-agent-name{font-size:12px;color:#48596a;margin:0 0 6px}.ds-agent-text{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:15px;line-height:1.7;margin:0}.ds-agent-text::selection{background:#e1edf8;color:#172b42}"
     },
     {
       "name": "执行详情",
@@ -195,7 +219,7 @@
       "refersTo": "run-details",
       "description": "原生折叠详情；数值沿用组件展廊的合成样例，不能当作生产用量或业务承诺。",
       "html": "<details class=\"ds-run-details\" open><summary>执行详情 · 48 Token</summary><p>输入 32 · 输出 16 · 用量完整 · 费用估算不完整</p><p>模型请求 2 · 执行步骤 2</p><div><p class=\"ds-operation\"><strong>demo.inventory</strong> · 已执行 · 结果校验通过</p></div></details>",
-      "css": ".ds-run-details{margin-top:12px;border-top:1px solid #cad4df;font:12px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#48596a}.ds-run-details summary{cursor:pointer;padding:10px 0;min-height:44px;display:list-item}.ds-run-details p{margin:4px 0}.ds-operation{padding:8px 0;overflow-wrap:anywhere}.ds-operation strong{font-weight:600;color:#172b42}.ds-run-details summary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}"
+      "css": ".ds-run-details{margin-top:12px;border-top:1px solid #dce2e8;font:12px/1.6 system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#48596a}.ds-run-details summary{cursor:pointer;padding:10px 0;min-height:44px;display:list-item}.ds-run-details p{margin:4px 0}.ds-operation{padding:8px 0;overflow-wrap:anywhere}.ds-operation strong{font-weight:600;color:#172b42}.ds-run-details summary:focus-visible{outline:3px solid #0758a0;outline-offset:3px}"
     },
     {
       "name": "聊天入口",
@@ -204,15 +228,22 @@
       "description": "默认圆形入口；预览保留控件造型，视口定位由 mountChatWidget 负责。",
       "html": "<button class=\"ds-launcher\" type=\"button\" aria-label=\"打开聊天助手\" title=\"打开聊天助手\" aria-haspopup=\"dialog\" aria-expanded=\"false\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" ><path d=\"M5 5h14v10H9l-4 4V5Z M9 9h6 M9 12h4\"/></svg></button>",
       "css": ".ds-launcher{width:56px;height:56px;border-radius:50%;border:1px solid #0758a0;background:#0758a0;color:#ffffff;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;touch-action:manipulation}.ds-launcher .ds-icon{width:26px;height:26px;flex:none}.ds-launcher:hover{filter:brightness(.93)}.ds-launcher:focus-visible{outline:3px solid #0758a0;outline-offset:3px}@media(forced-colors:active){.ds-launcher{border:1px solid ButtonText}}"
+    },
+    {
+      "name": "工具详情面板",
+      "kind": "custom",
+      "description": "主区域内的右侧详情，内容可聚焦并滚动。此预览使用合成的公开工具说明，不触发调用；真实页面关闭后返回工具入口。",
+      "html": "<aside class=\"ds-tool-panel\" aria-label=\"已接入工具\"><div class=\"ds-detail-header\"><h3>已接入工具</h3><button class=\"ds-detail-close\" type=\"button\" aria-label=\"关闭面板\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m6 6 12 12 M18 6 6 18\"/></svg></button></div><div class=\"ds-tool-content\" tabindex=\"0\" role=\"region\" aria-label=\"已接入工具\"><p class=\"ds-detail-note\">当前会话的工具配置。实际调用仍以服务端权限为准。</p><ul class=\"ds-tool-list\"><li class=\"ds-tool-item\"><div class=\"ds-tool-heading\"><h4>查看示例库存</h4><span class=\"ds-tool-kind\">只读</span></div><code class=\"ds-tool-name\">demo.inventory</code><p>读取合成库存样例。</p></li></ul></div></aside>",
+      "css": ".ds-tool-panel{width:min(360px,100%);height:360px;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--ae-chat-border,var(--line,#dce2e8));background:var(--ae-chat-canvas,var(--canvas,#fff));color:var(--ae-chat-text,var(--text,#172b42));font:16px/1.6 var(--ae-chat-font-family,system-ui)}.ds-detail-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px var(--ae-chat-space,16px);min-height:64px;border-bottom:1px solid var(--ae-chat-border,var(--line,#dce2e8))}.ds-detail-header h3{font-size:16px;font-weight:650;margin:0}.ds-detail-close{display:inline-flex;align-items:center;justify-content:center;min-height:44px;width:44px;padding:8px;border:1px solid transparent;border-radius:var(--ae-chat-control-radius,6px);background:transparent;color:var(--ae-chat-text,var(--text,#172b42));cursor:pointer}.ds-detail-close svg{width:20px;height:20px}.ds-detail-close:hover{background:var(--ae-chat-surface,var(--surface,#f6f8fa));border-color:var(--ae-chat-accent-text,var(--accent,#0758a0))}.ds-detail-close:focus-visible,.ds-tool-content:focus-visible{outline:3px solid var(--ae-chat-focus,var(--accent,#0758a0));outline-offset:3px}.ds-tool-content{overflow:auto;min-height:0;padding:16px;scrollbar-color:var(--ae-chat-border,var(--line,#dce2e8)) var(--ae-chat-surface,var(--surface,#f6f8fa));scrollbar-width:thin}.ds-detail-note{font-size:13px;line-height:1.75;color:var(--ae-chat-muted,var(--muted,#48596a));margin:0 0 16px}.ds-tool-list{list-style:none;margin:0;padding:0}.ds-tool-item{padding:16px 0;border-top:1px solid var(--ae-chat-border,var(--line,#dce2e8))}.ds-tool-item:first-child{padding-top:0;border-top:0}.ds-tool-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.ds-tool-heading h4{font-size:15px;font-weight:650;margin:0;overflow-wrap:anywhere}.ds-tool-kind{font-size:12px;color:var(--ae-chat-muted,var(--muted,#48596a));white-space:nowrap}.ds-tool-name{display:block;margin-top:4px;font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ae-chat-muted,var(--muted,#48596a));overflow-wrap:anywhere}.ds-tool-item p{margin:8px 0 0;font-size:13px;line-height:1.75;color:var(--ae-chat-muted,var(--muted,#48596a));overflow-wrap:anywhere}"
     }
   ],
   "narrative": {
     "northStar": "Agent Engine 工作台",
-    "overview": "聊天界面沿用 Agent Engine 的白色工作面、深蓝文字、蓝色操作和细分隔线。内容以平整记录排列，操作保持清楚、安静；悬浮入口让用户在当前工作环境中打开对话。深色主题与柔和圆角皮肤延续同一套层级和控件语义。\n\n本规范覆盖可复用 SDK 的 Token、原子组件、业务组件和页面挂载。默认视觉值来自实现，主题与皮肤通过公开接口替换。管理后台的导航、库存表和介绍区域只是接入示例；合成库存不构成 SDK 的业务能力或生产数据承诺。",
+    "overview": "聊天界面沿用 Agent Engine 的白色工作面、深蓝文字、蓝色操作和细分隔线。内容以平整记录排列，操作保持清楚、安静；悬浮入口让用户在当前工作环境中打开对话。深色主题与柔和圆角皮肤延续同一套层级和控件语义。\n\n本规范覆盖可复用 SDK 的 Token、原子组件、业务组件和页面挂载。默认视觉值来自实现，主题与皮肤通过公开接口替换。管理后台的导航、库存表和介绍区域只是接入示例；合成库存不构成 SDK 的业务能力或生产数据承诺。\n\n体验优化：标题与常用操作合并，新对话放左栏，输入和发送整合。正文采用 16px；文档宽屏助手停靠右侧并为正文让出空间。模式切换记住文章位置，引用随所属回答展示。",
     "keyCharacteristics": [
       "语义颜色统一驱动浅色、深色、系统主题和品牌色。",
       "细边框、留白与文字层级组织记录，不使用投影构造卡片层级。",
-      "悬浮对话与容器页面共享消息、历史、输入和执行详情组件。",
+      "悬浮对话与容器页面共享左侧会话列表、消息、输入及会话／工具详情。",
       "原生控件、清楚的焦点和明确状态支持键盘及触屏操作。",
       "每个挂载实例在 Shadow DOM 内应用样式，宿主保留自己的视觉身份。"
     ],
@@ -238,6 +269,7 @@
       "**Do** 让 Token、原子组件、业务组件和页面保持现有职责，业务组件接收数据及回调。",
       "**Do** 为 inline 容器提供明确尺寸，在宿主真实布局中验证容器与窗口响应。",
       "**Do** 保留文字状态、用量完整性、可见焦点、输入法保护和用户上翻位置。",
+      "**Do** 保留左栏当前项、详情滚动区的键盘入口、关闭后的焦点返回，以及当前配置与本轮工具快照的区别。",
       "**Do** 在宿主卸载或退出登录时清理挂载，并按控制器归属管理会话记忆。",
       "**Do** 将库存工作台与组件展廊标明为示例，保留合成数据的性质。"
     ],
@@ -247,7 +279,8 @@
       "**Don't** 给当前平整记录新增投影卡片层级、位图头像或装饰性素材。",
       "**Don't** 把收起、卸载或结束重试描述为已取消服务端任务。",
       "**Don't** 把缺失用量、未知执行结果或降级检测输出表示为已验证成功。",
-      "**Don't** 将模型文字作为 HTML 注入，或让展示组件直接处理模型密钥与网络请求。"
+      "**Don't** 将模型文字作为 HTML 注入，或让展示组件直接处理模型密钥与网络请求。",
+      "**Don't** 把未提供工具清单显示为零，或从原始配置自动暴露工具提示、Schema 和执行器细节。"
     ]
   }
 }

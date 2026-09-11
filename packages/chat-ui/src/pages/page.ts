@@ -1,22 +1,21 @@
 import {
   ChatController,
   errorCode,
+  createChatId,
   type ChatState,
 } from "@agent-runtime/chat-core";
-import {
-  createButton,
-  createIcon,
-  createStatus,
-  element,
-} from "../atoms/index.js";
+import { createButton, createStatus, element } from "../atoms/index.js";
 import {
   createComposer,
   createMessageTimeline,
   createSessionList,
+  createSessionDetails,
+  type SessionPanel,
+  type TimelineOptions,
 } from "../components/index.js";
 import { defaultChatCopy, explainChatError, type ChatCopy } from "../copy.js";
 
-export interface ChatPageOptions {
+export interface ChatPageOptions extends TimelineOptions {
   copy?: Partial<ChatCopy>;
   suggestions?: string[];
   onClose?: () => void;
@@ -29,8 +28,54 @@ export function createChatPage(
   const copy = { ...defaultChatCopy, ...options.copy };
   const root = element("section", "ae-page");
   root.setAttribute("aria-label", copy.title);
+  const main = element("div", "ae-chat-main");
+  const sidebar = element("aside", "ae-sidebar");
+  sidebar.setAttribute("aria-label", copy.history);
+  sidebar.id = "ae-history-" + createChatId();
+  const sidebarHeader = element("div", "ae-sidebar-header");
+  const sidebarBackdrop = createButton({
+    label: copy.closePanel,
+    onClick: () => setSidebar(false),
+  });
+  sidebarBackdrop.className = "ae-sidebar-backdrop";
+  sidebarBackdrop.replaceChildren();
+  sidebarBackdrop.setAttribute("aria-label", copy.closePanel);
+  sidebarBackdrop.tabIndex = -1;
+  sidebar.hidden = sidebarBackdrop.hidden = true;
+  let wide = false,
+    wideSidebar = true,
+    sidebarOpen = false;
+  function setSidebar(open: boolean, focus = true) {
+    if (wide) wideSidebar = open;
+    else sidebarOpen = open;
+    if (open) setPanel(undefined, false);
+    syncSidebar();
+    if (focus) {
+      if (open && !wide) sidebarClose.focus({ preventScroll: true });
+      else if (!open) historyToggle.focus({ preventScroll: true });
+    }
+  }
+  function syncSidebar() {
+    const visible = wide ? wideSidebar : sidebarOpen;
+    sidebar.hidden = !visible;
+    sidebarBackdrop.hidden = wide || !sidebarOpen;
+    sidebarClose.hidden = wide;
+    newButton.hidden = !visible;
+    quickNew.hidden = visible;
+    main.inert = !wide && sidebarOpen;
+    root.dataset.wide = String(wide);
+    root.dataset.narrow = String(main.clientWidth < 480);
+    historyToggle.setAttribute("aria-expanded", String(visible));
+  }
+  const sidebarClose = createButton({
+    label: copy.closePanel,
+    icon: "close",
+    iconOnly: true,
+    variant: "quiet",
+    onClick: () => setSidebar(false),
+  });
+  sidebarHeader.append(element("h2", "", copy.history), sidebarClose);
   const header = element("header", "ae-header");
-  header.append(createIcon("chat"));
   const heading = element("div", "ae-heading");
   heading.append(element("h2", "ae-title", copy.title));
   const connection = createStatus();
@@ -60,25 +105,21 @@ export function createChatPage(
   }
   const history = createSessionList((id) => {
     safe(() => controller.selectSession(id));
-    history.element.hidden = true;
-    historyToggle.setAttribute("aria-expanded", "false");
+    if (!wide) setSidebar(false);
   }, copy);
-  history.element.hidden = true;
+  sidebar.append(sidebarHeader, history.element);
   const historyToggle = createButton({
     label: copy.history,
-    icon: "history",
+    icon: "sidebar",
     iconOnly: true,
     variant: "quiet",
     onClick: () => {
-      history.element.hidden = !history.element.hidden;
-      historyToggle.setAttribute(
-        "aria-expanded",
-        String(!history.element.hidden),
-      );
+      setSidebar(!(wide ? wideSidebar : sidebarOpen));
     },
   });
   historyToggle.setAttribute("aria-expanded", "false");
-  header.append(historyToggle);
+  historyToggle.setAttribute("aria-controls", sidebar.id);
+  header.prepend(historyToggle);
   if (options.onClose)
     header.append(
       createButton({
@@ -90,21 +131,93 @@ export function createChatPage(
       }),
     );
   const toolbar = element("div", "ae-toolbar");
+  const mainBody = element("div", "ae-main-body");
+  const conversation = element("div", "ae-conversation");
+  const detailPanel = element("aside", "ae-detail-panel");
+  detailPanel.id = "ae-details-" + createChatId();
+  const detailHeader = element("div", "ae-detail-header");
+  const detailTitle = element("h3");
+  const detailClose = createButton({
+    label: copy.closePanel,
+    icon: "close",
+    iconOnly: true,
+    variant: "quiet",
+    onClick: () => setPanel(undefined),
+  });
+  const detailBackdrop = createButton({
+    label: copy.closePanel,
+    onClick: () => setPanel(undefined),
+  });
+  detailBackdrop.className = "ae-detail-backdrop";
+  detailBackdrop.replaceChildren();
+  detailBackdrop.setAttribute("aria-label", copy.closePanel);
+  detailBackdrop.tabIndex = -1;
+  const details = createSessionDetails(copy);
+  let panel: SessionPanel | undefined;
+  let detailTrigger: HTMLButtonElement | undefined;
+  function setPanel(next: SessionPanel | undefined, focus = true) {
+    panel = next;
+    detailPanel.hidden = detailBackdrop.hidden = !next;
+    conversation.inert = !!next;
+    infoButton.setAttribute("aria-expanded", String(next === "session"));
+    toolsButton.setAttribute("aria-expanded", String(next === "tools"));
+    if (next) {
+      detailTrigger = next === "session" ? infoButton : toolsButton;
+      detailTitle.textContent =
+        next === "session" ? copy.sessionDetails : copy.tools;
+      detailPanel.setAttribute("aria-label", detailTitle.textContent);
+      details.update(controller.snapshot, next);
+      if (focus) detailClose.focus({ preventScroll: true });
+    } else if (focus) detailTrigger?.focus({ preventScroll: true });
+  }
+  const infoButton = createButton({
+    label: copy.sessionDetails,
+    icon: "info",
+    variant: "quiet",
+    onClick: () => setPanel(panel === "session" ? undefined : "session"),
+  });
+  const toolsButton = createButton({
+    label: copy.toolsButton,
+    icon: "tool",
+    variant: "quiet",
+    onClick: () => setPanel(panel === "tools" ? undefined : "tools"),
+  });
+  infoButton.setAttribute("aria-controls", detailPanel.id);
+  toolsButton.setAttribute("aria-controls", detailPanel.id);
+  detailHeader.append(detailTitle, detailClose);
+  detailPanel.append(detailHeader, details.element);
+  detailPanel.hidden = detailBackdrop.hidden = true;
   const assistantLabel = element("label", "ae-select-label", copy.assistant);
   const select = element("select", "ae-select");
   assistantLabel.append(select);
   select.addEventListener("change", () =>
     safe(() => controller.newSession(select.value)),
   );
+  const startNewSession = () => {
+    setPanel(undefined, false);
+    if (!wide) setSidebar(false, false);
+    safe(() => controller.newSession());
+    composer.focus();
+  };
   const newButton = createButton({
     label: copy.newSession,
     icon: "plus",
-    onClick: () => {
-      safe(() => controller.newSession());
-      composer.focus();
-    },
+    onClick: startNewSession,
   });
-  toolbar.append(assistantLabel, newButton);
+  newButton.classList.add("ae-new-session");
+  const quickNew = createButton({
+    label: copy.newSession,
+    icon: "plus",
+    iconOnly: true,
+    variant: "quiet",
+    onClick: startNewSession,
+  });
+  quickNew.hidden = true;
+  sidebar.insertBefore(newButton, history.element);
+  sidebar.insertBefore(assistantLabel, history.element);
+  toolbar.append(quickNew, infoButton, toolsButton);
+  // Keep frequent actions in the header; details still open in the main body.
+  header.insertBefore(toolbar, header.children[2] ?? null);
   const transcript = element("div", "ae-transcript");
   transcript.tabIndex = 0;
   transcript.setAttribute("aria-label", "对话记录");
@@ -125,7 +238,7 @@ export function createChatPage(
       }),
     );
   welcome.append(suggestions);
-  const timeline = createMessageTimeline(copy);
+  const timeline = createMessageTimeline(copy, options);
   transcript.append(welcome, timeline.element);
   let following = true;
   let lastSession: string | undefined;
@@ -181,15 +294,36 @@ export function createChatPage(
   debug.target = "_blank";
   debug.rel = "noopener noreferrer";
   toolbar.append(debug);
-  root.append(
-    header,
-    toolbar,
-    history.element,
-    transcript,
-    jump,
-    feedback,
-    composer.element,
-  );
+  conversation.append(transcript, jump, feedback, composer.element);
+  mainBody.append(conversation, detailBackdrop, detailPanel);
+  main.append(header, mainBody);
+  root.append(sidebarBackdrop, sidebar, main);
+  root.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Escape" && (panel || (!wide && sidebarOpen))) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (panel) setPanel(undefined);
+      else setSidebar(false);
+    }
+    if (event.key === "Tab" && !wide && sidebarOpen) {
+      const focusable = [
+        ...sidebar.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), select:not(:disabled), [tabindex='0']",
+        ),
+      ].filter((el) => !el.hidden && el.getClientRects().length);
+      const active = (root.getRootNode() as ShadowRoot).activeElement;
+      const first = focusable[0],
+        last = focusable.at(-1);
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+  });
   let assistants = "";
   const unsubscribe = controller.subscribe((state: ChatState) => {
     connection.textContent =
@@ -210,16 +344,32 @@ export function createChatPage(
       );
     }
     select.value = state.assistantId ?? "";
+    assistantLabel.hidden = (state.config?.assistants.length ?? 0) <= 1;
     select.disabled =
       !!state.session || state.pending || state.sending || !state.config;
-    newButton.disabled = state.pending || state.sending || !state.config;
+    newButton.disabled = quickNew.disabled =
+      state.pending || state.sending || !state.config;
     history.update(
       state.sessions,
       state.session?.id,
       state.sending || state.pending,
+      state.config?.assistants ?? [],
     );
+    const currentAssistant = state.config?.assistants.find(
+      (a) => a.id === state.assistantId,
+    );
+    const tools = state.session ? state.session.tools : currentAssistant?.tools;
+    toolsButton.querySelector("span")!.textContent =
+      copy.toolsButton + (tools ? ` ${tools.length}` : "");
+    toolsButton.setAttribute(
+      "aria-label",
+      copy.tools + (tools ? `（${tools.length}）` : ""),
+    );
+    if (panel) details.update(state, panel);
     const sessionChanged = lastSession !== state.session?.id;
     lastSession = state.session?.id;
+    const hasRuns = !!state.session?.runs.length;
+    welcome.hidden = hasRuns;
     const next = JSON.stringify(state.session?.runs ?? []);
     if (next !== fingerprint || sessionChanged) {
       const top = transcript.scrollTop;
@@ -227,7 +377,7 @@ export function createChatPage(
       fingerprint = next;
       timeline.update(state.session?.runs ?? []);
       if (shouldFollow) {
-        transcript.scrollTop = transcript.scrollHeight;
+        transcript.scrollTop = hasRuns ? transcript.scrollHeight : 0;
         following = true;
         jump.hidden = true;
       } else {
@@ -235,7 +385,6 @@ export function createChatPage(
         jump.hidden = false;
       }
     }
-    welcome.hidden = !!state.session?.runs.length;
     composer.update(state);
     const visibleError = state.error ?? localError;
     feedback.hidden = !visibleError;
@@ -265,8 +414,17 @@ export function createChatPage(
     }
   });
   const resize = new ResizeObserver((entries) => {
-    root.dataset.narrow = String((entries[0]?.contentRect.width ?? 0) < 480);
-    if (following) transcript.scrollTop = transcript.scrollHeight;
+    const nextWide = (entries[0]?.contentRect.width ?? 0) >= 760;
+    const active = (root.getRootNode() as ShadowRoot).activeElement;
+    if (nextWide !== wide) {
+      wide = nextWide;
+      sidebarOpen = false;
+    }
+    syncSidebar();
+    if (sidebar.hidden && active && sidebar.contains(active))
+      historyToggle.focus({ preventScroll: true });
+    if (following)
+      transcript.scrollTop = welcome.hidden ? transcript.scrollHeight : 0;
   });
   resize.observe(root);
   return {

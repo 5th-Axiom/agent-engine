@@ -10,6 +10,7 @@ export function createComposer(options: {
   const copy = options.copy ?? defaultChatCopy;
   const root = element("form", "ae-composer");
   const field = createTextInput(copy.placeholder);
+  const surface = element("div", "ae-composer-surface");
   const footer = element("div", "ae-composer-footer");
   const count = element("p", "ae-input-count");
   const actions = element("div", "ae-composer-actions");
@@ -27,7 +28,8 @@ export function createComposer(options: {
   actions.append(cancel, send);
   footer.append(count, actions);
   const note = element("p", "ae-footnote", copy.footnote);
-  root.append(field.element, footer, note);
+  surface.append(field.element, footer);
+  root.append(surface, note);
   let composing = false;
   field.input.addEventListener("compositionstart", () => (composing = true));
   field.input.addEventListener("compositionend", () => {
@@ -61,9 +63,11 @@ export function createComposer(options: {
         field.input.value = state.draft;
       field.input.disabled = !state.config;
       field.input.readOnly = state.sending || state.pending;
+      const nearLimit = state.draft.length >= 7200;
       count.replaceChildren(
-        document.createTextNode(`${state.draft.length} / 8000`),
-        element("span", "ae-keyboard-hint", " · ⌘ / Ctrl + Enter"),
+        nearLimit
+          ? document.createTextNode(`${state.draft.length} / 8000`)
+          : element("span", "ae-keyboard-hint", "⌘ / Ctrl + Enter 发送"),
       );
       send.disabled =
         chatBusy(state) ||

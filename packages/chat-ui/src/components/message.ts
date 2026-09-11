@@ -11,6 +11,14 @@ export interface MessageViewData {
   name: string;
   text: string;
 }
+export interface ChatSourceLink {
+  label: string;
+  href: string;
+}
+export interface TimelineOptions {
+  /** Resolve public reference links for a completed reply. No model HTML is rendered. */
+  getRunSources?: (run: ChatRun) => readonly ChatSourceLink[];
+}
 export function createMessage(data: MessageViewData) {
   const root = element("section", "ae-message ae-message-" + data.sender);
   const name = element("p", "ae-message-name");
@@ -53,7 +61,10 @@ export function createRunDetails(copy: ChatCopy = defaultChatCopy) {
   };
 }
 /** Presentation only: no API calls, no controller, no scroll mutation. */
-export function createMessageTimeline(copy: ChatCopy = defaultChatCopy) {
+export function createMessageTimeline(
+  copy: ChatCopy = defaultChatCopy,
+  options: TimelineOptions = {},
+) {
   const root = element("div", "ae-timeline");
   const turns = new Map<
     string,
@@ -63,6 +74,7 @@ export function createMessageTimeline(copy: ChatCopy = defaultChatCopy) {
       agent: ReturnType<typeof createMessage>;
       status: HTMLElement;
       details: ReturnType<typeof createRunDetails>;
+      sources: HTMLElement;
       fingerprint: string;
     }
   >();
@@ -92,9 +104,13 @@ export function createMessageTimeline(copy: ChatCopy = defaultChatCopy) {
           });
           const status = element("p", "ae-turn-state");
           const details = createRunDetails(copy);
+          const sources = element("nav", "ae-sources");
+          sources.setAttribute("aria-label", "本条回答的参考资料");
+          sources.hidden = true;
           container.append(
             user.element,
             agent.element,
+            sources,
             status,
             details.element,
           );
@@ -104,6 +120,7 @@ export function createMessageTimeline(copy: ChatCopy = defaultChatCopy) {
             agent,
             status,
             details,
+            sources,
             fingerprint: "",
           };
           turns.set(run.id, turn);
@@ -132,6 +149,31 @@ export function createMessageTimeline(copy: ChatCopy = defaultChatCopy) {
                 : (runLabels[run.state] ?? run.state);
         turn.status.classList.toggle("ae-error-text", run.state === "failed");
         turn.details.update(run);
+        turn.sources.replaceChildren();
+        if (run.state === "completed" && options.getRunSources) {
+          try {
+            for (const source of options.getRunSources(run).slice(0, 8)) {
+              const url = new URL(source.href, location.href);
+              if (
+                !/^https?:$/.test(url.protocol) ||
+                url.username ||
+                url.password
+              )
+                continue;
+              const link = element("a", "", source.label);
+              link.href = url.href;
+              // Keep the active conversation and draft in place while reading a source.
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.setAttribute("aria-label", source.label + "（新标签页）");
+              turn.sources.append(link);
+            }
+          } catch {
+            // A host reference resolver cannot interrupt rendering or sending.
+            turn.sources.replaceChildren();
+          }
+        }
+        turn.sources.hidden = !turn.sources.childElementCount;
       }
     },
   };

@@ -13,6 +13,7 @@ import {
   assistantFor,
   listChatSessions,
   readChatSession,
+  publicTools,
 } from "./projection.js";
 import type { ChatHandlerOptions } from "./types.js";
 export * from "./types.js";
@@ -109,7 +110,10 @@ export function createChatHandler(options: ChatHandlerOptions) {
       const context = await options.resolveContext(req);
       if (!context?.engine) throw new ChatError("CHAT_UNAUTHENTICATED", 401);
       const publicAssistants = context.assistants.map((a) =>
-        assistantSchema.parse(a),
+        assistantSchema.parse({
+          ...a,
+          tools: publicTools(parseConfig(a.config).tools, a.toolDisplay),
+        }),
       );
       if (
         !publicAssistants.length ||

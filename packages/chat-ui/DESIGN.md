@@ -6,8 +6,8 @@ colors:
   black: "#000000"
   navy: "#172b42"
   muted: "#48596a"
-  line: "#cad4df"
-  surface: "#f3f6f9"
+  line: "#dce2e8"
+  surface: "#f6f8fa"
   blue: "#0758a0"
   selected: "#e1edf8"
   error: "#99252c"
@@ -21,36 +21,55 @@ colors:
   dark-error: "#ffadb1"
 typography:
   headline:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
     fontSize: "22px"
     fontWeight: 650
     lineHeight: 1.35
   title:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
     fontSize: "18px"
     fontWeight: 650
     lineHeight: 1.6
   body:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "15px"
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+    fontSize: "16px"
     lineHeight: 1.6
   message:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "15px"
-    lineHeight: 1.7
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+    fontSize: "16px"
+    lineHeight: 1.8
   label:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "12px"
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+    fontSize: "13px"
     lineHeight: 1.6
   input:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
     fontSize: "16px"
     lineHeight: 1.5
   button:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "15px"
-    fontWeight: 600
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+    fontSize: "16px"
+    fontWeight: 500
     lineHeight: 1.6
+  toolbar:
+    fontSize: "14px"
+    fontWeight: 500
+    lineHeight: 1.6
+  detail-note:
+    fontSize: "13px"
+    lineHeight: 1.75
+  panel-title:
+    fontSize: "16px"
+    fontWeight: 650
+    lineHeight: 1.6
+  history-title:
+    fontSize: "14px"
+    fontWeight: 500
+    lineHeight: 1.6
+  identifier:
+    fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace"
+    fontSize: "12px"
+    lineHeight: 1.7
 rounded:
   control: "6px"
   message: "12px"
@@ -100,7 +119,7 @@ components:
   history-item:
     backgroundColor: "transparent"
     textColor: "{colors.navy}"
-    typography: "{typography.body}"
+    typography: "{typography.history-title}"
     rounded: "{rounded.control}"
     padding: "12px"
     width: "100%"
@@ -139,13 +158,15 @@ components:
 
 - 语义颜色统一驱动浅色、深色、系统主题和品牌色。
 - 细边框、留白与文字层级组织记录，不使用投影构造卡片层级。
-- 悬浮对话与容器页面共享消息、历史、输入和执行详情组件。
+- 悬浮对话与容器页面共享左侧会话列表、消息、输入及会话／工具详情。
 - 原生控件、清楚的焦点和明确状态支持键盘及触屏操作。
 - 每个挂载实例在 Shadow DOM 内应用样式，宿主保留自己的视觉身份。
 
 来源为 [Token](src/tokens/index.ts)、[共享样式](src/styles.ts)、[原子组件](src/atoms/index.ts)、[业务组件](src/components/index.ts) 和 [页面](src/pages/index.ts)。方向来自 [接入示例](../../examples/embedded/index.html) 的首个 body 注释及 [PRODUCT.md](PRODUCT.md)，没有替换现有 Playground 或 Debug 的设计。
 
-本次文档承接 finish review（本地审查材料） 的 `ship` 结论。该审查接受六张证据：桌面浅色（本地审查材料）、桌面深色（本地审查材料）、关闭入口（本地审查材料）、容器嵌入（本地审查材料）、移动浅色（本地审查材料）、移动深色（本地审查材料）。前四张为 1440×1000，后两张为 390×844；移动截图使用 rounded 皮肤。文档提取没有重跑浏览器验收或机械检测。检测器因缺少解析依赖降级，返回的 `[]` 不能作为计算样式对比度通过证据；颜色依据是主题校验代码及已有契约测试结果，视觉结论限于已审查尺寸和状态。
+本次合并依据共享样式、页面、会话列表与详情组件，以及文档宿主的侧栏终审记录。初审发现工具滚动区缺少明确键盘入口；修正为可聚焦且具名的 region 后，复核结论为 `ship`，仅覆盖该项已评分修复。审查记录接受九张当前截图：`widget-sidebar.png`、`widget-tools.png`、`ai-session-details.png`、`ai-tools.png`、`ai-tools-dark.png`、`mobile-sidebar.png`、`mobile-tools.png`、`ai-320.png`、`ai-desktop.png`，均位于文档宿主的 `.impeccable/review/`。
+
+本轮验证记录为类型检查、构建、14 项后端／控制器测试、28 组文档站验证及 19 组 SDK 浏览器验证通过。侧栏检测器本轮只运行一次，三个 advisory 均涉及有意采用的 13／14px 字级，现已记录其用途；这不等于完整无障碍或计算样式对比度审计。本文同步未重跑浏览器或检测器，移动证据限于 Chromium 视口；较早的六张首版截图与供应商验证保留在公开验收说明的历史记录中。
 
 本地审查报告和截图被 Git 忽略，克隆仓库不包含这些材料。可交付的行为说明与复现入口见 [公开验收/使用说明](../../docs/frontend-sdk-acceptance.md)。
 
@@ -165,7 +186,7 @@ components:
 - **海军蓝文字（navy）与浅色文字（dark-text）**：正文和控件的主要文字。
 - **蓝灰次级文字（muted / dark-muted）**：发送者、连接状态、辅助说明和用量。
 - **次级工作面（surface / dark-surface）**：历史区域、次按钮悬停和禁用控件。
-- **记录分隔线（line / dark-line）**：控件边框及头部、工具栏、输入区的细分隔线。
+- **记录分隔线（line / dark-line）**：控件、详情面板与输入色面的必要边界。
 - **选中底色（selected / dark-selected）**：用户消息、历史当前项和文本选区。
 - **黑色与白色（black / white）**：自定义品牌色按钮的对比文字候选。
 
@@ -189,31 +210,38 @@ components:
 
 ## Typography
 
-采用系统无衬线字体栈，SDK 没有远程字体、展示字体或独立等宽字体。标题通过字号和字重建立层级，正文保留足够行距阅读长回复；字体不承担营销式表达。
+采用系统无衬线字体栈，SDK 没有远程字体或展示字体。会话 ID 与工具名称使用本机等宽字体，便于辨认标识符。标题通过字号和字重建立层级，正文保留足够行距阅读长回复；字体不承担营销式表达。
 
 | 前置 Token 角色 | 用途                                   |
 | --------------- | -------------------------------------- |
 | headline        | 空会话欢迎标题                         |
 | title           | 对话页头部标题                         |
-| body            | 页面正文、历史条目和助手选项           |
+| body            | 页面正文和助手选项                     |
+| history-title   | 左侧会话条目的两行标题                 |
 | message         | 保留换行的用户与助手文本               |
 | label           | 发送者、状态、执行详情、字符计数和脚注 |
 | input           | 多行输入框，触屏下保持明确可读的字号   |
 | button          | 主、次、安静按钮的操作文字             |
+| toolbar         | 新对话、当前会话和工具数量入口         |
+| detail-note     | 配置说明和工具描述                     |
+| panel-title     | 左侧列表与右侧详情面板的标题           |
+| identifier      | 会话 ID 和工具名称                     |
 
-`fontFamily`、`fontSize` 与 `smallFontSize` 可通过主题覆盖；欢迎标题、页标题和输入字号当前由共享样式固定。错误反馈使用局部字号（13px），不扩成通用字号层级。字符计数使用等宽数字；消息保持原始换行并允许长串在任意位置换行。欢迎说明宽度上限（60ch），每轮记录宽度上限（70ch）。
+`fontFamily`、`fontSize` 与 `smallFontSize` 可通过主题覆盖；欢迎标题、页标题、输入、工具栏和详情说明字号当前由共享样式固定。错误反馈采用与 detail-note 相同的字号，沿用页面行高。工具标题为 15px、字重 650，权限类别使用 label。字符计数使用等宽数字；消息、标识符和工具描述允许长串在任意位置换行。会话列表标题最多两行，完整标题保留在按钮的 title 属性。欢迎说明与每轮记录宽度上限（720px），输入区含内边距上限（760px）。
 
 ## Layout
 
-页面是占满挂载容器高度的单列 flex 结构：头部、助手工具栏、可展开历史、可滚动记录、最新消息入口、反馈区和输入区。头部、工具栏、输入区保持在各自位置，记录区域独立滚动；历史区域最高占页面高度（35%）。宿主需为 inline 容器提供实际高度，SDK 不接管宿主页面的栅格。
+页面根节点是占满挂载容器高度的横向 flex 结构，左侧会话列表与右侧主区域并排。根容器宽度达到（760px）时，左栏默认常驻、宽（232px），可从主区域页头的图标收起；左栏含一个列表标题、新对话按钮、多助手时才显示的选择器，以及占据剩余高度、独立滚动的会话列表。列表组件自身的标题在侧栏组合中隐藏，避免重复标题。主区域保持纵向结构：合并操作入口的页头、主体；主体中的记录、反馈和输入区沿纵向排列，只有记录区独立滚动。宿主需为 inline 容器提供实际高度，SDK 不接管宿主页面的栅格。
 
-默认 `space` 决定头部和主要区域的横向内边距；rounded 皮肤使用 `rounded-space`。工具栏和输入区的纵向内边距采用 medium，记录区采用 large；窄容器记录区回到 space。每轮记录底部间隔（28px），同轮消息之间（16px）。输入框最小高度（68px）、最大高度（144px），允许纵向调整。
+根容器小于（760px）时，左栏默认收起，展开后覆盖在页面左侧，宽度为 `min(280px, 100% - 32px)`。关闭按钮、遮罩和 Escape 均可收起；此时主区域 inert，Tab 在侧栏内循环，关闭或选择会话后焦点返回页头入口。右侧详情定位在主区域的主体内，宽度为 `min(360px, 100%)`，不覆盖页头；打开时对话部分 inert，背景遮罩表达当前操作范围。主区域宽度小于（480px）时，详情铺满主体宽度。
+
+默认 `space` 决定头部和主要区域的横向内边距；rounded 皮肤使用 `rounded-space`。页头纵向内边距（8px）、最小高度（64px），记录区纵向采用 large；窄主区域页头为两行网格，标题与连接状态同行，下行放操作，记录区纵向内边距回到 space。每轮记录底部间隔（28px），同轮消息之间（16px）。输入框最小高度（60px）、最大高度（144px），允许纵向调整。
 
 悬浮入口默认在视口右下角，右侧留白（24px），底部留白为 `max(24px, env(safe-area-inset-bottom))`；`position: "left"` 可改到左侧。入口尺寸见前置 `launcher` Token。桌面对话默认宽高（420×680px），位于右侧（24px）、底部（92px）；实际宽度为 `min(panelWidth, 100vw - 32px)`，高度为 `min(panelHeight, visualViewportHeight - 116px)`。
 
 在窗口宽度不大于 `breakpoint`（默认 600px）时，对话使用原生 modal dialog 占满可见视口，去掉外框和圆角，跟随 `visualViewport` 的高度及顶部偏移。桌面使用非模态原生 dialog，宿主可继续操作。输入区底部保留安全区。
 
-页面自身另有容器响应阈值（小于 480px）：隐藏键盘快捷键提示、压缩头部和记录区纵向留白。这由 `ResizeObserver` 观察组件宽度，与窗口是否移动模式分别处理。窗口和容器阈值记录于 sidecar；接入示例自身的导航栅格不属于 SDK 布局 Token。
+页面自身另有主区域响应阈值（小于 480px）：隐藏键盘快捷键提示及工具栏图标、收紧头部和记录区纵向留白。`ResizeObserver` 观察页面根宽度，并按主区域实际宽度设置窄布局；它与窗口是否移动模式分别处理。窗口和容器阈值记录于 sidecar；文档宿主显式配置的（440px）停靠助手和接入示例导航栅格均不属于 SDK 默认尺寸。
 
 **The Container Boundary Rule.** 页面适应被分配的容器；悬浮挂载只通过入口和对话接收指针事件，普通宿主区域保持可操作。
 
@@ -249,14 +277,18 @@ workbench 皮肤使用前置 control / message / panel 圆角；rounded 只替�
 
 - **消息与时间线**：`createMessage()` 接收 sender / name / text；用户消息靠右并有底色，助手回复为平整文字。`createMessageTimeline()` 接收 Run 列表，按 Run 身份更新既有节点，展现当前文本草稿和明确的运行状态。内容经 textContent 输出；当前没有 Markdown、HTML、附件或富媒体渲染。
 - **执行详情**：`createRunDetails()` 使用原生 details / summary 折叠，显示 Token、输入/输出、用量与费用估算是否完整、模型请求数、步骤数、操作执行与校验状态。未知用量显示破折号，不把缺失值画成零；失败和待核验有明确文案。
-- **输入区**：`createComposer()` 接收 onDraft / onSend / onCancel 回调。字符计数上限（8000），支持按钮发送及 ⌘ / Ctrl + Enter，输入法组合期间不发送；空白、待确认或不可发送时禁用发送。活动 Run 显示停止入口，停止请求期间显示等待状态。
-- **历史**：`createSessionList()` 接收会话摘要及选择回调。条目整行可操作，当前项用 `aria-current` 和选中底色；空列表有说明。更新条目时尝试恢复原会话按钮的焦点。
+- **输入区**：`createComposer()` 接收 onDraft / onSend / onCancel 回调。字符上限（8000），接近上限（7200）时展示计数；此前仅宽屏显示快捷键提示。输入和发送操作放在同一边界内，支持按钮发送及 ⌘ / Ctrl + Enter，输入法组合期间不发送；空白、待确认或不可发送时禁用发送。活动 Run 显示停止入口，停止请求期间显示等待状态。
+- **左侧会话列表**：`createSessionList()` 接收会话摘要及选择回调。条目整行可操作，标题最多两行，次行显示正在执行或所属助手；当前项用 `aria-current` 和选中底色，空列表有说明。更新条目时尝试恢复原会话按钮的焦点。发送待确认期间禁用选择；助手选择器只在多助手配置下显示，已创建会话时不可切换助手。
+- **会话与工具详情**：`createSessionDetails()` 接收公开状态和面板类型。当前会话以键值列表显示标题、助手、状态、ID、创建时间、总轮数、配置版本及工具数；未创建时明确说明发送后生成。工具按细分隔线排列，显示公开名称、显式说明与权限类别；新会话预览所选助手配置，已有会话使用保存配置。活动 Run 的工具快照不同于当前配置时，另列本轮工具与 `activeConfigVersion`，不让新配置冒充正在执行的配置。未提供工具清单与空清单使用不同文案。
+- **详情键盘路径**：面板打开后焦点进入关闭按钮，再按 Tab 可进入内容滚动区。滚动根节点为 `tabIndex=0`、`role="region"`，名称随“当前会话”或“已接入工具”变化；保留可见焦点。Escape 或关闭按钮返回对应工具栏入口，外层聊天继续打开。
 
-业务组件只接收数据和回调，没有网络请求，也不拥有滚动策略。文案可由 `ChatCopy` 覆盖公开字段；运行详情及部分状态字符串目前仍在实现中固定为中文，不宣称完整国际化。
+工具详情仅使用服务器公开投影。标签和说明来自显式 `toolDisplay`，不会自动展示原始工具提示、参数 Schema、执行器或凭据；“只读／可写／需审批／已禁用”是说明，实际调用仍由服务端权限决定。
+
+业务组件只接收数据和回调，没有网络请求。页面组合负责对话记录滚动与面板开关，详情组件更新内容时保留当前滚动位置。文案可由 `ChatCopy` 覆盖公开字段；运行详情及部分状态字符串目前仍在实现中固定为中文，不宣称完整国际化。
 
 ### 页面组合、挂载与生命周期
 
-`createChatPage()` 把组件连接到 `ChatController`，负责连接状态、助手选择、新会话、历史、反馈、焦点和滚动。用户距记录末尾小于（64px）时跟随新内容；用户上翻时保留位置并显示“回到最新消息”。新会话重新跟随末尾。错误区使用 `role="alert"`，根据状态显示重试发送、结束重试、重新连接；等待宿主输入或核验保持明确状态。
+`createChatPage()` 把组件连接到 `ChatController`，负责连接状态、助手选择、新会话、左栏、详情、反馈、焦点和滚动。页头提供侧栏切换、“当前会话”和“工具 N”，左栏提供“新对话”；左栏收起时页头提供新对话图标；没有公开清单时不猜测数量。工具栏入口以 `aria-controls`、`aria-expanded` 连接详情面板，打开项使用选中底色。用户距记录末尾小于（64px）时跟随新内容；用户上翻时保留位置并显示“回到最新消息”。新会话从欢迎标题顶部开始。错误区使用 `role="alert"`，根据状态显示重试发送、结束重试、重新连接；等待宿主输入或核验保持明确状态。
 
 `mountChatPage(target, options)` 与 `mountChatWidget(options)` 均创建开放 Shadow Root 并安装同一套样式。共享样式以 `:host { all: initial }` 重置继承起点，再应用语义字体和颜色；优先使用 adoptedStyleSheets，回退 style 标签可接收 `styleNonce`。低层组件单独复用时，应在自己的 Shadow Root 中调用 `installChatStyles()`，并对 host 调用 `applyChatTheme()`。
 
@@ -272,6 +304,7 @@ workbench 皮肤使用前置 control / message / panel 圆角；rounded 只替�
 - **Do** 让 Token、原子组件、业务组件和页面保持现有职责，业务组件接收数据及回调。
 - **Do** 为 inline 容器提供明确尺寸，在宿主真实布局中验证容器与窗口响应。
 - **Do** 保留文字状态、用量完整性、可见焦点、输入法保护和用户上翻位置。
+- **Do** 保留左栏当前项、详情滚动区的键盘入口、关闭后的焦点返回，以及当前配置与本轮工具快照的区别。
 - **Do** 在宿主卸载或退出登录时清理挂载，并按控制器归属管理会话记忆。
 - **Do** 将库存工作台与组件展廊标明为示例，保留合成数据的性质。
 
@@ -283,3 +316,10 @@ workbench 皮肤使用前置 control / message / panel 圆角；rounded 只替�
 - **Don't** 把收起、卸载或结束重试描述为已取消服务端任务。
 - **Don't** 把缺失用量、未知执行结果或降级检测输出表示为已验证成功。
 - **Don't** 将模型文字作为 HTML 注入，或让展示组件直接处理模型密钥与网络请求。
+- **Don't** 把未提供工具清单显示为零，或从原始配置自动暴露工具提示、Schema 和执行器细节。
+
+## 回答引用与宿主停靠
+
+ChatPageOptions / ChatMountOptions 接受可选 getRunSources(run) 同步回调；createMessageTimeline(copy, options) 同样可用。只为已完成回答解析链接，最多八项，标签作为 textContent。仅 HTTP(S) 且不含用户名密码的 URL 可展示，默认新标签页打开并带 noopener noreferrer；回调抛错不会中断时间线。宿主负责引用来源与授权校验，SDK 不把模型字符串当 HTML。
+
+Widget 的原生 dialog 暴露 part="panel"，宿主可以用 [data-agent-chat]::part(panel) 调整外部位置和几何，优先通过 theme.tokens 配置尺寸与响应断点。不要改写 SDK 内部类名或破坏移动模态行为。

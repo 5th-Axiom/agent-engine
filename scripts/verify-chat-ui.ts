@@ -366,11 +366,18 @@ try {
   await settleLayout();
   const inlineWidths = await inline.locator(".ae-page").evaluate((el) => ({
     page: el.getBoundingClientRect().width,
+    main: el.querySelector(".ae-chat-main")!.getBoundingClientRect().width,
+    sidebar: el.querySelector(".ae-sidebar")!.getBoundingClientRect().width,
     composer: el.querySelector(".ae-composer")!.getBoundingClientRect().width,
     input: el.querySelector(".ae-input")!.getBoundingClientRect().width,
   }));
-  assert(Math.abs(inlineWidths.page - inlineWidths.composer) <= 2);
-  assert(inlineWidths.input > inlineWidths.page - 50);
+  assert(
+    Math.abs(inlineWidths.page - inlineWidths.main - inlineWidths.sidebar) <= 2,
+  );
+  assert(
+    Math.abs(Math.min(760, inlineWidths.main) - inlineWidths.composer) <= 2,
+  );
+  assert(inlineWidths.input > inlineWidths.composer - 50);
   // One batched visual checkpoint; functional-only runs do not consume visual rounds.
   if (!process.argv.includes("--functional-only")) {
     const path = "packages/chat-ui/.impeccable/review";
@@ -476,6 +483,47 @@ try {
     return connected;
   });
   assert(globalReady);
+  const references = await page.evaluate(async () => {
+    const api = (window as any).AgentChat;
+    const timeline = api.createMessageTimeline(undefined, {
+      getRunSources() {
+        return [
+          { href: "javascript:alert(1)", label: "unsafe" },
+          { href: "data:text/html,<script>alert(1)</script>", label: "unsafe" },
+          { href: "https://user:password@example.invalid/", label: "private" },
+          { href: "/docs/", label: "<img src=x onerror=alert(1)>" },
+        ];
+      },
+    });
+    timeline.update([
+      {
+        id: "synthetic-source",
+        sequence: 1,
+        input: "合成引用测试",
+        output: "合成回答",
+        draft: "",
+        state: "completed",
+        cancelRequested: false,
+        steps: 1,
+        attempts: 1,
+        operations: [],
+        usage: { complete: false, costComplete: false },
+      },
+    ]);
+    return {
+      count: timeline.element.querySelectorAll(".ae-sources a").length,
+      href: timeline.element
+        .querySelector(".ae-sources a")
+        ?.getAttribute("href"),
+      label: timeline.element.querySelector(".ae-sources a")?.textContent,
+      images: timeline.element.querySelectorAll("img, script").length,
+    };
+  });
+  assert.equal(references.count, 1);
+  assert.equal(references.href, host.url + "/docs/");
+  assert.equal(references.label, "<img src=x onerror=alert(1)>");
+  assert.equal(references.images, 0);
+
   assert.equal(await page.locator("[data-agent-chat]").count(), 0);
   assert.deepEqual(errors, []);
   console.log(
@@ -489,6 +537,7 @@ try {
         "send",
         "continue",
         "text-safety",
+        "reference-url-and-text-safety",
         "theme-state",
         "style-isolation",
         "ime",

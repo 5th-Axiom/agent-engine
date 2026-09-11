@@ -1,10 +1,10 @@
 :root {
   color-scheme: light;
   --canvas: #fff;
-  --surface: #f3f6f9;
+  --surface: #f6f8fa;
   --text: #172b42;
   --muted: #48596a;
-  --line: #cad4df;
+  --line: #dce2e8;
   --accent: #0758a0;
   --selected: #e1edf8;
   --on-accent: #fff;
@@ -43,7 +43,7 @@ body {
   margin: 0;
   background: var(--canvas);
   color: var(--text);
-  font: 15px/1.75 var(--font);
+  font: 16px/1.8 var(--font);
   -webkit-font-smoothing: antialiased;
 }
 button,
@@ -223,17 +223,19 @@ kbd {
   align-self: start;
   height: calc(100dvh - var(--header));
   overflow: auto;
-  border-right: 1px solid var(--line);
   padding: 32px 22px 24px 0;
   display: flex;
   flex-direction: column;
   scrollbar-width: thin;
 }
 .nav-group {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
-.nav-group h2 {
-  font-size: 12px;
+.nav-group summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 10px;
+  font-size: 13px;
   font-weight: 650;
   color: var(--muted);
   margin: 0 0 7px;
@@ -304,8 +306,8 @@ main:focus {
   gap: 24px;
 }
 .article-heading h1 {
-  font-size: 34px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 650;
   letter-spacing: -0.025em;
   line-height: 1.35;
   margin: 0 0 18px;
@@ -343,7 +345,7 @@ main:focus {
   justify-content: center;
   gap: 9px;
   text-decoration: none;
-  font-weight: 550;
+  font-weight: 500;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -380,50 +382,16 @@ main:focus {
   gap: 26px;
   margin-bottom: 34px;
 }
-.process {
-  display: flex;
-  align-items: center;
-  padding: 22px 0;
-  border-block: 1px solid var(--line);
-  margin-bottom: 32px;
-  gap: 16px;
-}
-.process span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 13px;
-}
-.process i {
-  height: 1px;
-  background: var(--line);
-  flex: 1;
-  min-width: 12px;
-  position: relative;
-}
-.process i:after {
-  content: "";
-  width: 5px;
-  height: 5px;
-  position: absolute;
-  right: 0;
-  top: -2px;
-  border-right: 1px solid var(--line);
-  border-top: 1px solid var(--line);
-  transform: rotate(45deg);
-}
 .prose {
-  font-size: 15px;
-  line-height: 1.9;
+  font-size: 16px;
+  line-height: 1.8;
   overflow-wrap: anywhere;
 }
 .prose p {
   margin: 16px 0;
 }
 .prose h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 650;
   line-height: 1.5;
   margin: 42px 0 14px;
@@ -458,7 +426,7 @@ main:focus {
   margin: 6px 0;
 }
 .prose code {
-  font: 13px/1.75 var(--mono);
+  font: 14px/1.75 var(--mono);
   background: var(--surface);
   border-radius: 4px;
   padding: 2px 5px;
@@ -540,6 +508,41 @@ tr:last-child td {
 td code {
   font-size: 12px;
 }
+.product-table table {
+  table-layout: fixed;
+  font-size: 14px;
+}
+.product-table th,
+.product-table td {
+  width: 50%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.product-table td {
+  padding-block: 20px;
+}
+.product-table td strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+.product-table .product-action {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 8px;
+  text-align: center;
+  color: var(--accent);
+}
+@media (max-width: 480px) {
+  .product-table .product-action {
+    padding-inline: 8px;
+    gap: 4px;
+  }
+  .product-action .icon {
+    display: none;
+  }
+}
 .heading-anchor {
   opacity: 0;
   margin-left: 10px;
@@ -602,48 +605,6 @@ h3:hover .heading-anchor,
 .contents nav a[aria-current="true"] {
   color: var(--accent);
 }
-.reading-tip {
-  margin-top: 34px;
-  border-top: 1px solid var(--line);
-  padding-top: 22px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.reading-tip > svg {
-  color: var(--accent);
-  margin-bottom: 10px;
-}
-.reading-tip p {
-  margin-bottom: 4px;
-}
-.reading-tip .text-action {
-  font-size: 12px;
-}
-.reading-tip .text-action svg {
-  width: 14px;
-}
-.article-help {
-  margin-top: 48px;
-  padding: 24px 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  border-block: 1px solid var(--line);
-}
-.article-help h2 {
-  font-size: 16px;
-  line-height: 1.5;
-  margin: 0 0 5px;
-}
-.article-help p {
-  font-size: 13px;
-  color: var(--muted);
-  margin: 0;
-}
-.article-help .button {
-  flex: none;
-}
 .page-turn {
   display: flex;
   justify-content: space-between;
@@ -668,7 +629,7 @@ h3:hover .heading-anchor,
   color: var(--muted);
 }
 .page-turn a strong {
-  font-weight: 550;
+  font-weight: 500;
 }
 .page-turn a:hover strong {
   color: var(--accent);
@@ -886,21 +847,6 @@ dialog::backdrop {
 .not-found h1 {
   font-size: 32px;
 }
-#assistant-sources {
-  margin: 20px 0;
-  padding: 16px;
-  background: var(--surface);
-  border-radius: 6px;
-}
-#assistant-sources h2 {
-  font-size: 14px;
-  margin: 0 0 6px;
-}
-#assistant-sources a {
-  display: block;
-  font-size: 13px;
-  padding: 5px 0;
-}
 @keyframes search-open {
   from {
     transform: translateY(-8px);
@@ -992,15 +938,16 @@ dialog::backdrop {
     margin-bottom: 20px;
   }
   .article-heading {
-    display: block;
+    display: flex;
+    gap: 8px;
   }
   .article-heading h1 {
-    font-size: 30px;
+    font-size: 28px;
     margin-bottom: 14px;
   }
   .article-heading .button {
-    margin: 0 0 18px;
-    min-height: 40px;
+    margin: 0;
+    min-height: 44px;
     font-size: 12px;
   }
   .lead {
@@ -1018,28 +965,12 @@ dialog::backdrop {
   .start-actions .text-action {
     font-size: 13px;
   }
-  .process {
-    gap: 10px;
-    padding: 20px 0;
-    margin-bottom: 26px;
-  }
-  .process span {
-    font-size: 11px;
-    gap: 5px;
-  }
-  .process .icon {
-    width: 17px;
-    height: 17px;
-  }
-  .process i {
-    min-width: 8px;
-  }
   .prose {
-    font-size: 15px;
-    line-height: 1.9;
+    font-size: 16px;
+    line-height: 1.8;
   }
   .prose h2 {
-    font-size: 21px;
+    font-size: 22px;
     margin-top: 34px;
   }
   .prose pre {
@@ -1049,7 +980,7 @@ dialog::backdrop {
     padding-left: 16px;
   }
   .prose pre code {
-    font-size: 12px;
+    font-size: 13px;
   }
   .table-scroll {
     margin-right: -4px;
@@ -1058,14 +989,6 @@ dialog::backdrop {
   td {
     padding: 10px;
     min-width: 115px;
-  }
-  .article-help {
-    padding: 22px 0;
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .article-help .button {
-    font-size: 13px;
   }
   .page-turn {
     gap: 20px;
@@ -1131,12 +1054,6 @@ dialog::backdrop {
   .article-heading h1 {
     font-size: 27px;
   }
-  .process span {
-    font-size: 10px;
-  }
-  .process {
-    gap: 6px;
-  }
   .search-footer {
     flex-direction: column;
     gap: 3px;
@@ -1161,7 +1078,6 @@ dialog::backdrop {
   .sidebar,
   .contents,
   .article-heading .button,
-  .article-help,
   .page-turn,
   .launcher-hint,
   [data-agent-chat],
@@ -1187,5 +1103,78 @@ dialog::backdrop {
   }
   .site-footer {
     padding: 24px 0;
+  }
+}
+
+/* Reading enhancements share the document typography and interaction colors. */
+.article-heading .ask-article {
+  border-color: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  min-height: 44px;
+}
+.setup-steps {
+  margin: 24px 0 20px;
+  font-size: 13px;
+}
+.setup-steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding-left: 20px;
+  margin: 0;
+}
+.setup-steps li {
+  margin: 0;
+  padding: 0;
+}
+.setup-steps a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.setup-steps a[aria-current] {
+  color: var(--accent);
+  font-weight: 600;
+}
+.framework-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+.framework-tabs button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: transparent;
+  font-size: 14px;
+}
+.framework-tabs button:hover {
+  background: var(--surface);
+}
+.framework-tabs button[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.framework-examples [role="tabpanel"] > h2 {
+  margin-top: 0;
+}
+@media (max-width: 480px) {
+  .article-heading .ask-article .icon {
+    display: none;
+  }
+  .article-heading h1 {
+    min-width: 0;
+  }
+  .product-table th:first-child,
+  .product-table td:first-child {
+    width: 55%;
+  }
+  .product-table th:last-child,
+  .product-table td:last-child {
+    width: 45%;
   }
 }

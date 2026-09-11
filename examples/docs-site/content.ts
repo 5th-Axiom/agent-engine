@@ -19,10 +19,11 @@ const pages: {
 }[] = [
   {
     id: "welcome",
-    title: "将 Agent 接入你的产品",
+    title: "产品介绍",
     group: "接入指南",
-    description: "使用现成聊天界面，或直接调用后端能力。选择适合你的接入方式。",
-    keywords: "总览 选择 前端 后端 接入 SDK 架构",
+    description:
+      "Agent Engine 是一套让你的产品拥有 AI 对话、业务工具调用和会话管理能力的开发工具。",
+    keywords: "介绍 是什么 产品 形态 特点 总览 前端 后端 接入 SDK",
   },
   {
     id: "installation",

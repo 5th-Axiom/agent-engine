@@ -5,6 +5,7 @@ import {
   AgentEngineError,
   createAgentEngine,
   type ModelAdapter,
+  defineTool,
 } from "@agent-runtime/sdk";
 import { MemoryStore, scriptedModel, finalText } from "@agent-runtime/testing";
 import {
@@ -38,9 +39,16 @@ async function setup(
     protocolKey: { secretRef: "PROTOCOL_SECRET" },
     adapters: { models: { scripted: model } },
     policy: { allowedOrigins: ["https://model.example.com"] },
+    bindings: {
+      "private-binding": {
+        version: "1",
+        sideEffect: "read",
+        execute: async () => ({ value: 1 }),
+      },
+    },
   });
   close.push(() => engine.close());
-  const config = {
+  const config: Record<string, unknown> = {
     models: {
       primary: {
         provider: "scripted",
@@ -52,6 +60,8 @@ async function setup(
     },
     routing: { primary: "primary" },
   };
+  const toolDisplay: Record<string, { label?: string; description?: string }> =
+    {};
   let disabled = false;
   let origin = "";
   const handler = createChatHandler({
@@ -67,7 +77,7 @@ async function setup(
         engine: engine.forPrincipal({ tenantId: "tenant", subjectId: user }),
         assistants: disabled
           ? [{ id: "other", label: "Other", config }]
-          : [{ id: "demo", label: "Demo", config }],
+          : [{ id: "demo", label: "Demo", config, toolDisplay }],
         defaultAssistant: disabled ? "other" : "demo",
       };
     },
@@ -105,8 +115,138 @@ async function setup(
       },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
-  return { engine, origin, request, model, disable: () => (disabled = true) };
+  return {
+    engine,
+    origin,
+    request,
+    model,
+    config,
+    toolDisplay,
+    disable: () => (disabled = true),
+  };
 }
+
+const catalogTool = (name: string) =>
+  defineTool({
+    name,
+    description: "private-model-instructions",
+    inputSchema: {
+      type: "object",
+      properties: { "private-schema-field": { type: "string" } },
+      additionalProperties: false,
+    },
+    outputSchema: true,
+    execution: {
+      type: "binding",
+      bindingKey: "private-binding",
+      sideEffect: "read",
+    },
+  });
+
+it("publishes only safe tool catalog fields and reads the saved session's configuration", async () => {
+  const h = await setup();
+  const first = catalogTool("demo.first"),
+    second = catalogTool("demo.second");
+  h.config.tools = [first];
+  h.toolDisplay["demo.first"] = {
+    label: "公开工具",
+    description: "供用户阅读的说明。",
+  };
+  h.toolDisplay["not-configured"] = { label: "不能出现" };
+  const config = await (await h.request("/config")).json();
+  expect(config.assistants[0].tools).toEqual([
+    {
+      name: "demo.first",
+      label: "公开工具",
+      description: "供用户阅读的说明。",
+      sideEffect: "read",
+      permission: "allow",
+    },
+  ]);
+  const created = await (
+    await h.request("/sessions", {
+      requestId: randomUUID(),
+      assistantId: "demo",
+    })
+  ).json();
+  h.config.tools = [first, second];
+  const session = await (await h.request("/sessions/" + created.id)).json();
+  expect(session.tools).toHaveLength(1);
+  expect(session.configVersion).toBe(1);
+  expect(typeof session.createdAt).toBe("number");
+  expect(
+    (await (await h.request("/config")).json()).assistants[0].tools,
+  ).toHaveLength(2);
+  for (const body of [JSON.stringify(config), JSON.stringify(session)])
+    expect(body).not.toMatch(
+      /private-model-instructions|private-schema-field|private-binding|MODEL_SECRET|baseURL|inputSchema|execution|不能出现/,
+    );
+  expect(
+    (await h.request("/sessions/" + created.id, undefined, "bob")).status,
+  ).toBe(403);
+  expect(h.model.requests).toHaveLength(0);
+});
+
+it("distinguishes an active run's frozen tools from updated session tools", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  const model: ModelAdapter & { requests: unknown[] } = {
+    version: "catalog-active-1",
+    capabilities: { tools: true, thinking: false, structuredOutput: false },
+    requests: [],
+    async *stream(req, ctx) {
+      this.requests.push(req);
+      yield { type: "delta", kind: "text", blockId: "text", text: "合成等待" };
+      await Promise.race([
+        gate,
+        new Promise<void>((r) =>
+          ctx.signal.addEventListener("abort", () => r(), { once: true }),
+        ),
+      ]);
+      ctx.signal.throwIfAborted();
+      yield* finalText("完成");
+    },
+  };
+  const h = await setup(model);
+  h.config.tools = [catalogTool("demo.first")];
+  const created = await (
+    await h.request("/sessions", {
+      requestId: randomUUID(),
+      assistantId: "demo",
+    })
+  ).json();
+  try {
+    await h.request(`/sessions/${created.id}/runs`, {
+      requestId: randomUUID(),
+      input: "合成等待",
+    });
+    const owner = h.engine.forPrincipal({
+      tenantId: "tenant",
+      subjectId: "alice",
+    });
+    const saved = await owner.readSession(created.id);
+    expect(saved.activeRun).toBeTruthy();
+    await (
+      await owner.loadSession(created.id)
+    ).replaceConfig({
+      ifVersion: saved.version,
+      config: { ...saved.config, tools: [catalogTool("demo.second")] },
+    });
+    const view = await (await h.request("/sessions/" + created.id)).json();
+    expect(view.tools.map((t: { name: string }) => t.name)).toEqual([
+      "demo.second",
+    ]);
+    expect(view.activeTools.map((t: { name: string }) => t.name)).toEqual([
+      "demo.first",
+    ]);
+    expect(view.configVersion).toBe(2);
+    expect(view.activeConfigVersion).toBe(1);
+  } finally {
+    release();
+  }
+});
 it("requires authentication and an allowed origin before model dispatch, with explicit preflight", async () => {
   const h = await setup();
   expect((await fetch(h.origin + "/api/agent-chat/config")).status).toBe(401);

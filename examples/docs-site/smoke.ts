@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { writeFile, mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 
-// Explicit provider smoke: sends three public, non-sensitive questions to an already running local host.
+// Explicit provider smoke: sends four public, non-sensitive questions to an already running local host.
 const url = process.env.AGENT_DOCS_SMOKE_URL ?? "http://127.0.0.1:4320";
 if (new URL(url).hostname !== "127.0.0.1")
   throw Error("SMOKE_REQUIRES_LOCAL_HOST");
@@ -20,12 +20,12 @@ try {
     "data-chat-available",
     "true",
   );
-  await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
   const widget = page.locator("[data-agent-chat]");
   const questions = [
     "我要把聊天图标接入自己的管理后台。前端 SDK 用哪个挂载方法，是否还需要后端？请简短解释。",
     "先不谈项目，请给正在学习新东西的我一句简短的鼓励。",
     "我想只接后端 SDK，怎么创建会话、发消息和续聊？是否必须安装前端 SDK？请给准确的方法名并简短回答。",
+    "请先用 api.lookup 定位 createSessionMemory，再用 code.read 阅读函数实现：浏览器存储读写失败时会怎样？请给源码路径、行号和提交版本，简短回答。",
   ];
   const report = [];
   for (const question of questions) {
@@ -69,10 +69,18 @@ try {
     else {
       assert.ok(
         run.operations.some(
-          (o) => o.name === "docs.search" && o.state === "succeeded",
+          (o) =>
+            [
+              "docs.search",
+              "docs.read",
+              "api.lookup",
+              "examples.find",
+              "code.search",
+              "code.read",
+            ].includes(o.name) && o.state === "succeeded",
         ),
       );
-      assert.match(run.output, /\/docs\/[a-z-]+\//);
+      assert.match(run.output, /\/(?:docs|sources)\//);
     }
     report.push({ question, ...run, sessionId: session.id });
   }
@@ -81,14 +89,32 @@ try {
   assert.match(report[2]!.output, /createSession/);
   assert.match(report[2]!.output, /loadSession/);
   assert.match(report[2]!.output, /无需|不需|不必|不用/);
+  for (const name of ["api.lookup", "code.read"])
+    assert.ok(
+      report[3]!.operations.some(
+        (o) => o.name === name && o.state === "succeeded",
+      ),
+      name,
+    );
+  assert.match(report[3]!.output, /\/sources\/[a-f0-9]{40,64}\/.+#L\d+/);
   for (const run of report)
     assert.ok(
       !run.output.includes("**") && !run.output.includes("```"),
       "default answers should suit the plain-text IM",
     );
   await page.reload();
-  await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
-  await expect(widget.locator(".ae-turn")).toHaveCount(3);
+  await expect(widget.locator(".ae-turn")).toHaveCount(4);
+  await expect(widget.locator(".ae-sidebar")).toBeVisible();
+  await widget.getByRole("button", { name: "当前会话", exact: true }).click();
+  await expect(widget.locator(".ae-detail-panel")).toContainText(
+    report[0]!.sessionId,
+  );
+  await widget
+    .getByRole("button", { name: "已接入工具（6）", exact: true })
+    .click();
+  await expect(widget.locator(".ae-tool-item")).toHaveCount(6);
+  await expect(widget.locator(".ae-tool-list")).toContainText("code.read");
+  await page.keyboard.press("Escape");
   await page.screenshot({
     path: new URL("live-chat.png", directory).pathname,
     fullPage: false,
@@ -107,9 +133,10 @@ try {
       passed: true,
       realProvider: true,
       questions: report.length,
-      docsSearchVerified: true,
+      projectRetrievalVerified: true,
       ordinaryChatVerified: true,
       integrationAnswersVerified: true,
+      publicApiAndSourceReadVerified: true,
       sessionId: report[0]!.sessionId,
     }),
   );

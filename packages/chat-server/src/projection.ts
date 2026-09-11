@@ -2,14 +2,36 @@ import {
   AgentEngineError,
   type AgentEngine,
   type SessionRecord,
+  type ToolDefinition,
 } from "@agent-runtime/sdk";
 import {
   ChatError,
   type ChatSession,
   type ChatRun,
   type ChatSessionSummary,
+  chatToolSchema,
+  type ChatTool,
 } from "@agent-runtime/chat-core";
-import type { ChatContext } from "./types.js";
+import type { ChatContext, ChatAssistantDefinition } from "./types.js";
+
+export function publicTools(
+  tools: ToolDefinition[],
+  display?: ChatAssistantDefinition["toolDisplay"],
+): ChatTool[] {
+  return tools.map((tool) => {
+    const copy =
+      display && Object.hasOwn(display, tool.name)
+        ? display[tool.name]
+        : undefined;
+    return chatToolSchema.parse({
+      name: tool.name,
+      sideEffect: tool.execution.sideEffect,
+      permission: tool.permission ?? "allow",
+      label: copy?.label,
+      description: copy?.description,
+    });
+  });
+}
 
 export function assistantFor(
   session: SessionRecord,
@@ -89,8 +111,14 @@ export async function readChatSession(
   if (inspection.runs.some((r) => r.acceptedSequence === undefined))
     throw new ChatError("RUN_ORDER_UNAVAILABLE", 409);
   const runs: ChatRun[] = [];
+  let activeTools: ChatTool[] | undefined;
+  let activeConfigVersion: number | undefined;
   for (const summary of inspection.runs.slice(-50)) {
     const r = await engine.readRun(id, summary.id);
+    if (r.id === session.activeRun) {
+      activeTools = publicTools(r.config.tools, assistant.toolDisplay);
+      activeConfigVersion = r.configVersion;
+    }
     runs.push({
       id: r.id,
       sequence: summary.acceptedSequence!,
@@ -135,6 +163,10 @@ export async function readChatSession(
     runs,
     totalRuns: inspection.runs.length,
     snapshotSequence: inspection.snapshotSequence,
+    createdAt: session.createdAt,
+    configVersion: session.version,
+    tools: publicTools(session.config.tools, assistant.toolDisplay),
+    ...(activeTools ? { activeTools, activeConfigVersion } : {}),
     ...(debugPath ? { debugPath } : {}),
   };
 }

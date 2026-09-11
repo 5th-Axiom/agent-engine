@@ -42,8 +42,8 @@ export const primitiveColors = {
   white: "#ffffff",
   navy: "#172b42",
   muted: "#48596a",
-  line: "#cad4df",
-  surface: "#f3f6f9",
+  line: "#dce2e8",
+  surface: "#f6f8fa",
   blue: "#0758a0",
   selected: "#e1edf8",
   error: "#99252c",
@@ -91,9 +91,9 @@ export const darkColors: ChatColors = {
 };
 export const layoutTokens = {
   fontFamily:
-    'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  fontSize: 15,
-  smallFontSize: 12,
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
+  fontSize: 16,
+  smallFontSize: 13,
   controlHeight: 44,
   controlRadius: 6,
   messageRadius: 12,
