@@ -123,12 +123,8 @@ async function request(
 const wire = (name: string) => "t_" + hash(name).slice(0, 40);
 const unwire = (name: string, req: ModelRequest) => {
   const tool = req.tools.find((t) => wire(t.name) === name);
-  if (!tool)
-    throw new AgentEngineError(
-      "MODEL_PROTOCOL_ERROR",
-      "Unknown wire tool name",
-    );
-  return tool.name;
+  // Unknown names remain uncallable, but reach the bounded input-repair loop.
+  return tool?.name ?? `engine.invalid-wire.${hash(name)}`;
 };
 export function openAICompatible(): ModelAdapter {
   return {
@@ -224,7 +220,8 @@ export function openAICompatible(): ModelAdapter {
             tokens.output = u.completion_tokens;
           if (u.prompt_tokens_details?.cached_tokens !== undefined) {
             tokens.cacheReadInput = u.prompt_tokens_details.cached_tokens;
-            tokens.uncachedInput = u.prompt_tokens - tokens.cacheReadInput!;
+            if (u.prompt_tokens !== undefined)
+              tokens.uncachedInput = u.prompt_tokens - tokens.cacheReadInput!;
             tokens.cacheWriteInput = 0;
           }
           if (u.completion_tokens_details?.reasoning_tokens !== undefined)
@@ -250,13 +247,17 @@ export function openAICompatible(): ModelAdapter {
         }
         if (delta.refusal) refused = true;
         for (const c of delta.tool_calls ?? []) {
-          if (!Number.isInteger(c.index) || c.index < 0 || c.index >= 16)
+          if (!Number.isInteger(c.index) || c.index < 0)
             throw new AgentEngineError("MODEL_PROTOCOL_ERROR");
+          // Transport bound; the executor rejects batches over the business limit of 16.
+          if (c.index >= 256) throw new AgentEngineError("MODEL_OUTPUT_LIMIT");
           const old = calls.get(c.index) ?? { id: "", name: "", args: "" };
           if (c.id) old.id = c.id;
           if (c.function?.name) old.name += c.function.name;
           if (c.function?.arguments) old.args += c.function.arguments;
           calls.set(c.index, old);
+          if (c.function?.arguments || c.function?.name)
+            yield { type: "activity" };
         }
         if (choice.finish_reason) finish = choice.finish_reason;
       }
@@ -474,6 +475,12 @@ export function anthropicCompatible(): ModelAdapter {
             b.thinking = (b.thinking ?? "") + d.thinking;
           if (d.type === "signature_delta")
             b.signature = (b.signature ?? "") + d.signature;
+          if (
+            (d.type === "thinking_delta" && d.thinking) ||
+            (d.type === "signature_delta" && d.signature) ||
+            (d.type === "input_json_delta" && d.partial_json)
+          )
+            yield { type: "activity" };
         }
         if (v.type === "content_block_stop") {
           if (!blocks[v.index] || closed.has(v.index))

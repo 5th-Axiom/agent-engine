@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Ajv } from "ajv";
-import type { AnySchema } from "ajv";
+import type { AnySchema, ValidateFunction } from "ajv";
 import { fail } from "../errors/index.js";
 import { json, hash, freeze, type JsonValue } from "../protocol/json.js";
 const name = z.string().min(1).max(128);
@@ -341,13 +341,24 @@ export const defaults = freeze({
     },
   },
 } as const);
-const ajv = new Ajv({ strict: true, allErrors: true, validateFormats: false });
+const schemaValidators = new Map<string, ValidateFunction>();
 export function validateSchema(
   schema: unknown,
   value: unknown,
 ): { ok: boolean; issues: { path: string; keyword: string }[] } {
   try {
-    const check = ajv.compile(schema as AnySchema);
+    const key = hash(json(schema));
+    let check = schemaValidators.get(key);
+    if (!check) {
+      check = new Ajv({
+        strict: true,
+        allErrors: true,
+        validateFormats: false,
+      }).compile(schema as AnySchema);
+      if (schemaValidators.size >= 128)
+        schemaValidators.delete(schemaValidators.keys().next().value!);
+      schemaValidators.set(key, check);
+    }
     return {
       ok: !!check(value),
       issues: (check.errors ?? []).map((e) => ({
@@ -473,7 +484,12 @@ export function effectiveConfig(
 ): SessionAgentConfig {
   const { version: _, ...base } = defaults;
   const out = parseConfig(
-    mergeObjects(base, DefaultsSchema.parse(engineDefaults), config),
+    mergeObjects(
+      { budgets: ceilings.budgets },
+      base,
+      DefaultsSchema.parse(engineDefaults),
+      config,
+    ),
   );
   const check = (v: unknown, c: unknown, path: string) => {
     if (c && typeof c === "object")
@@ -481,6 +497,8 @@ export function effectiveConfig(
         check((v as Record<string, unknown>)?.[k], x, `${path}.${k}`);
     else if (typeof c === "number" && typeof v === "number" && v > c)
       fail("CONFIG_POLICY_VIOLATION", `Policy ceiling exceeded: ${path}`);
+    else if (path.endsWith(".maxEstimatedCost.currency") && v !== c)
+      fail("CONFIG_POLICY_VIOLATION", "Policy cost currency mismatch");
   };
   check(out, ceilings, "config");
   const compact = out.context!.compaction!;
@@ -546,7 +564,11 @@ export interface ConfigProvenance {
   policyVersion: string;
   sources: Record<
     string,
-    "session" | "engine-default" | "library-default" | "run-override"
+    | "session"
+    | "engine-default"
+    | "library-default"
+    | "run-override"
+    | "policy-ceiling"
   >;
 }
 export function configProvenance(
@@ -578,7 +600,15 @@ export function configProvenance(
         ? "session"
         : has(enginePaths, path)
           ? "engine-default"
-          : "library-default";
+          : path.startsWith("/budgets/") &&
+              has(
+                declaredConfigPaths(
+                  (policy as { ceilings?: unknown })?.ceilings ?? {},
+                ),
+                path,
+              )
+            ? "policy-ceiling"
+            : "library-default";
   return {
     defaultsVersion: defaults.version + ":" + hash(engineDefaults),
     policyVersion: hash(policy),

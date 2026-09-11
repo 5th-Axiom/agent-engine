@@ -135,19 +135,25 @@ export function resolveChatTheme(
   options: ChatThemeOptions = {},
   systemDark = false,
 ): ChatTokens {
+  if (options.mode === "system") {
+    const light = resolveChatTheme({ ...options, mode: "light" });
+    const dark = resolveChatTheme({ ...options, mode: "dark" });
+    return systemDark ? dark : light;
+  }
   if (options.mode && !["light", "dark", "system"].includes(options.mode))
     throw Error("CHAT_INVALID_THEME");
   if (options.skin && !Object.hasOwn(skins, options.skin))
     throw Error("CHAT_INVALID_SKIN");
-  const dark =
-    options.mode === "dark" || (options.mode === "system" && systemDark);
+  const dark = options.mode === "dark";
   const colors = { ...(dark ? darkColors : lightColors) };
   const accent = options.accent ?? options.tokens?.accent;
   if (accent) {
     if (!/^#[a-f0-9]{6}$/i.test(accent)) throw Error("CHAT_INVALID_COLOR");
     colors.accent = accent;
     colors.onAccent =
-      contrast(accent, p.white) >= contrast(accent, p.black) ? p.white : p.black;
+      contrast(accent, p.white) >= contrast(accent, p.black)
+        ? p.white
+        : p.black;
     colors.accentText =
       contrast(accent, colors.canvas) >= 4.5 ? accent : colors.text;
     colors.focus = contrast(accent, colors.canvas) >= 3 ? accent : colors.text;
@@ -194,7 +200,7 @@ export function applyChatTheme(
   onChange?: (tokens: ChatTokens) => void,
 ) {
   const media = matchMedia("(prefers-color-scheme: dark)");
-  let current = options;
+  let current = structuredClone(options);
   const apply = () => {
     const tokens = resolveChatTheme(current, media.matches);
     for (const [key, value] of Object.entries(tokens))
@@ -217,7 +223,7 @@ export function applyChatTheme(
   return {
     update: (next: ChatThemeOptions) => {
       resolveChatTheme(next, media.matches);
-      current = next;
+      current = structuredClone(next);
       return apply();
     },
     destroy: () => media.removeEventListener("change", apply),

@@ -1,4 +1,6 @@
-# 新实现任务
+# 原始实施任务（历史存档）
+
+> 以下为首版实施时的任务说明，不代表当前待办。当前进度见 [实施清单](implementation-plan.md)，已完成验证见 [实施记录](implementation-status.md)。
 
 请直接在 `/Users/circle/git/agent-engine` 实现 Agent Engine。用户明确要求基于已反复审查的技术方案与 WorkBuddy 相关实现，分阶段持续推进，直到首版完整交付；不要只给计划，不要停在脚手架或 Demo。
 

@@ -716,19 +716,40 @@ export class AgentEngine {
     await this.sessionIdentity(id);
     return new AgentSession(this, id);
   }
-  async listSessions() {
+  async listSessions(query: { after?: string; limit?: number } = {}) {
+    const limit = query.limit ?? 500;
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 500 ||
+      (query.after !== undefined && typeof query.after !== "string")
+    )
+      fail("CONFIG_INVALID");
     await this.authorize("session", "list");
-    return this.transaction(async (tx) =>
-      (await tx.list<SessionRecord>("sessions"))
+    return this.transaction(async (tx) => {
+      const ordered = (await tx.list<SessionRecord>("sessions"))
         .filter(
           (s) =>
             !s.deleted &&
             s.principal.tenantId === this.principal.tenantId &&
             s.principal.subjectId === this.principal.subjectId,
         )
-        .slice(0, 500)
-        .map((s) => ({ id: s.id, version: s.version, archived: s.archived })),
-    );
+        .sort(
+          (a, b) =>
+            (b.createdAt ?? 0) - (a.createdAt ?? 0) || a.id.localeCompare(b.id),
+        );
+      const cursor =
+        query.after === undefined
+          ? -1
+          : ordered.findIndex((s) => s.id === query.after);
+      if (query.after !== undefined && cursor === -1) fail("ACCESS_DENIED");
+      return ordered.slice(cursor + 1, cursor + 1 + limit).map((s) => ({
+        id: s.id,
+        version: s.version,
+        archived: s.archived,
+        createdAt: s.createdAt,
+      }));
+    });
   }
   async replaceConfig(
     id: string,
@@ -881,6 +902,12 @@ export class AgentEngine {
           if (o.tools.some((n) => !config.tools.some((t) => t.name === n)))
             fail("CONFIG_POLICY_VIOLATION");
           config.tools = config.tools.filter((t) => o.tools!.includes(t.name));
+          config.skills = config.skills.map((skill) => ({
+            ...skill,
+            allowedTools: skill.allowedTools.filter((name) =>
+              o.tools!.includes(name),
+            ),
+          }));
         }
         if (o.loop)
           for (const [k, v] of Object.entries(o.loop)) {
@@ -1009,8 +1036,17 @@ export class AgentEngine {
       w = waiter();
       this.waiting.set(r.id, w);
     }
-    if (r.result) w.resolve(r.result);
-    else if (r.error)
+    if (r.result) {
+      const target = w;
+      const scoped = new AgentEngine(this.options, this.owner, r.principal);
+      void scoped.readRun(r.sessionId, r.id).then(
+        (current) =>
+          current.result
+            ? target.resolve(current.result)
+            : target.reject(new AgentEngineError("DATA_RETENTION_EXPIRED")),
+        (error) => target.reject(error),
+      );
+    } else if (r.error)
       w.reject(
         new AgentEngineError(
           r.error.code,
@@ -1127,6 +1163,10 @@ export class AgentEngine {
         result = undefined;
       }
       if (state === "completed") {
+        const scoped = new AgentEngine(this.options, this.owner, r.principal);
+        await scoped.authorize("session", r.sessionId);
+        await scoped.authorize("data", r.sessionId);
+        await scoped.authorizeContext(r, r.messages, tx);
         this.checkBudget(r);
         r.result = result!;
       } else
@@ -1562,9 +1602,9 @@ export class AgentEngine {
             operation?.executionStatus === "succeeded"
               ? {
                   executionStatus: "succeeded",
-                  receipt: operation.receipt ?? null,
+                  code,
                 }
-              : { executionStatus: "not_executed", code: "RUN_CANCELLED" },
+              : { executionStatus: "not_executed", code },
           ),
         });
       }
@@ -1960,20 +2000,28 @@ export class AgentEngine {
               fail("MODEL_CONTINUATION_UNAVAILABLE");
             m.native = unseal(
               m.native,
-              await this.secret(this.options.protocolKey.secretRef),
+              await abortable(
+                this.secret(this.options.protocolKey.secretRef),
+                combined,
+              ),
               protocolBinding(r, model, adapter),
             );
           }
-        const secret = await this.secret(model.apiKey.secretRef);
+        const secret = await abortable(
+          this.secret(model.apiKey.secretRef),
+          combined,
+        );
         const release = await this.modelSlots.acquire(combined);
         try {
           combined.throwIfAborted();
           this.checkModelTarget(model);
-          await this.authorize("model", model.baseURL);
-          await this.authorize("data", r.sessionId);
-          await this.authorizeContext(r, request.messages);
+          await abortable(this.authorize("model", model.baseURL), combined);
+          await abortable(this.authorize("data", r.sessionId), combined);
+          await abortable(this.authorizeContext(r, request.messages), combined);
           await this.options.store.assertHeld();
+          combined.throwIfAborted();
           await this.owner.mutate(id, async (r) => {
+            combined.throwIfAborted();
             if (r.cancelRequested) fail("RUN_CANCELLED");
             r.usage.find((u) => u.id === attemptId)!.dispatchState = "sent";
           });
@@ -2062,12 +2110,19 @@ export class AgentEngine {
           if (!this.options.protocolKey) fail("MODEL_CONTINUATION_UNAVAILABLE");
           completed.native = seal(
             completed.native,
-            await this.secret(this.options.protocolKey.secretRef),
+            await abortable(
+              this.secret(this.options.protocolKey.secretRef),
+              combined,
+            ),
             protocolBinding(r, model, adapter),
           );
         }
         this.options.fault?.("model.before_commit");
         await this.owner.mutate(id, async (r, tx) => {
+          if (r.cancelRequested) fail("RUN_CANCELLED");
+          await abortable(this.authorize("data", r.sessionId), combined);
+          await this.authorizeContext(r, r.messages, tx, combined);
+          this.checkBudget(r);
           delete r.drafts?.[messageId];
           r.steps.at(-1)!.response = completed;
           r.decision = completed;
@@ -2109,14 +2164,26 @@ export class AgentEngine {
       } catch (e) {
         if (e instanceof Error && e.name === "SimulatedCrash") throw e;
         const err =
-          e instanceof AgentEngineError
-            ? new AgentEngineError(e.code, e.code, e.retryable, e.replaySafety)
-            : new AgentEngineError(
-                "MODEL_PROVIDER_ERROR",
-                "Provider request failed",
+          combined.aborted && !signal.aborted
+            ? new AgentEngineError(
+                "MODEL_TIMEOUT",
+                "Model attempt expired",
                 true,
                 "safe",
-              );
+              )
+            : e instanceof AgentEngineError
+              ? new AgentEngineError(
+                  e.code,
+                  e.code,
+                  e.retryable,
+                  e.replaySafety,
+                )
+              : new AgentEngineError(
+                  "MODEL_PROVIDER_ERROR",
+                  "Provider request failed",
+                  true,
+                  "safe",
+                );
         await this.owner.mutate(id, async (r, tx) => {
           delete r.drafts?.[messageId];
           await this.owner.event(tx, r, {
@@ -2212,7 +2279,7 @@ export class AgentEngine {
                 ? "provider_5xx"
                 : "connection_reset";
         if (
-          !fallbackAllowed &&
+          !(fallbackAllowed && next) &&
           !r.config.retry!.model!.retryOn!.includes(retryCategory)
         )
           throw err;
@@ -2226,14 +2293,21 @@ export class AgentEngine {
           });
         });
         const backoff = r.config.retry!.model!.backoff!;
-        await this.clock.sleep(
+        const remaining =
+          r.config.loop!.timeoutMs! -
+          r.activeMs -
+          (r.lastActiveAt === undefined
+            ? 0
+            : Math.max(0, this.clock.now() - r.lastActiveAt));
+        if (remaining <= 0) fail("BUDGET_EXCEEDED");
+        const delay =
           Math.min(
             backoff.maxDelayMs,
             backoff.initialDelayMs * 2 ** (step.attempts.length - 1),
           ) *
-            (0.5 + this.clock.random() / 2),
-          signal,
-        );
+          (0.5 + this.clock.random() / 2);
+        if (delay >= remaining) fail("BUDGET_EXCEEDED");
+        await this.clock.sleep(delay, signal);
       }
     }
     fail("MODEL_PROVIDER_ERROR", "Retry allowance exhausted");
@@ -3063,9 +3137,91 @@ export class AgentEngine {
       });
       await this.owner.mutate(r.id, async (r) => {
         r.operationIds[i] = opId;
-        if (!(r.operationRefs ??= []).includes(opId))
-          r.operationRefs.push(opId);
       });
+      let permission: "allow" | "ask" | "deny" =
+        tool.permission === "deny"
+          ? "deny"
+          : tool.permission === "require-approval"
+            ? "ask"
+            : tool.execution.sideEffect === "write"
+              ? "deny"
+              : "allow";
+      if (r.config.permissions?.policy) {
+        const result = await this.invokeBinding(
+          r.config.permissions.policy.bindingKey,
+          {
+            capability: tool.name,
+            sideEffect: tool.execution.sideEffect,
+            input: transformed,
+            context: r.context,
+          },
+          r,
+          signal,
+          opId,
+        );
+        if (result === "allow" || result === "ask" || result === "deny")
+          permission = result;
+        else fail("TOOL_PERMISSION_DENIED");
+      }
+      if (tool.permission === "deny") permission = "deny";
+      else if (tool.permission === "require-approval" && permission === "allow")
+        permission = "ask";
+      if (
+        permission !== "deny" &&
+        r.pending?.operationId === opId &&
+        r.pending.resolution
+      ) {
+        permission =
+          (r.pending.resolution as JsonObject).decision === "allow_once"
+            ? "allow"
+            : "deny";
+      }
+      if (permission === "ask") {
+        await this.owner.mutate(r.id, async (r, tx) => {
+          r.pending = {
+            id: randomUUID(),
+            kind: "permission",
+            question: `Allow ${tool!.name}?`,
+            operationId: opId,
+            expiresAt:
+              this.clock.now() + (r.config.permissions?.timeoutMs ?? 600000),
+          };
+          r.state = "awaiting_input";
+          r.activeMs += this.clock.now() - r.lastActiveAt!;
+          delete r.lastActiveAt;
+          await this.owner.event(tx, r, {
+            type: "input.required",
+            runId: r.id,
+            data: json(r.pending) as JsonObject,
+          });
+          await this.owner.event(tx, r, {
+            type: "run.awaiting_input",
+            runId: r.id,
+            data: { requestId: r.pending!.id },
+          });
+        });
+        return true;
+      }
+      await this.authorize("capability", tool.name, tool.execution.sideEffect);
+      if (permission === "deny") {
+        if (op.executionStatus === "planned" && op.runId === r.id) {
+          op.executionStatus = "not_executed";
+          op.error = new AgentEngineError("TOOL_PERMISSION_DENIED").toJSON();
+          await this.transaction((tx) => tx.put("operations", opId, op));
+        }
+        await this.observation(r, a.id, { code: "TOOL_PERMISSION_DENIED" }, i);
+        await this.owner.mutate(r.id, async (run, tx) => {
+          delete run.pending;
+          await this.owner.event(tx, run, {
+            type: "tool.failed",
+            runId: run.id,
+            toolCallId: a.id,
+            operationId: opId,
+            data: { name: tool!.name, capabilityKind: kind },
+          });
+        });
+        continue;
+      }
       if (
         op.executionStatus === "dispatching" ||
         op.executionStatus === "outcome_unknown"
@@ -3077,217 +3233,143 @@ export class AgentEngine {
         op.executionStatus = "planned";
         await this.transaction((tx) => tx.put("operations", opId, op));
       }
+      if (op.executionStatus === "succeeded") {
+        await this.authorize("data", `operation:${opId}`, "read");
+      }
+      await this.owner.mutate(r.id, async (run) => {
+        if (!(run.operationRefs ??= []).includes(opId))
+          run.operationRefs.push(opId);
+      });
       if (op.executionStatus === "planned") {
-        let permission: "allow" | "ask" | "deny" =
-          tool.permission === "deny"
-            ? "deny"
-            : tool.permission === "require-approval"
-              ? "ask"
-              : tool.execution.sideEffect === "write"
-                ? "deny"
-                : "allow";
-        if (r.config.permissions?.policy) {
-          const result = await this.invokeBinding(
-            r.config.permissions.policy.bindingKey,
-            {
-              capability: tool.name,
-              sideEffect: tool.execution.sideEffect,
-              input: transformed,
-              context: r.context,
-            },
-            r,
-            signal,
-            opId,
-          );
-          if (result === "allow" || result === "ask" || result === "deny")
-            permission = result;
-          else fail("TOOL_PERMISSION_DENIED");
-        }
-        if (tool.permission === "deny") permission = "deny";
-        else if (
-          tool.permission === "require-approval" &&
-          permission === "allow"
-        )
-          permission = "ask";
-        if (
-          permission !== "deny" &&
-          r.pending?.operationId === opId &&
-          r.pending.resolution
-        ) {
-          permission =
-            (r.pending.resolution as JsonObject).decision === "allow_once"
-              ? "allow"
-              : "deny";
-        }
-        if (permission === "ask") {
+        let tries = 0;
+        while (true) {
+          r = await this.owner.get(r.id);
+          if (r.cancelRequested) fail("RUN_CANCELLED");
+          if (
+            r.capabilityInvocations >= r.config.loop!.maxCapabilityInvocations!
+          )
+            fail("BUDGET_EXCEEDED");
+          await this.options.store.assertHeld();
+          let claimed = false;
           await this.owner.mutate(r.id, async (r, tx) => {
-            r.pending = {
-              id: randomUUID(),
-              kind: "permission",
-              question: `Allow ${tool!.name}?`,
-              operationId: opId,
-              expiresAt:
-                this.clock.now() + (r.config.permissions?.timeoutMs ?? 600000),
-            };
-            r.state = "awaiting_input";
-            r.activeMs += this.clock.now() - r.lastActiveAt!;
-            delete r.lastActiveAt;
-            await this.owner.event(tx, r, {
-              type: "input.required",
-              runId: r.id,
-              data: json(r.pending) as JsonObject,
-            });
-            await this.owner.event(tx, r, {
-              type: "run.awaiting_input",
-              runId: r.id,
-              data: { requestId: r.pending!.id },
-            });
-          });
-          return true;
-        }
-        await this.authorize(
-          "capability",
-          tool.name,
-          tool.execution.sideEffect,
-        );
-        if (permission === "deny") {
-          op.executionStatus = "not_executed";
-          op.error = new AgentEngineError("TOOL_PERMISSION_DENIED").toJSON();
-          await this.transaction((tx) => tx.put("operations", opId, op));
-        } else {
-          let tries = 0;
-          while (true) {
-            r = await this.owner.get(r.id);
             if (r.cancelRequested) fail("RUN_CANCELLED");
+            const current = await tx.get<OperationRecord>("operations", opId);
+            if (!current) fail("TOOL_OPERATION_CONFLICT");
+            op = current;
+            if (op.executionStatus !== "planned") return;
+            claimed = true;
+            r.capabilityInvocations++;
+            op.executionStatus = "dispatching";
+            op.runId = r.id;
+            op.sessionId = r.sessionId;
             if (
-              r.capabilityInvocations >=
-              r.config.loop!.maxCapabilityInvocations!
+              kind === "knowledge" ||
+              (memory && a.name.startsWith("engine.memory.read."))
             )
-              fail("BUDGET_EXCEEDED");
-            await this.options.store.assertHeld();
-            let claimed = false;
-            await this.owner.mutate(r.id, async (r, tx) => {
-              if (r.cancelRequested) fail("RUN_CANCELLED");
-              const current = await tx.get<OperationRecord>("operations", opId);
-              if (!current) fail("TOOL_OPERATION_CONFLICT");
-              op = current;
-              if (op.executionStatus !== "planned") return;
-              claimed = true;
-              r.capabilityInvocations++;
-              op.executionStatus = "dispatching";
-              op.runId = r.id;
-              op.sessionId = r.sessionId;
-              if (
-                kind === "knowledge" ||
-                (memory && a.name.startsWith("engine.memory.read."))
-              )
-                await this.owner.event(tx, r, {
-                  type:
-                    kind === "knowledge"
-                      ? "knowledge.search.started"
-                      : "memory.read.started",
-                  runId: r.id,
-                  operationId: opId,
-                  data: { name: tool!.name, capabilityKind: kind },
-                });
-              await tx.put("operations", opId, op);
               await this.owner.event(tx, r, {
-                type: "tool.started",
+                type:
+                  kind === "knowledge"
+                    ? "knowledge.search.started"
+                    : "memory.read.started",
                 runId: r.id,
                 operationId: opId,
-                toolCallId: a.id,
                 data: { name: tool!.name, capabilityKind: kind },
               });
+            await tx.put("operations", opId, op);
+            await this.owner.event(tx, r, {
+              type: "tool.started",
+              runId: r.id,
+              operationId: opId,
+              toolCallId: a.id,
+              data: { name: tool!.name, capabilityKind: kind },
             });
-            if (!claimed) {
-              if (
-                ["dispatching", "outcome_unknown"].includes(op.executionStatus)
-              ) {
-                await this.pauseUnknown(r, op);
-                return true;
-              }
+          });
+          if (!claimed) {
+            if (
+              ["dispatching", "outcome_unknown"].includes(op.executionStatus)
+            ) {
+              await this.pauseUnknown(r, op);
+              return true;
+            }
+            break;
+          }
+          this.options.fault?.("tool.before_execute");
+          try {
+            const receipt = await this.dispatch(
+              tool,
+              transformed,
+              r,
+              signal,
+              opId,
+            );
+            this.options.fault?.("tool.after_execute");
+            if (
+              memory &&
+              a.name.startsWith("engine.memory.write.") &&
+              (receipt as JsonObject)?.code === "MEMORY_VERSION_CONFLICT"
+            ) {
+              op.receipt = receipt;
+              op.executionStatus = "failed";
+              op.error = new AgentEngineError(
+                "MEMORY_VERSION_CONFLICT",
+              ).toJSON();
+              await this.transaction((tx) => tx.put("operations", opId, op));
               break;
             }
-            this.options.fault?.("tool.before_execute");
-            try {
-              const receipt = await this.dispatch(
-                tool,
-                transformed,
-                r,
-                signal,
-                opId,
-              );
-              this.options.fault?.("tool.after_execute");
-              if (
-                memory &&
-                a.name.startsWith("engine.memory.write.") &&
-                (receipt as JsonObject)?.code === "MEMORY_VERSION_CONFLICT"
-              ) {
-                op.receipt = receipt;
-                op.executionStatus = "failed";
-                op.error = new AgentEngineError(
-                  "MEMORY_VERSION_CONFLICT",
-                ).toJSON();
-                await this.transaction((tx) => tx.put("operations", opId, op));
-                break;
-              }
-              op.receipt = json(receipt);
-              op.executionStatus = "succeeded";
-              op.validationStatus = "pending";
+            op.receipt = json(receipt);
+            op.executionStatus = "succeeded";
+            op.validationStatus = "pending";
+            await this.transaction((tx) => tx.put("operations", opId, op));
+            this.options.fault?.("tool.after_receipt");
+            await this.owner.wakeOperationWaiters(opId, r.id);
+            break;
+          } catch (e) {
+            if (e instanceof Error && e.name === "SimulatedCrash") throw e;
+            if (e instanceof AgentEngineError && e.replaySafety === "safe") {
+              const limit =
+                tool.execution.sideEffect === "write"
+                  ? r.config.retry!.writeTool!.maxRetries
+                  : r.config.retry!.readonlyTool!.maxRetries;
+              const retry = e.retryable && !signal.aborted && tries++ < limit;
+              op.executionStatus = retry ? "planned" : "not_executed";
+              op.error = e.toJSON();
               await this.transaction((tx) => tx.put("operations", opId, op));
-              this.options.fault?.("tool.after_receipt");
+              if (retry) continue;
               await this.owner.wakeOperationWaiters(opId, r.id);
               break;
-            } catch (e) {
-              if (e instanceof Error && e.name === "SimulatedCrash") throw e;
-              if (e instanceof AgentEngineError && e.replaySafety === "safe") {
-                const limit =
-                  tool.execution.sideEffect === "write"
-                    ? r.config.retry!.writeTool!.maxRetries
-                    : r.config.retry!.readonlyTool!.maxRetries;
-                const retry = e.retryable && !signal.aborted && tries++ < limit;
-                op.executionStatus = retry ? "planned" : "not_executed";
-                op.error = e.toJSON();
-                await this.transaction((tx) => tx.put("operations", opId, op));
-                if (retry) continue;
-                await this.owner.wakeOperationWaiters(opId, r.id);
-                break;
-              }
-              if (tool.execution.sideEffect === "write") {
-                op.executionStatus = "outcome_unknown";
-                op.error = new AgentEngineError(
-                  "TOOL_OUTCOME_UNKNOWN",
-                ).toJSON();
-                await this.pauseUnknown(r, op);
-                return true;
-              }
-              const err =
-                e instanceof AgentEngineError
-                  ? e
-                  : new AgentEngineError("TOOL_EXECUTION_FAILED");
-              if (
-                err.retryable &&
-                tries++ < r.config.retry!.readonlyTool!.maxRetries
-              ) {
-                op.executionStatus = "planned";
-                op.error = err.toJSON();
-                await this.transaction((tx) => tx.put("operations", opId, op));
-                await this.owner.mutate(r.id, async (run, tx) =>
-                  this.owner.event(tx, run, {
-                    type: "tool.failed",
-                    runId: run.id,
-                    operationId: opId,
-                    toolCallId: a.id,
-                    data: { name: tool!.name, capabilityKind: kind },
-                  }),
-                );
-                continue;
-              }
-              op.executionStatus = "failed";
+            }
+            if (tool.execution.sideEffect === "write") {
+              op.executionStatus = "outcome_unknown";
+              op.error = new AgentEngineError("TOOL_OUTCOME_UNKNOWN").toJSON();
+              await this.pauseUnknown(r, op);
+              return true;
+            }
+            const err =
+              e instanceof AgentEngineError
+                ? e
+                : new AgentEngineError("TOOL_EXECUTION_FAILED");
+            if (
+              err.retryable &&
+              tries++ < r.config.retry!.readonlyTool!.maxRetries
+            ) {
+              op.executionStatus = "planned";
               op.error = err.toJSON();
               await this.transaction((tx) => tx.put("operations", opId, op));
-              break;
+              await this.owner.mutate(r.id, async (run, tx) =>
+                this.owner.event(tx, run, {
+                  type: "tool.failed",
+                  runId: run.id,
+                  operationId: opId,
+                  toolCallId: a.id,
+                  data: { name: tool!.name, capabilityKind: kind },
+                }),
+              );
+              continue;
             }
+            op.executionStatus = "failed";
+            op.error = err.toJSON();
+            await this.transaction((tx) => tx.put("operations", opId, op));
+            break;
           }
         }
       }
@@ -3527,16 +3609,34 @@ export class AgentEngine {
     r: Pick<RunRecord, "config"> &
       Partial<Pick<RunRecord, "sessionId" | "compaction" | "operationRefs">>,
     messages: ModelMessage[],
+    transaction?: StoreTransaction,
+    signal?: AbortSignal,
   ) {
-    if (r.sessionId)
-      await this.transaction(async (tx) => {
+    const authorize: AgentEngine["authorize"] = (...args) =>
+      signal
+        ? abortable(this.authorize(...args), signal)
+        : this.authorize(...args);
+    signal?.throwIfAborted();
+    const retained = async (tx: StoreTransaction) => {
+      if (r.sessionId) {
         this.assertRetained(await this.sessionRecord(tx, r.sessionId!));
         for (const id of r.operationRefs ?? []) {
           const operation = await tx.get<OperationRecord>("operations", id);
-          if (operation?.dataExpiredAt !== undefined)
+          if (!operation || operation.dataExpiredAt !== undefined)
             fail("DATA_RETENTION_EXPIRED");
+          const source = await tx.get<SessionRecord>(
+            "sessions",
+            operation.sessionId,
+          );
+          if (!source || source.deleted) fail("DATA_RETENTION_EXPIRED");
+          this.assertRetained(source);
         }
-      });
+      }
+    };
+    if (transaction) await retained(transaction);
+    else await this.transaction(retained);
+    for (const id of r.operationRefs ?? [])
+      await authorize("data", `operation:${id}`, "read");
     const refs = [
       ...new Map(
         [
@@ -3556,12 +3656,12 @@ export class AgentEngine {
             : !r.config.tools.some((tool) => tool.name === ref.id)
       )
         fail("ACCESS_DENIED", "Context capability was removed");
-      await this.authorize(
+      await authorize(
         "capability",
         ref.kind === "tool" ? ref.id : `${ref.kind}:${ref.id}`,
         "read",
       );
-      await this.authorize("data", `${ref.kind}:${ref.id}`);
+      await authorize("data", `${ref.kind}:${ref.id}`);
       if (
         ref.source &&
         typeof ref.source === "object" &&
@@ -3570,7 +3670,7 @@ export class AgentEngine {
         const itemId =
           ref.kind === "memory" ? ref.source.id : ref.source.chunkId;
         if (typeof itemId === "string")
-          await this.authorize(
+          await authorize(
             "data",
             `${ref.kind}:${ref.id}/${encodeURIComponent(itemId)}`,
             "read",
@@ -3578,6 +3678,13 @@ export class AgentEngine {
           );
       }
     }
+    // Authorization can await host code; recheck time after it returns.
+    signal?.throwIfAborted();
+    for (const ref of refs)
+      if (ref.expiresAt && !(Date.parse(ref.expiresAt) > this.clock.now()))
+        fail("ACCESS_DENIED", "Context source expired");
+    if (transaction) await retained(transaction);
+    else await this.transaction(retained);
   }
   private async observation(
     r: RunRecord,
@@ -4214,13 +4321,18 @@ export class AgentEngine {
     const context = await this.transaction(async (tx) => {
       const session = await this.sessionRecord(tx, id);
       this.assertRetained(session);
-      const refs = (await tx.list<RunRecord>("runs"))
-        .filter((run) => run.sessionId === id)
-        .flatMap((run) => [
-          ...run.messages.flatMap((message) => message.dataRefs ?? []),
-          ...(run.compaction?.sourceRefs ?? []),
-        ]);
+      const runs = (await tx.list<RunRecord>("runs")).filter(
+        (run) => run.sessionId === id,
+      );
+      const refs = runs.flatMap((run) => [
+        ...run.messages.flatMap((message) => message.dataRefs ?? []),
+        ...(run.compaction?.sourceRefs ?? []),
+      ]);
       return {
+        sessionId: id,
+        operationRefs: [
+          ...new Set(runs.flatMap((run) => run.operationRefs ?? [])),
+        ],
         config: session.config,
         refs: [...new Map(refs.map((ref) => [hash(ref), ref])).values()],
       };
@@ -4759,6 +4871,19 @@ function pointer(value: JsonValue, path: string): JsonValue | undefined {
     v = (v as JsonObject)[part.replace(/~1/g, "/").replace(/~0/g, "~")];
   }
   return v;
+}
+async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  let abort: () => void = () => {};
+  const interrupted = new Promise<never>((_, reject) => {
+    abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  });
+  try {
+    return await Promise.race([work, interrupted]);
+  } finally {
+    signal.removeEventListener("abort", abort);
+  }
 }
 async function* boundedStream<T>(
   stream: AsyncIterable<T>,

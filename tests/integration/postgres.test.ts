@@ -6,49 +6,59 @@ it("PostgreSQL management lock, atomic rollback and committed stream order", asy
     process.env.AGENT_TEST_DATABASE_URL ??
     "postgresql://postgres@127.0.0.1:55439/agent_engine_test";
   const store = PostgresStore.fromConnectionString(url);
-  await store.migrate();
-  await store.acquire();
-  const other = PostgresStore.fromConnectionString(url);
-  await expect(other.acquire()).rejects.toMatchObject({ code: "ENGINE_BUSY" });
-  await other.close();
-  const session = randomUUID();
-  await expect(
-    store.transaction(async (tx) => {
-      await tx.put("test", session, { ok: true });
-      await tx.append(session, {
-        type: "session.created",
-        data: { version: 1 },
-      });
-      throw Error("fault");
-    }),
-  ).rejects.toThrow();
-  expect(
-    await store.transaction(async (tx) => [
-      await tx.get("test", session),
-      await tx.head(session),
-    ]),
-  ).toEqual([undefined, 0]);
-  await Promise.all(
-    Array.from({ length: 20 }, (_, i) =>
+  let other: PostgresStore | undefined, reopened: PostgresStore | undefined;
+  try {
+    await store.migrate();
+    await store.acquire();
+    other = PostgresStore.fromConnectionString(url);
+    await expect(other.acquire()).rejects.toMatchObject({
+      code: "ENGINE_BUSY",
+    });
+    await other.close();
+    const session = randomUUID();
+    await expect(
       store.transaction(async (tx) => {
-        await tx.put("test", session, { i });
+        await tx.put("test", session, { ok: true });
         await tx.append(session, {
-          type: "session.config_updated",
-          data: { version: i },
+          type: "session.created",
+          data: { version: 1 },
         });
+        throw Error("fault");
       }),
-    ),
-  );
-  const events = await store.transaction((tx) => tx.events(session, 0));
-  expect(events.map((e) => e.sequence)).toEqual(
-    Array.from({ length: 20 }, (_, i) => i + 1),
-  );
-  expect(new Set(events.map((e) => e.id)).size).toBe(20);
-  await store.close();
-  const reopened = PostgresStore.fromConnectionString(url);
-  await reopened.acquire();
-  expect(await reopened.transaction((tx) => tx.head(session))).toBe(20);
-  await reopened.close();
+    ).rejects.toThrow();
+    expect(
+      await store.transaction(async (tx) => [
+        await tx.get("test", session),
+        await tx.head(session),
+      ]),
+    ).toEqual([undefined, 0]);
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        store.transaction(async (tx) => {
+          await tx.put("test", session, { i });
+          await tx.append(session, {
+            type: "session.config_updated",
+            data: { version: i },
+          });
+        }),
+      ),
+    );
+    const events = await store.transaction((tx) => tx.events(session, 0));
+    expect(events.map((e) => e.sequence)).toEqual(
+      Array.from({ length: 20 }, (_, i) => i + 1),
+    );
+    expect(new Set(events.map((e) => e.id)).size).toBe(20);
+    await store.close();
+    reopened = PostgresStore.fromConnectionString(url);
+    await reopened.acquire();
+    expect(await reopened.transaction((tx) => tx.head(session))).toBe(20);
+  } finally {
+    await Promise.allSettled([
+      store.close(),
+      other?.close(),
+      reopened?.close(),
+    ]);
+  }
 });
 
 it("terminating the management connection blocks subsequent capability dispatch", async () => {

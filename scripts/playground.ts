@@ -1,3 +1,4 @@
+import { closeResources } from "./lib/close-resources.js";
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
 import {
@@ -110,14 +111,19 @@ try {
   const stop = async () => {
     if (closing) return;
     closing = true;
-    await host?.close();
-    await engine?.close();
+    await closeResources(host, engine ?? store);
   };
   process.once("SIGINT", () => {
-    void stop();
+    void stop().catch(() => {
+      console.error("PLAYGROUND_CLOSE_FAILED");
+      process.exitCode = 1;
+    });
   });
   process.once("SIGTERM", () => {
-    void stop();
+    void stop().catch(() => {
+      console.error("PLAYGROUND_CLOSE_FAILED");
+      process.exitCode = 1;
+    });
   });
 } catch (error) {
   const code =
@@ -127,8 +133,6 @@ try {
   console.error(
     `${code}：请检查本地配置和端口；数据库容器可用 docker start agent-engine-test-pg 启动。`,
   );
-  await host?.close();
-  if (engine) await engine.close();
-  else await store?.close();
+  await closeResources(host, engine ?? store).catch(() => {});
   process.exitCode = 1;
 }

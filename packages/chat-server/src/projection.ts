@@ -36,35 +36,41 @@ export async function listChatSessions(
   context: ChatContext,
   namespace: string,
 ): Promise<ChatSessionSummary[]> {
-  const summaries = await context.engine.listSessions();
   const result: ChatSessionSummary[] = [];
-  for (const s of summaries) {
-    if (s.archived) continue;
-    try {
-      const record = await context.engine.readSession(s.id);
-      const assistant = assistantFor(record, context, namespace);
-      result.push({
-        id: s.id,
-        assistantId: assistant.id,
-        title: title(record),
-        createdAt: record.createdAt ?? 0,
-        active: !!record.activeRun,
-      });
-    } catch (error) {
-      if (
-        error instanceof ChatError &&
-        ["CHAT_SESSION_NOT_FOUND", "CHAT_ASSISTANT_UNAVAILABLE"].includes(
-          error.code,
+  let after: string | undefined;
+  while (result.length < 50) {
+    const summaries = await context.engine.listSessions({ after });
+    for (const s of summaries) {
+      if (s.archived) continue;
+      try {
+        const record = await context.engine.readSession(s.id);
+        const assistant = assistantFor(record, context, namespace);
+        result.push({
+          id: s.id,
+          assistantId: assistant.id,
+          title: title(record),
+          createdAt: record.createdAt ?? 0,
+          active: !!record.activeRun,
+        });
+        if (result.length === 50) break;
+      } catch (error) {
+        if (
+          error instanceof ChatError &&
+          ["CHAT_SESSION_NOT_FOUND", "CHAT_ASSISTANT_UNAVAILABLE"].includes(
+            error.code,
+          )
         )
-      )
-        continue;
-      if (
-        error instanceof AgentEngineError &&
-        ["ACCESS_DENIED", "DATA_RETENTION_EXPIRED"].includes(error.code)
-      )
-        continue;
-      throw error;
+          continue;
+        if (
+          error instanceof AgentEngineError &&
+          ["ACCESS_DENIED", "DATA_RETENTION_EXPIRED"].includes(error.code)
+        )
+          continue;
+        throw error;
+      }
     }
+    if (summaries.length < 500) break;
+    after = summaries.at(-1)!.id;
   }
   return result
     .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))

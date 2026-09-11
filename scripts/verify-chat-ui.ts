@@ -450,6 +450,12 @@ try {
     true,
   );
   // Unmount owns network/DOM cleanup; remount works without global singleton state.
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    ),
+  );
+  assert.equal(await page.locator("[data-agent-chat]").count(), 2);
   await page.evaluate(() => {
     (window as any).chatExample.widget.destroy();
     (window as any).chatExample.inline.destroy();
@@ -495,6 +501,7 @@ try {
         "container-resize",
         "mobile-modal",
         "focus-return",
+        "bfcache-preserves-mounts",
         "destroy",
         "classic-script",
       ],

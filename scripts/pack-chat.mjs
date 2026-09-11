@@ -10,7 +10,9 @@ for (const name of ["sdk", "chat-core", "chat-server", "chat-ui"]) {
     { cwd: resolve("packages", name), encoding: "utf8" },
   );
   if (result.status !== 0) {
-    process.stderr.write(result.stderr);
+    const detail =
+      result.error?.message || result.stderr || "Package command failed";
+    process.stderr.write(detail.endsWith("\n") ? detail : `${detail}\n`);
     process.exit(result.status ?? 1);
   }
 }

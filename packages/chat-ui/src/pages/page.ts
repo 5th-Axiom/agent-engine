@@ -42,7 +42,9 @@ export function createChatPage(
   const feedbackActions = element("div", "ae-feedback-actions");
   feedback.append(feedbackText, feedbackActions);
   feedback.hidden = true;
+  let localError: string | undefined;
   const safe = (operation: () => unknown) => {
+    localError = undefined;
     try {
       Promise.resolve(operation()).catch((error) =>
         showError(errorCode(error)),
@@ -52,6 +54,7 @@ export function createChatPage(
     }
   };
   function showError(code: string) {
+    localError = code;
     feedback.hidden = false;
     feedbackText.textContent = explainChatError(code);
   }
@@ -153,7 +156,10 @@ export function createChatPage(
   );
   const composer = createComposer({
     copy,
-    onDraft: (value) => controller.setDraft(value),
+    onDraft: (value) => {
+      localError = undefined;
+      controller.setDraft(value);
+    },
     onSend: () => safe(() => controller.send()),
     onCancel: () => safe(() => controller.cancel()),
   });
@@ -231,9 +237,10 @@ export function createChatPage(
     }
     welcome.hidden = !!state.session?.runs.length;
     composer.update(state);
-    feedback.hidden = !state.error;
-    feedbackText.textContent = state.error
-      ? explainChatError(state.error) +
+    const visibleError = state.error ?? localError;
+    feedback.hidden = !visibleError;
+    feedbackText.textContent = visibleError
+      ? explainChatError(visibleError) +
         (state.pending
           ? " 重试使用原请求编号；结束重试不会停止已受理的任务。"
           : "")

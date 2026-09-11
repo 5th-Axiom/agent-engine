@@ -25,44 +25,47 @@ try {
   );
   process.exit(2);
 }
-const store = PostgresStore.fromConnectionString(
-  process.env.AGENT_TEST_DATABASE_URL ??
-    "postgresql://postgres@127.0.0.1:55439/agent_engine_test",
-);
-await store.migrate();
-let echoes = 0;
-const engine = await createAgentEngine({
-  store,
-  principal: { tenantId: randomUUID(), subjectId: "provider-smoke" },
-  secrets: local.secrets,
-  protocolKey: local.protocolKey,
-  bindings: {
-    echo: {
-      version: "1",
-      sideEffect: "read",
-      execute: async () => {
-        echoes++;
-        return { value: "READY" };
+let store: PostgresStore | undefined;
+let engine: Awaited<ReturnType<typeof createAgentEngine>> | undefined;
+const completed: string[] = [];
+let stage = "initialization";
+try {
+  store = PostgresStore.fromConnectionString(
+    process.env.AGENT_TEST_DATABASE_URL ??
+      "postgresql://postgres@127.0.0.1:55439/agent_engine_test",
+  );
+  await store.migrate();
+  let echoes = 0;
+  engine = await createAgentEngine({
+    store,
+    principal: { tenantId: randomUUID(), subjectId: "provider-smoke" },
+    secrets: local.secrets,
+    protocolKey: local.protocolKey,
+    bindings: {
+      echo: {
+        version: "1",
+        sideEffect: "read",
+        execute: async () => {
+          echoes++;
+          return { value: "READY" };
+        },
       },
     },
-  },
-  policy: {
-    allowedOrigins: [new URL(local.model.baseURL).origin],
-    allowedModelTargets: [
-      {
-        provider: local.model.provider,
-        origin: new URL(local.model.baseURL).origin,
-        credentialScopes: [local.model.apiKey.secretRef],
-      },
-    ],
-    allowPrivateOrigins: local.allowPrivateNetwork
-      ? [new URL(local.model.baseURL).origin]
-      : [],
-  },
-});
-const completed: string[] = [];
-let stage = "basic";
-try {
+    policy: {
+      allowedOrigins: [new URL(local.model.baseURL).origin],
+      allowedModelTargets: [
+        {
+          provider: local.model.provider,
+          origin: new URL(local.model.baseURL).origin,
+          credentialScopes: [local.model.apiKey.secretRef],
+        },
+      ],
+      allowPrivateOrigins: local.allowPrivateNetwork
+        ? [new URL(local.model.baseURL).origin]
+        : [],
+    },
+  });
+  stage = "basic";
   const model = local.model;
   const base = {
     models: { primary: model },
@@ -152,7 +155,7 @@ try {
       },
     });
     const assertNativeThinking = async (sessionId: string, runId: string) => {
-      const run = await engine.readRun(sessionId, runId);
+      const run = await engine!.readRun(sessionId, runId);
       const responses = run.steps.flatMap((step) =>
         step.response ? [step.response] : [],
       );
@@ -171,7 +174,7 @@ try {
           !("content" in native)
         );
       });
-      const events = (await (await engine.loadSession(sessionId)).listEvents())
+      const events = (await (await engine!.loadSession(sessionId)).listEvents())
         .events;
       if (
         !observed ||
@@ -224,5 +227,16 @@ try {
   );
   process.exitCode = 1;
 } finally {
-  await engine.close();
+  try {
+    await (engine ?? store)?.close();
+  } catch {
+    console.error(
+      JSON.stringify({
+        completed: false,
+        stage: "cleanup",
+        code: "SMOKE_CLEANUP_FAILED",
+      }),
+    );
+    process.exitCode = 1;
+  }
 }

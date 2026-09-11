@@ -1,3 +1,4 @@
+import { closeResources } from "../../scripts/lib/close-resources.js";
 import { randomBytes, createHmac } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
@@ -137,11 +138,20 @@ try {
   const close = async () => {
     if (closing) return;
     closing = true;
-    await host?.close();
-    await engine?.close();
+    await closeResources(host, engine ?? store);
   };
-  process.once("SIGINT", () => void close());
-  process.once("SIGTERM", () => void close());
+  process.once("SIGINT", () => {
+    void close().catch(() => {
+      console.error("DOCS_CLOSE_FAILED");
+      process.exitCode = 1;
+    });
+  });
+  process.once("SIGTERM", () => {
+    void close().catch(() => {
+      console.error("DOCS_CLOSE_FAILED");
+      process.exitCode = 1;
+    });
+  });
 } catch (error) {
   const code =
     error instanceof LocalModelConfigError || error instanceof AgentEngineError
@@ -150,8 +160,6 @@ try {
   console.error(
     `${code}：请检查模型配置、独立数据库和端口。仅阅读可使用：pnpm exec tsx examples/docs-site/start.ts --read-only`,
   );
-  await host?.close();
-  if (engine) await engine.close();
-  else await store?.close();
+  await closeResources(host, engine ?? store).catch(() => {});
   process.exitCode = 1;
 }

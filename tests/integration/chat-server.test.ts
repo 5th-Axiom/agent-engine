@@ -307,3 +307,35 @@ it("omits private thinking, native protocol and provider errors from actual HTTP
     /private-native-thought|private-signature|private-provider-body|MODEL_SECRET|PROTOCOL_SECRET|encrypted|apiKey/,
   );
 });
+
+it("finds this chat namespace even when 500 newer sessions belong to another namespace", async () => {
+  const h = await setup();
+  const created = (await (
+    await h.request("/sessions", {
+      requestId: randomUUID(),
+      assistantId: "demo",
+    })
+  ).json()) as { id: string };
+  const scoped = h.engine.forPrincipal({
+    tenantId: "tenant",
+    subjectId: "alice",
+  });
+  const original = await scoped.readSession(created.id);
+  // Store fixture isolates the bridge's pagination from the separately tested create API.
+  await h.engine.options.store.transaction(async (tx) => {
+    for (let i = 0; i < 500; i++) {
+      const copy = structuredClone(original);
+      copy.id = randomUUID();
+      copy.createdAt = original.createdAt! + i + 1;
+      copy.config.metadata = {
+        agentChat: { namespace: "another-app", assistantId: "demo" },
+      };
+      await tx.put("sessions", copy.id, copy);
+    }
+  });
+  const response = await h.request("/sessions");
+  expect(response.status).toBe(200);
+  expect((await response.json()).map((s: { id: string }) => s.id)).toEqual([
+    created.id,
+  ]);
+});

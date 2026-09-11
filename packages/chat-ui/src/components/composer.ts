@@ -59,7 +59,8 @@ export function createComposer(options: {
     update: (state: ChatState) => {
       if (field.input.value !== state.draft && !composing)
         field.input.value = state.draft;
-      field.input.disabled = state.sending || state.pending || !state.config;
+      field.input.disabled = !state.config;
+      field.input.readOnly = state.sending || state.pending;
       count.replaceChildren(
         document.createTextNode(`${state.draft.length} / 8000`),
         element("span", "ae-keyboard-hint", " · ⌘ / Ctrl + Enter"),

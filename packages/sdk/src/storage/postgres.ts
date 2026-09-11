@@ -53,7 +53,7 @@ export class PostgresStore implements EngineStore {
         await c.query("INSERT INTO ae_schema(version) VALUES ($1)", [SCHEMA]);
       await c.query("COMMIT");
     } catch (e) {
-      await c.query("ROLLBACK");
+      await c.query("ROLLBACK").catch(() => {});
       throw e;
     } finally {
       c.release();

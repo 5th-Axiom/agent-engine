@@ -229,3 +229,31 @@ it("theme skins and arbitrary brand colors retain readable semantic pairs", () =
     "CHAT_THEME_CONTRAST",
   );
 });
+
+it("async authentication headers time out or abort without a late dispatch", async () => {
+  for (const cancel of [false, true]) {
+    let release!: (value: HeadersInit) => void,
+      calls = 0;
+    const headers = new Promise<HeadersInit>((resolve) => {
+      release = resolve;
+    });
+    const controller = new AbortController();
+    const transport = createHttpChatTransport({
+      baseURL: "https://app.example.com/api/chat",
+      timeoutMs: 30,
+      headers: () => headers,
+      fetch: async () => {
+        calls++;
+        throw new Error("Must not dispatch");
+      },
+    });
+    const result = transport.getConfig(controller.signal);
+    if (cancel) controller.abort();
+    await expect(result).rejects.toMatchObject({
+      code: cancel ? "CHAT_ABORTED" : "CHAT_REQUEST_TIMEOUT",
+    });
+    release({ authorization: "synthetic" });
+    await Promise.resolve();
+    expect(calls).toBe(0);
+  }
+});

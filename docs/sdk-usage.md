@@ -90,3 +90,12 @@ Policy、业务键、Skill Loader 和真正的业务执行均受能力额度/信
 ## 前端聊天 SDK
 
 `chat-core` 提供受限聊天协议/状态控制器；`chat-ui` 提供四层组件、悬浮入口和嵌入页；`chat-server` 通过 Node HTTP 对接已验证用户的 Engine。浏览器只传助手 ID 和文本，模型、凭据与工具授权留在服务器。完整安装、宿主鉴权、React/Vue、主题和生命周期示例见[前端 SDK 接入教程](frontend-sdk.md)，边界见 [ADR 0005](adr/0005-embeddable-chat-sdk.md)。
+
+
+## 会话分页与审查修复后的配置边界
+
+`engine.listSessions({ limit: 100, after })` 返回当前主体的会话，按创建时间从新到旧、同时间按 ID 排序。`limit` 为 1–500，默认 500；下一页把上一页最后一项的 `id` 作为 `after`，返回空数组即结束。游标必须属于当前主体且仍存在；不存在或已删除时从首页重新读取。返回项含 `id/version/archived/createdAt`，不含正文。IM 桥分页查找当前助手空间的最近 50 条，不会被其他助手空间占满第一页而遮蔽。
+
+Engine 的预算硬上限在会话未填写预算时仍生效；有效配置将这类字段的来源标记为 `policy-ceiling`。显式超限或费用币种不一致会拒绝配置。Run 的 `overrides.tools` 同时与 Skill 的 `allowedTools` 取交集，空交集不能调用业务工具。
+
+标准模型协议将未知能力和最多 256 个调用内的超限批次送入有界输入修复；业务上限仍是每批 16 个，超限批次零执行。256 是适配器的传输保护上限，达到更高索引时以 `MODEL_OUTPUT_LIMIT` 结束，不扩大业务能力额度。Thinking、签名与工具参数的有效数据片段可重置流空闲计时；纯心跳不重置，也不公开私有正文。

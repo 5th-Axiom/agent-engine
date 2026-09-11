@@ -1,3 +1,4 @@
+import { createChatId } from "./identity.js";
 import {
   ChatError,
   errorCode,
@@ -219,8 +220,8 @@ export class ChatController {
     this.pending = {
       input: text,
       assistantId: this.state.assistantId,
-      createId: crypto.randomUUID(),
-      requestId: crypto.randomUUID(),
+      createId: createChatId(),
+      requestId: createChatId(),
       sessionId: this.sessionId,
     };
     await this.dispatch();

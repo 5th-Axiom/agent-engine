@@ -156,15 +156,12 @@ document.querySelector("#mount-inline").addEventListener("click", () => {
   document.querySelector("#mount-inline").hidden = true;
 });
 // Host lifecycle example: destroy on logout/unmount; closing the panel does not cancel a server Run.
-window.addEventListener(
-  "pagehide",
-  () => {
-    widget.destroy();
-    inline?.destroy();
-    galleryTheme.destroy();
-  },
-  { once: true },
-);
+window.addEventListener("pagehide", (event) => {
+  if (event.persisted) return;
+  widget.destroy();
+  inline?.destroy();
+  galleryTheme.destroy();
+});
 window.chatExample = {
   widget,
   get inline() {

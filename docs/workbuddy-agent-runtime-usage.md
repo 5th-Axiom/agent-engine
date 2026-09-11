@@ -226,7 +226,7 @@ const result = await adapter.updateAutomation({
 });
 ```
 
-这是内部 Payload 示例。UI、`automation_update` Tool 和底层 Facade 的字段形态略有差异，接入时以当前调用层类型为准。
+这是恢复源码对应的历史内部 Payload 示例，不是当前 Agent Engine 的可执行调用或部署配置；其 ACTIVE 与发送字段保留当时行为。UI、`automation_update` Tool 和底层 Facade 的字段形态略有差异，接入时以当前调用层类型为准。
 
 ### 2.8 看本轮 Token、费用和报错链路
 
@@ -1435,7 +1435,7 @@ await session.prompts.send({
 - 恢复仓库缺少原始 TypeScript 类型、构建发布配置和兼容承诺；
 - 内部 RPC Channel 和 Payload 可能随版本变化。
 
-若要在新项目中使用，应参考这些行为设计公开 Runtime Contract，而不是直接依赖恢复文件。对应方案见 `reports/agent-runtime-technical-design.md`。
+若要在新项目中使用，应参考这些行为设计公开 Runtime Contract，而不是直接依赖恢复文件。对应方案见 [Agent Engine 技术方案](technical-design.md)。
 
 ## 17. 关键源码依据
 

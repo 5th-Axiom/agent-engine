@@ -57,24 +57,44 @@ export function createHttpChatTransport(
     if (signal?.aborted) abort();
     signal?.addEventListener("abort", abort, { once: true });
     const timer = setTimeout(abort, timeout);
+    let interrupt: () => void = () => {};
+    const interrupted = new Promise<never>((_, reject) => {
+      interrupt = () => reject(new Error("Request interrupted"));
+      controller.signal.addEventListener("abort", interrupt, { once: true });
+      if (controller.signal.aborted) interrupt();
+    });
     try {
-      const headers = new Headers(await options.headers?.());
+      const headers = new Headers(
+        await Promise.race([
+          Promise.resolve().then(() => {
+            controller.signal.throwIfAborted();
+            return options.headers?.();
+          }),
+          interrupted,
+        ]),
+      );
       headers.set("accept", "application/json");
       if (body !== undefined) {
         headers.set("content-type", "application/json");
         headers.set("x-agent-chat", "1");
       }
       controller.signal.throwIfAborted();
-      const response = await (options.fetch ?? globalThis.fetch)(base + path, {
-        method: body === undefined ? "GET" : "POST",
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        credentials: options.credentials ?? "same-origin",
-        redirect: "error",
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      const data: unknown = await response.json().catch(() => undefined);
+      const response = await Promise.race([
+        (options.fetch ?? globalThis.fetch)(base + path, {
+          method: body === undefined ? "GET" : "POST",
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          credentials: options.credentials ?? "same-origin",
+          redirect: "error",
+          cache: "no-store",
+          signal: controller.signal,
+        }),
+        interrupted,
+      ]);
+      const data: unknown = await Promise.race([
+        response.json().catch(() => undefined),
+        interrupted,
+      ]);
       if (!response.ok) {
         const parsed = z
           .object({
@@ -108,6 +128,7 @@ export function createHttpChatTransport(
       );
     } finally {
       clearTimeout(timer);
+      controller.signal.removeEventListener("abort", interrupt);
       signal?.removeEventListener("abort", abort);
     }
   }

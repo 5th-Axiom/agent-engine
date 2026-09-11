@@ -21,7 +21,8 @@
     "verify:playground": "pnpm build && tsx scripts/verify-playground.ts",
     "verify:chat-ui": "pnpm build && tsx scripts/verify-chat-ui.ts",
     "pack:chat": "pnpm build && node scripts/pack-chat.mjs",
-    "verify:chat-packages": "pnpm pack:chat && node scripts/verify-chat-packages.mjs"
+    "verify:chat-packages": "pnpm pack:chat && node scripts/verify-chat-packages.mjs",
+    "verify:review-fixes": "pnpm build && node scripts/verify-review-fixes.mjs"
   },
   "devDependencies": {
     "@agent-runtime/debug": "workspace:*",

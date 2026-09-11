@@ -71,11 +71,13 @@ async function api(path, value) {
   } catch {
     throw new Error("NETWORK_ERROR");
   }
-  const data = await response.json();
+  const data = await response.json().catch(() => {
+    throw new Error("NETWORK_ERROR");
+  });
   if (!response.ok) throw new Error(data.error?.code || "LOCAL_SERVER_ERROR");
   return data;
 }
-function feedback(error, reconnect = false) {
+function feedback(error, reconnect = error.message === "NETWORK_ERROR") {
   $("feedback").hidden = false;
   $("feedback-text").textContent =
     `${messages[error.message] || "操作未完成，请重试或查看 Debug。"} (${error.message})`;
@@ -149,11 +151,33 @@ async function openSession(id) {
   if (state.sending) return;
   state.sessionId = id;
   state.pending = null;
+  state.pollFailed = true;
   resetView();
   updateControls();
   setURL(id);
   clearFeedback();
-  await refresh();
+  try {
+    await refresh();
+    if (id !== state.sessionId) return;
+  } catch (error) {
+    if (id !== state.sessionId) return;
+    if (
+      id === state.sessionId &&
+      [
+        "DATA_RETENTION_EXPIRED",
+        "ACCESS_DENIED",
+        "SESSION_NOT_FOUND",
+        "NOT_FOUND",
+      ].includes(error.message)
+    ) {
+      state.sessionId = null;
+      state.pollFailed = false;
+      setURL(null);
+      resetView();
+    }
+    updateControls();
+    throw error;
+  }
   await loadSessions();
   $("messages").scrollTop = $("messages").scrollHeight;
   if (matchMedia("(max-width: 850px)").matches) $("settings").open = false;
@@ -270,7 +294,13 @@ async function refresh() {
   const ticket = ++refreshSequence;
   if (!state.sessionId) return;
   const id = state.sessionId;
-  const view = await api(`/api/sessions/${id}`);
+  let view;
+  try {
+    view = await api(`/api/sessions/${id}`);
+  } catch (error) {
+    if (id !== state.sessionId || ticket !== refreshSequence) return;
+    throw error;
+  }
   if (id !== state.sessionId || ticket !== refreshSequence) return;
   const wasActive = state.view?.activeRun;
   if (state.pollFailed) clearFeedback();

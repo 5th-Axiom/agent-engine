@@ -1,6 +1,6 @@
 # Agent Engine 技术方案
 
-> 状态：Draft for Review · 已完成第二轮契约一致性修订，尚未实现\
+> 状态：历史设计基线 · 已完成第二轮契约一致性修订；M0–M3 实现与后续审查修复见 [实施清单](implementation-plan.md)\
 > 目标项目：`~/git/agent-engine`\
 > 对照基线：WorkBuddy AI 5.4.2 / CodeBuddy CLI 2.132.0 恢复源码\
 > 定位：通用、纯粹、与本地代码工作区无关的 Agent Engine\
@@ -1299,7 +1299,7 @@ export interface SessionAgentConfig {
 
 Session 持久化保留“调用方显式值 + 规范化定义”，Engine Defaults 在创建时用于校验和预览，不能被抹去来源后全部变成 Session 显式覆盖值。新 Run 按当时的 Defaults 与 Session 显式值生成有效快照；相同 `requestId` 的重投以及已接受 Run 的恢复则始终使用旧快照。`getConfig()` 返回版本化声明，Debug 的 Effective Config 另显示该 Run 的完整合并结果。
 
-合并使用字段白名单：普通对象递归合并已知字段；能力数组以及 `retryOn/fallbacks` 等策略数组整体替换；省略表示继承，空数组表示清空，`null` 仅在 Schema 明确允许时有意义。Engine Defaults、Session、Run 显式值超出硬上限时拒绝，不静默更改。`replaceConfig()` 与受理 Run 在 Session 版本上串行化；Run 可通过 `ifConfigVersion` 要求指定版本，版本不符受理前报 `CONFIG_VERSION_CONFLICT`。Engine 的 Defaults/Policy 在实例存活期间不原地热更新，变更需新版本启动；实时撤权走独立授权器。
+合并使用字段白名单：普通对象递归合并已知字段；能力数组以及 `retryOn/fallbacks` 等策略数组整体替换；省略表示继承，空数组表示清空，`null` 仅在 Schema 明确允许时有意义。Engine Defaults、Session、Run 显式值超出硬上限时拒绝，不静默更改。未显式填写的预算字段继承 Policy Ceiling，来源标记为 `policy-ceiling`；已填写的费用币种必须与硬上限一致。`replaceConfig()` 与受理 Run 在 Session 版本上串行化；Run 可通过 `ifConfigVersion` 要求指定版本，版本不符受理前报 `CONFIG_VERSION_CONFLICT`。Engine 的 Defaults/Policy 在实例存活期间不原地热更新，变更需新版本启动；实时撤权走独立授权器。
 
 `defineTool()`、`defineKnowledgeBase()` 等开发辅助函数可以接收 Zod Schema，但 Config Normalizer 必须在持久化前把它转换成标准 JSON Schema。最终保存和参与 Hash 的 Session Config 必须完全 JSON 可序列化：不允许保存函数、类实例或 Secret 明文；可执行实现统一保存为 `adapter type + bindingKey/endpoint` 引用。
 

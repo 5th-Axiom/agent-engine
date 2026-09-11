@@ -145,7 +145,9 @@ components:
 
 来源为 [Token](src/tokens/index.ts)、[共享样式](src/styles.ts)、[原子组件](src/atoms/index.ts)、[业务组件](src/components/index.ts) 和 [页面](src/pages/index.ts)。方向来自 [接入示例](../../examples/embedded/index.html) 的首个 body 注释及 [PRODUCT.md](PRODUCT.md)，没有替换现有 Playground 或 Debug 的设计。
 
-本次文档承接 [finish review](.impeccable/review/finish-review.md) 的 `ship` 结论。该审查接受六张证据：[桌面浅色](.impeccable/review/desktop-light.png)、[桌面深色](.impeccable/review/desktop-dark.png)、[关闭入口](.impeccable/review/desktop-closed.png)、[容器嵌入](.impeccable/review/inline.png)、[移动浅色](.impeccable/review/mobile-light.png)、[移动深色](.impeccable/review/mobile-dark.png)。前四张为 1440×1000，后两张为 390×844；移动截图使用 rounded 皮肤。文档提取没有重跑浏览器验收或机械检测。检测器因缺少解析依赖降级，返回的 `[]` 不能作为计算样式对比度通过证据；颜色依据是主题校验代码及已有契约测试结果，视觉结论限于已审查尺寸和状态。
+本次文档承接 finish review（本地审查材料） 的 `ship` 结论。该审查接受六张证据：桌面浅色（本地审查材料）、桌面深色（本地审查材料）、关闭入口（本地审查材料）、容器嵌入（本地审查材料）、移动浅色（本地审查材料）、移动深色（本地审查材料）。前四张为 1440×1000，后两张为 390×844；移动截图使用 rounded 皮肤。文档提取没有重跑浏览器验收或机械检测。检测器因缺少解析依赖降级，返回的 `[]` 不能作为计算样式对比度通过证据；颜色依据是主题校验代码及已有契约测试结果，视觉结论限于已审查尺寸和状态。
+
+本地审查报告和截图被 Git 忽略，克隆仓库不包含这些材料。可交付的行为说明与复现入口见 [公开验收/使用说明](../../docs/frontend-sdk-acceptance.md)。
 
 ## Colors
 

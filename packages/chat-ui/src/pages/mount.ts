@@ -1,5 +1,6 @@
 import {
   ChatController,
+  createChatId,
   type ChatTransport,
   type SessionMemory,
   type ChatState,
@@ -7,6 +8,7 @@ import {
 import { createButton, element, type ChatIcon } from "../atoms/index.js";
 import {
   applyChatTheme,
+  resolveChatTheme,
   type ChatThemeOptions,
   type ChatTokens,
 } from "../tokens/index.js";
@@ -31,6 +33,7 @@ export interface ChatWidgetOptions extends ChatMountOptions {
   onOpenChange?: (open: boolean) => void;
 }
 function setup(target: HTMLElement, options: ChatMountOptions) {
+  resolveChatTheme(options.theme);
   if (!options.controller && !options.transport)
     throw Error("CHAT_TRANSPORT_REQUIRED");
   const controller =
@@ -83,6 +86,7 @@ export function mountChatPage(target: HTMLElement, options: ChatMountOptions) {
   };
 }
 export function mountChatWidget(options: ChatWidgetOptions) {
+  const dialogId = "agent-chat-" + createChatId();
   const view = setup(options.target ?? document.body, options);
   let isOpen = false;
   let destroyed = false;
@@ -105,7 +109,7 @@ export function mountChatWidget(options: ChatWidgetOptions) {
   launcher.setAttribute("aria-haspopup", "dialog");
   const dialog = element("dialog", "ae-dialog");
   dialog.setAttribute("aria-label", copy.title);
-  dialog.id = "agent-chat-" + crypto.randomUUID();
+  dialog.id = dialogId;
   launcher.setAttribute("aria-controls", dialog.id);
   const page = createChatPage(view.controller, {
     ...options,
@@ -204,17 +208,19 @@ export function mountChatWidget(options: ChatWidgetOptions) {
     updateTheme: theme.update,
     destroy: (settings: { clearSession?: boolean } = {}) => {
       if (destroyed) return;
+      destroyed = true;
+      const wasOpen = isOpen;
       if (isOpen) {
         isOpen = false;
         dialog.close();
       }
-      destroyed = true;
       window.removeEventListener("resize", resize);
       visualViewport?.removeEventListener("resize", resize);
       visualViewport?.removeEventListener("scroll", resize);
       page.destroy();
       theme.destroy();
       view.dispose(settings.clearSession);
+      if (wasOpen) notify();
     },
   };
 }

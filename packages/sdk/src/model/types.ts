@@ -45,6 +45,8 @@ export interface ModelResponse {
   providerResponseId?: string;
 }
 export type ModelStreamEvent =
+  // Valid private payload progress, without disclosing its contents to consumers.
+  | { type: "activity" }
   | { type: "delta"; blockId: string; kind: "text" | "thinking"; text: string }
   | {
       type: "usage";
