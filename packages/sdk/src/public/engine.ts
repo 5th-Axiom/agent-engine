@@ -3791,6 +3791,9 @@ export class AgentEngine {
         ? abortable(this.authorize(...args), signal)
         : this.authorize(...args);
     signal?.throwIfAborted();
+    // Recheck the host's session-wide data grant before sending historical context.
+    // Tool-level grants alone cannot express a revoked row/environment scope.
+    if (r.sessionId) await authorize("data", r.sessionId, "read");
     const retained = async (tx: StoreTransaction) => {
       if (r.sessionId) {
         this.assertRetained(await this.sessionRecord(tx, r.sessionId!));

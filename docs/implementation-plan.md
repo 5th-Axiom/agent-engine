@@ -192,3 +192,16 @@ CodeRabbit 与 Codex 合并后的 31 项确认问题已逐项修复，两个条�
 - [x] [改动与配置总结](reply-display-alignment.md)、前端 SDK、公开 API、场景文章及 DOCS-43 至 DOCS-46 同步。保留原有未提交工作；未提交、发布或部署。
 
 公开过程保持原有大小与回读上限；旧未保留思考无法补回。当前传输仍为快照轮询，本轮未新增语音、公式、语法高亮、M4/M5 能力。
+
+## 2026-09-12 Alice AI Debug 独立接入（用户追加）
+
+- [x] 通用 Chat 增加可选 opaque contextRef、controller 冻结引用、宿主 resolveRunContext，以及 contextBar 挂载点；增加契约/集成测试，保留原宿主行为。可信上下文不会自动进入模型提示词。
+- [x] Alice 仓库新增独立 diagnostics 服务，直接 Biz 身份验证与只读 PostgreSQL，范围持久受理、AST/字段/用户/时间约束、受控诊断工具、版本化资料、证据留存与独立读取、页面及 Debug icon。
+- [x] 隔离 PostgreSQL 验证读取/联表/聚合/CTE、非法 SQL、真实取消、上限、撤权、范围冻结、证据游标、并发/正常重启；子进程 SIGKILL 后恢复同一 Run，无重复查询。Alice 30 项测试、类型与构建通过，详见其 diagnostics/ACCEPTANCE.md。
+- [x] 桌面/手机聊天与证据链路、刷新、scope 竞态、翻页失败重试、退出登录和 widget 零查询预填已验证；终审仅对 F1/F2 两项修复确认 resolved、ship。
+- [x] 已授权真实模型使用隔离合成任务，2 次数据库查询、3 次模型尝试、10131 tokens，用量完整；未取得价格，不标费用完整。
+- [x] 新增双仓来源锁、固定工具链、内部本地包、制品记录、Compose profile、diagnostics-only、管理锁/备份/迁移/回滚保护。正式发布拒绝未锁定 commit；当前锁仍待 Engine 改动提交。
+- [x] Engine 本次相关回归 18 文件 / 110 项及类型检查、构建通过；最终 Node 26.3.0 合成发布容器完成断网依赖加载、非 root/只读文件系统与隔离 PostgreSQL 运行验证。Compose 配置与发布脚本语法检查通过，未据此宣称真实部署通过。
+- [ ] 指定测试管理员、获准用户/字段/模型、真实故障样本及 Secret/部署位置待提供，未执行真实测试站点部署、读真实业务数据或回滚演练。D0/D3 不标完成；logs 未接入，部署源码仅支持明确提供的固定清单。
+
+通用契约见 [可信页面上下文](chat-context.md)，本轮行为卡 DIAG-01 至 DIAG-06 见 [Alice 接入行为卡](alice-diagnostics-behaviors.md)。两仓其他并行改动保留；未复制 WorkBuddy 重建代码、提示词、资产或会话数据，未增加 M4/M5 能力。

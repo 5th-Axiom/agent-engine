@@ -405,3 +405,7 @@ describeProcess({ name, input, output }) {
 模型 `thinking.expose: "content"`、Engine 策略 `thinkingDisplayRetention: "session"` 和宿主 `thinkingDisplay: "content"` 共同开启公开思考正文；默认仍只展示状态。`summary` 仅展示供应商摘要。完整配置、协议限制与 API 兼容见[回复展示改进](reply-display-alignment.md)。思考与回答分别呈现，不展示原生签名和遮蔽块；未返回正文时明确提示。
 
 整页和浮窗自动处理短时文字缓冲、稳定 Markdown 节点、历史立即呈现及减少动态效果。直接使用 `createMessage` 时，可传 `streaming: true`，卸载调用 `destroy()`。已完成的基础模型阶段收在执行详情，当前阶段、工具和可展示思考留在过程区。
+
+### 宿主页面范围
+
+`controller.setContextRef()` 为下一轮设置不透明范围引用，重试保持原引用。Chat Server 的可选 `resolveRunContext` 在身份与 session 授权后解析；宿主必须持久复用首次解析并重检权限。`contextBar` 可挂载环境/对象控件。完整契约、旧客户端行为和例子见[可信页面上下文](chat-context.md)。

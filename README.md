@@ -12,6 +12,7 @@ Agent Engine 帮你把 AI 模型接进自己的程序：模型负责理解和回
 | ------------------------------ | --------------------------------------------------- |
 | 浏览带聊天助手的官方文档站     | [文档站启动与维护](examples/docs-site/README.md)    |
 | 把 IM 图标接进自己的管理后台   | [前端 SDK 接入教程](docs/frontend-sdk.md)           |
+| 给聊天传递可信页面范围 | [宿主上下文与范围冻结](docs/chat-context.md) |
 | 从零安装、启动项目             | [新手上手指南](docs/getting-started.md)             |
 | 聊天、测试工具、查看 Debug     | [测试页面操作手册](docs/local-playground.md)        |
 | 配置模型、更换 API Key         | [模型与凭据配置](docs/local-model-configuration.md) |

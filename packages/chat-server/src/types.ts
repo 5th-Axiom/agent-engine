@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import type { AgentEngine, JsonValue } from "@agent-runtime/sdk";
+import type { AgentEngine, JsonValue, JsonObject } from "@agent-runtime/sdk";
 import type { ChatAssistant, ChatTool } from "@agent-runtime/chat-core";
 export interface ChatAssistantDefinition extends Omit<
   ChatAssistant,
@@ -33,6 +33,16 @@ export interface ChatHandlerOptions {
   allowedOrigins: string[] | (() => string[]);
   /** Called on every request, including reads. Throw ChatError('CHAT_UNAUTHENTICATED',401) on failure. */
   resolveContext: (request: IncomingMessage) => Promise<ChatContext>;
+  /** Resolve an opaque reference after session authorization. Must durably reuse the first
+   * resolution for (principal, sessionId, requestId), including retries without a reference.
+   * Recheck authorization on reuse. Never return credentials or trust browser identity.
+   * Called on all submissions when configured; absence preserves existing behavior. */
+  resolveRunContext?: (input: {
+    context: ChatContext;
+    sessionId: string;
+    requestId: string;
+    contextRef?: string;
+  }) => Promise<JsonObject>;
   allowCredentials?: boolean;
   allowedHeaders?: string[];
   /** Optional, trusted relative navigation; absent by default. This does not authorize the Debug route itself. */

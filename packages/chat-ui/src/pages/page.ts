@@ -16,6 +16,8 @@ import {
 import { defaultChatCopy, explainChatError, type ChatCopy } from "../copy.js";
 
 export interface ChatPageOptions extends TimelineOptions {
+  /** Host-owned scope controls, placed below the header. The host owns listeners and cleanup. */
+  contextBar?: HTMLElement;
   /** Preserve legacy SDK behavior by default; docs host uses Enter to send. */
   sendShortcut?: "enter" | "mod-enter";
   copy?: Partial<ChatCopy>;
@@ -313,7 +315,9 @@ export function createChatPage(
   toolbar.append(debug);
   conversation.append(transcript, jump, feedback, composer.element);
   mainBody.append(conversation, detailBackdrop, detailPanel);
-  main.append(header, mainBody);
+  main.append(header);
+  if (options.contextBar) main.append(options.contextBar);
+  main.append(mainBody);
   root.append(sidebarBackdrop, sidebar, main);
   root.addEventListener("keydown", (event) => {
     if (event.isComposing) return;

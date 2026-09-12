@@ -30,6 +30,11 @@ export const sendMessageSchema = z
     input: z.string().trim().max(8000),
     modelId: z.string().min(1).max(128).optional(),
     skillId: z.string().min(1).max(128).optional(),
+    /** Opaque host-issued reference, never a browser-provided Engine context. */
+    contextRef: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,200}$/)
+      .optional(),
     attachments: z.array(chatImageSchema).max(8).optional(),
   })
   .refine((v) => !!v.input || !!v.attachments?.length);

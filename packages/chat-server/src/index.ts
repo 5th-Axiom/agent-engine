@@ -248,9 +248,19 @@ export function createChatHandler(options: ChatHandlerOptions) {
             !available.skills.some((skill) => skill.id === input.skillId)
           )
             throw new ChatError("CHAT_SKILL_UNAVAILABLE", 409);
-          const { modelId, skillId, ...message } = input;
+          const { modelId, skillId, contextRef, ...message } = input;
+          if (contextRef && !options.resolveRunContext)
+            throw new ChatError("CHAT_CONTEXT_UNAVAILABLE", 400);
+          const runContext = await options.resolveRunContext?.({
+            context,
+            sessionId: id,
+            requestId: input.requestId,
+            ...(contextRef ? { contextRef } : {}),
+          });
+
           const handle = await session.startRun({
             ...message,
+            ...(runContext ? { context: runContext } : {}),
             ...(modelId ? { overrides: { model: modelId } } : {}),
             ...(skillId ? { skill: skillId } : {}),
           });

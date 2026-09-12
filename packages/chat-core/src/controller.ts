@@ -19,6 +19,7 @@ export interface DraftImage {
   error?: string;
 }
 export interface ChatState {
+  contextRef?: string;
   modelId?: string;
   skillId?: string;
   images?: DraftImage[];
@@ -64,6 +65,7 @@ export function createSessionMemory(
   };
 }
 interface Pending {
+  contextRef?: string;
   modelId?: string;
   skillId?: string;
   attachments?: ChatImage[];
@@ -297,6 +299,14 @@ export class ChatController {
     this.state.draft = value.slice(0, 8000);
     this.emit();
   }
+  /** Sets the next turn's host-issued scope. A pending submission keeps its original reference. */
+  setContextRef(value?: string) {
+    this.assertLive();
+    if (value !== undefined && !/^[A-Za-z0-9_-]{1,200}$/.test(value))
+      throw new ChatError("INVALID_INPUT");
+    this.state.contextRef = value;
+    this.emit();
+  }
   setModel(id: string) {
     this.assertLive();
     if (this.state.sending || this.pending)
@@ -381,6 +391,7 @@ export class ChatController {
       throw new ChatError("CHAT_MODEL_UNAVAILABLE");
     this.pending = {
       input: text,
+      ...(this.state.contextRef ? { contextRef: this.state.contextRef } : {}),
       ...(selectedChatModel(this.state)
         ? { modelId: selectedChatModel(this.state)!.id }
         : {}),
@@ -432,6 +443,7 @@ export class ChatController {
         {
           requestId: pending.requestId,
           input: pending.input,
+          ...(pending.contextRef ? { contextRef: pending.contextRef } : {}),
           ...(pending.modelId ? { modelId: pending.modelId } : {}),
           ...(pending.skillId ? { skillId: pending.skillId } : {}),
           ...(pending.attachments?.length
