@@ -2,49 +2,25 @@
 
 接入分两处：Tool 定义告诉模型有哪些参数和返回值；Binding 把工具连接到服务器上的真实业务方法。
 
-## 1. 定义工具与 Binding
+## 前置条件
 
-保存为 tools.ts。readInventory 由你的业务实现，传入的 principal 来自引擎的可信身份，signal 用于请求取消：
+完成[环境准备](/docs/installation/)，导出 [backend 示例](/docs/integration/)。本页脚本与 settings.ts、backend.ts 同目录；示例库存是显式标记的本地数据。
 
-{{code:tools.ts}}
+## 定义、注册、调用
 
-输入和输出采用 JSON Schema。引擎验证输入后再调用 Binding；输出仍需满足 outputSchema。例子使用非负整数库存，你的业务若允许小数或其他状态，应同时修改契约与实际返回格式。
+{{code:tool-run.ts}}
 
-## 2. 注册并提供给会话
-
-下面沿用[后端教程](/docs/sdk/)的 createBackend。readInventory 和 authorizeAgentRequest 是你的业务方法，并非 SDK 导出：
-
-```ts
-import { createBackend } from "./backend.js";
-import { inventoryTool, inventoryBinding } from "./tools.js";
-import { readInventory, authorizeAgentRequest } from "./business.js";
-
-const { engine, config } = await createBackend({
-  principal: { tenantId: "my-app", subjectId: "inventory-task" },
-  authorize: authorizeAgentRequest,
-  bindings: { "inventory.read.v1": inventoryBinding(readInventory) },
-});
-const session = await engine.createSession({
-  config: {
-    ...config,
-    instructions: { text: "库存问题必须调用 inventory.read，不要猜测库存。" },
-    tools: [inventoryTool],
-  },
-});
-const result = await session.run({
-  input: "商品 A 还有多少库存？",
-  requestId: "unique-inventory-question-id",
-});
-console.log(result.outputText);
+```sh
+node --env-file=.env --import tsx tool-run.ts
 ```
 
-**注册 Binding 不等于自动开放工具。** Engine 需要有对应实现，Session 的 tools 需要明确列出定义，宿主权限还需要允许当前用户调用。只在提示词里写工具名称不够。
+defineBoundTool 从结构化 Zod Schema 推导 execute 参数类型，并生成 definition 与 bindings。普通工具仍可使用 defineTool + BindingContract，既有 API 保留。不要将 execute 函数放进 Session 配置。
 
-## 3. 判断工具是否真的调用
+**注册 Binding 不等于自动开放工具。** Session 仍需列出 definition，宿主仍需允许调用。型别推导不替代运行时输入和输出验证。
 
-在业务函数或[Debug](/docs/debug/)中确认 inventory.read 的执行记录，并核对实际输入、返回值和权限结果。模型说“我查过了”不代表工具已执行。
+## 确认接入成功
 
-单测时可以注入一个返回固定库存的 readInventory；接入业务时替换为真实查询。不要将固定数字当成生产库存，也不要把当前用户身份从模型参数中取出。
+看到库存回答后检查 operations：应包含 inventory.read，executionStatus 为 succeeded，validationStatus 为 valid。如果模型没有调用工具，检查提示和模型工具能力；若输出验证失败，修正业务返回值，不能将模型声称“查过了”当成证据。
 
 ## 写操作需要额外契约
 

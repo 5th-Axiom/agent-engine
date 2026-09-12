@@ -1,5 +1,7 @@
 **目标：** 在你自己的 Node 项目中创建一个 Agent，发送消息，拿到回答并继续对话。只需后端 SDK，不必安装前端 SDK；你可以把结果返回给自己的页面，也可以用于服务端任务。
 
+直接运行完整目录可先[导出 backend 示例](/docs/integration/)。下面展示相同文件的接入方式。
+
 本例调用你配置的真实模型。它不是测试模型或 Playground 脚本。先[安装 @agent-runtime/sdk](/docs/installation/)，准备一个独立 PostgreSQL 数据库和模型访问凭据。
 
 ## 1. 准备项目与服务端配置
@@ -10,13 +12,25 @@
 pnpm add -D typescript tsx @types/node
 ```
 
-按[模型配置与密钥管理](/docs/models/)准备 .env 和 settings.ts，放在本例 backend.ts 的同一目录。settings.ts 只在后端读取环境变量并创建会话配置；不会把真实 API Key 放入 Session。
+按下列模板准备 .env，再保存 settings.ts，与 backend.ts 放在同一目录。
+
+```dotenv .env
+DATABASE_URL=postgresql://USER:PASSWORD@DB_HOST:5432/YOUR_DATABASE
+MODEL_BASE_URL=https://your-model.example/v1
+MODEL_NAME=your-model
+MODEL_API_KEY=REPLACE_WITH_YOUR_PROVIDER_KEY
+PROTOCOL_KEY=REPLACE_WITH_A_STABLE_RANDOM_KEY
+```
+
+{{code:settings.ts}}
+
+settings.ts 只在后端读取环境变量并创建会话配置；不会把真实 API Key 放入 Session。
 
 数据库连接使用你已经创建好的库。SDK 会迁移表结构，不会自动创建业务数据库。没有本地数据库时，可参考[本地示例附录](/docs/quickstart/)，为自己的服务另建数据库。
 
 ## 2. 创建 Engine
 
-保存为 backend.ts。Engine 是长期存在的运行管理实例，通常在服务启动时创建一次：
+保存为 backend.ts。Engine 是长期存在的运行管理实例，通常在服务启动时创建一次。本文的 Agent 是产品能力的称呼；助手配置用于新建 Session，Session 保存自己的配置和历史，每次 run 冻结本轮配置，见[对象与生命周期](/docs/concepts/#助手-引擎与会话)：
 
 {{code:backend.ts}}
 
@@ -32,7 +46,7 @@ principal 是这份 Engine 的可信身份。下面的脚本用固定服务身�
 
 createSession 只创建会话，**run 才会调用模型**。第一次回答由 first.outputText 取得。第二次通过 loadSession 加载同一会话，不需要把之前的消息数组重新传一遍。
 
-示例每次运行脚本都会新建会话；要跨进程继续旧会话，由你的业务保存 session.id，下次直接 loadSession。数据库、身份与 PROTOCOL_KEY 需要保持一致。
+设置 SESSION_ID 时示例会加载已有会话；未设置时新建会话。要跨进程继续旧会话，由你的业务保存 session.id，下次直接 loadSession。数据库、身份与 PROTOCOL_KEY 需要保持一致。
 
 ## 4. 执行并检查结果
 

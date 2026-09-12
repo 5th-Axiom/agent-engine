@@ -41,7 +41,7 @@ pnpm playground
 
 ## 打开官方文档站
 
-在模型与数据库已配置的项目目录运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run docs`。打开 <http://127.0.0.1:4320/>，默认进入使用本项目 SDK 的 AI 对话模式，可查询文档、API、示例和已提交的公开源码。顶部切换“传统模式”，按前端或后端 SDK 路线阅读手册；两种模式共享会话。尚未配置模型时，可用 `pnpm run docs --read-only` 阅读和搜索。详细说明见 [文档站使用说明](examples/docs-site/README.md)。
+在模型与数据库已配置的项目目录运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run docs`。打开 <http://127.0.0.1:4320/>，默认进入使用本项目 SDK 的 AI 对话模式，可查询文档、API、示例和已提交的公开源码。顶部切换“阅读文档”，按环境、对话、图片、工具、Skill、记忆和 Debug 等场景阅读手册；两种模式共享会话。尚未配置模型时，可用 `pnpm run docs --read-only` 阅读和搜索。详细说明见 [文档站使用说明](examples/docs-site/README.md)。
 
 ## 开发者入口
 
@@ -56,8 +56,16 @@ pnpm playground
 | `@agent-runtime/chat-ui`     | Token / 原子 / 业务 / 页面四层，悬浮和嵌入入口 |
 | `@agent-runtime/chat-server` | 对接宿主身份与 Engine 的 Node HTTP 桥          |
 
-管理后台接入、React / Vue / HTML 示例、皮肤与品牌色设置见[前端 SDK 教程](docs/frontend-sdk.md)。`pnpm pack:chat` 生成可安装的本地包，安装时按教程设置内部依赖覆盖。
+管理后台接入、React / Vue / HTML 示例、皮肤与品牌色设置见[前端 SDK 教程](docs/frontend-sdk.md)。`pnpm example:export` 导出可在仓库外安装的后端、前端和全栈示例，包含本地依赖包与完整配置。产品交付形式仍待确定，公共 npm、CLI、压缩包与安装包保留入口。
+
+场景文档、API 与图片能力的改动和迁移说明见[优化总结](docs/usage-optimization-summary.md)。
 
 `pnpm example basic` 可运行不消耗真实模型额度的示例；`pnpm check` 执行类型检查、构建和自动测试。两者需要专用 PostgreSQL 测试库。全部命令及运行条件见[上手指南的命令表](docs/getting-started.md#常用命令)。
 
 首版已实现会话持久化、工具与 Skill、知识检索、Memory、审批、恢复及用量记录；这些能力并非都提供网页操作入口。分布式调度、真实重放和监控产品不在当前范围。实现与验收证据见[首版验收报告](docs/release-acceptance.md)。
+
+聊天界面支持有序处理过程：模型活动、Skill、工具、检索/记忆、重试和等待均按真实事件展示，支持安全摘要、耗时、用量与刷新恢复。[架构评估与 API 改动](docs/chat-process-architecture.md)说明实现及边界；运行 `pnpm verify:chat-process` 验证完整 HTTP/浏览器路径。
+
+聊天输入区现支持长文本展开、快捷键设置、模型和 Skill 选择；服务端从已声明配置生成可用目录，选择按 Run 冻结。语音未接入时麦克风置灰。接入与兼容性说明见[输入编辑与模型选择](docs/composer-alignment.md)。
+
+回复渲染、公开思考配置和 API 变更见[回复展示改进](docs/reply-display-alignment.md)。

@@ -479,3 +479,127 @@ it("finds this chat namespace even when 500 newer sessions belong to another nam
     created.id,
   ]);
 });
+
+it("offers safe model and skill choices, freezes the chosen run and rejects unavailable selections", async () => {
+  const h = await setup();
+  const models = h.config.models as Record<string, Record<string, unknown>>;
+  models.second = {
+    ...models.primary,
+    model: "second-model",
+    capabilities: { images: true },
+  };
+  h.config.skills = [
+    {
+      id: "guide",
+      name: "接入指南",
+      description: "Guide",
+      instructions: "PRIVATE_SELECTED_GUIDE",
+      allowedTools: [],
+    },
+  ];
+  const catalog = await (await h.request("/config")).json();
+  expect(catalog.assistants[0]).toMatchObject({
+    defaultModelId: "primary",
+    models: [
+      {
+        id: "primary",
+        label: "synthetic-model",
+        supportsImages: false,
+        thinking: false,
+      },
+      {
+        id: "second",
+        label: "second-model",
+        supportsImages: true,
+        thinking: false,
+      },
+    ],
+    skills: [{ id: "guide", label: "接入指南" }],
+  });
+  expect(JSON.stringify(catalog)).not.toMatch(
+    /PRIVATE_SELECTED|baseURL|secretRef|apiKey/,
+  );
+  const created = await (
+    await h.request("/sessions", {
+      requestId: randomUUID(),
+      assistantId: "demo",
+    })
+  ).json();
+  for (const extra of [{ modelId: "missing" }, { skillId: "missing" }]) {
+    const rejected = await h.request(`/sessions/${created.id}/runs`, {
+      requestId: randomUUID(),
+      input: "test",
+      ...extra,
+    });
+    expect(rejected.status).toBe(409);
+  }
+  for (const extra of [
+    { overrides: { model: "second" } },
+    { model: { baseURL: "https://evil.example" } },
+    { apiKey: "arbitrary" },
+  ])
+    expect(
+      (
+        await h.request(`/sessions/${created.id}/runs`, {
+          requestId: randomUUID(),
+          input: "test",
+          ...extra,
+        })
+      ).status,
+    ).toBe(400);
+  expect(h.model.requests).toHaveLength(0);
+  const input = {
+    requestId: randomUUID(),
+    input: "按指南接入",
+    modelId: "second",
+    skillId: "guide",
+  };
+  const sent = await (
+    await h.request(`/sessions/${created.id}/runs`, input)
+  ).json();
+  expect(sent.runId).toBeTruthy();
+  expect(
+    await (await h.request(`/sessions/${created.id}/runs`, input)).json(),
+  ).toEqual(sent);
+  await expect
+    .poll(
+      async () =>
+        (await (await h.request(`/sessions/${created.id}`)).json()).runs[0]
+          ?.state,
+    )
+    .toBe("completed");
+  expect(h.model.requests).toHaveLength(1);
+  expect(h.model.requests[0]).toMatchObject({
+    model: { model: "second-model" },
+  });
+  expect(JSON.stringify(h.model.requests[0])).toContain(
+    "PRIVATE_SELECTED_GUIDE",
+  );
+  const view = await (await h.request(`/sessions/${created.id}`)).json();
+  expect(view.runs[0]).toMatchObject({ modelId: "second", skillId: "guide" });
+  expect(view.defaultModelId).toBe("primary");
+  expect(JSON.stringify(view)).not.toMatch(
+    /PRIVATE_SELECTED|baseURL|secretRef|apiKey/,
+  );
+  const owner = h.engine.forPrincipal({
+    tenantId: "tenant",
+    subjectId: "alice",
+  });
+  expect((await owner.readSession(created.id)).config.routing.primary).toBe(
+    "primary",
+  );
+  delete models.second;
+  expect(
+    (await (await h.request(`/sessions/${created.id}`)).json()).models.map(
+      (m: { id: string }) => m.id,
+    ),
+  ).toEqual(["primary"]);
+  expect(
+    (
+      await h.request(`/sessions/${created.id}/runs`, {
+        ...input,
+        requestId: randomUUID(),
+      })
+    ).status,
+  ).toBe(409);
+});

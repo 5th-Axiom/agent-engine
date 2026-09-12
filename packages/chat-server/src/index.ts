@@ -1,6 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { ProcessJournal } from "./process.js";
 import { z } from "zod";
-import { AgentEngineError, parseConfig, terminal } from "@agent-runtime/sdk";
+import {
+  AgentEngineError,
+  parseConfig,
+  terminal,
+  imageLimits,
+  imageMediaTypes,
+} from "@agent-runtime/sdk";
 import {
   ChatError,
   assistantIdSchema,
@@ -14,6 +21,7 @@ import {
   listChatSessions,
   readChatSession,
   publicTools,
+  publicComposer,
 } from "./projection.js";
 import type { ChatHandlerOptions } from "./types.js";
 export * from "./types.js";
@@ -23,14 +31,14 @@ function json(res: ServerResponse, status: number, value: unknown) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
 }
-async function body(req: IncomingMessage): Promise<unknown> {
+async function body(req: IncomingMessage, limit = 40000): Promise<unknown> {
   if (req.headers["content-type"]?.split(";")[0] !== "application/json")
     throw new ChatError("CHAT_JSON_REQUIRED", 415);
   let bytes = 0;
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     bytes += chunk.length;
-    if (bytes > 40000) throw new ChatError("CHAT_INPUT_TOO_LARGE", 413);
+    if (bytes > limit) throw new ChatError("CHAT_INPUT_TOO_LARGE", 413);
     chunks.push(Buffer.from(chunk));
   }
   try {
@@ -41,6 +49,7 @@ async function body(req: IncomingMessage): Promise<unknown> {
 }
 /** Framework-neutral Node handler. Returns false only when the path belongs to another route. */
 export function createChatHandler(options: ChatHandlerOptions) {
+  const journal = new ProcessJournal();
   const base = options.basePath ?? "/api/agent-chat";
   if (
     !/^\/[a-zA-Z0-9_/-]+$/.test(base) ||
@@ -112,6 +121,10 @@ export function createChatHandler(options: ChatHandlerOptions) {
       const publicAssistants = context.assistants.map((a) =>
         assistantSchema.parse({
           ...a,
+          ...publicComposer(parseConfig(a.config), a),
+          supportsImages:
+            parseConfig(a.config).models[parseConfig(a.config).routing.primary]
+              ?.capabilities?.images === true,
           tools: publicTools(parseConfig(a.config).tools, a.toolDisplay),
         }),
       );
@@ -126,8 +139,37 @@ export function createChatHandler(options: ChatHandlerOptions) {
       if (!publicAssistants.some((a) => a.id === defaultAssistant))
         throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE", 403);
       const route = path.slice(base.length);
+      if (options.images && route === "/images" && req.method === "POST") {
+        const data = z
+          .strictObject({
+            mediaType: z.enum(imageMediaTypes),
+            data: z
+              .string()
+              .max(7_000_000)
+              .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+            filename: z.string().max(120).optional(),
+          })
+          .parse(await body(req, 7_100_000));
+        const ref = await context.engine.uploadImage({
+          data: Buffer.from(data.data, "base64"),
+          mediaType: data.mediaType,
+          filename: data.filename,
+        });
+        json(res, 201, ref);
+        return true;
+      }
+      const imageRoute = /^\/images\/([a-f0-9-]{36})$/i.exec(route);
+      if (options.images && imageRoute && req.method === "GET") {
+        const image = await context.engine.readImage(imageRoute[1]!);
+        json(res, 200, {
+          mediaType: image.mediaType,
+          data: image.data.toString("base64"),
+        });
+        return true;
+      }
       if (route === "/config" && req.method === "GET") {
         json(res, 200, {
+          ...(options.images ? { images: imageLimits } : {}),
           protocolVersion: 1,
           assistants: publicAssistants,
           defaultAssistant,
@@ -147,7 +189,14 @@ export function createChatHandler(options: ChatHandlerOptions) {
         if (!assistant) throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE", 403);
         const config = parseConfig(assistant.config);
         for (const model of Object.values(config.models))
-          if (model.thinking) model.thinking.expose = "none";
+          if (model.thinking) {
+            if (!assistant.thinkingDisplay) model.thinking.expose = "none";
+            else if (
+              assistant.thinkingDisplay === "summary" &&
+              model.thinking.expose === "content"
+            )
+              model.thinking.expose = "summary";
+          }
         config.metadata = {
           ...config.metadata,
           agentChat: {
@@ -169,7 +218,7 @@ export function createChatHandler(options: ChatHandlerOptions) {
         throw new ChatError("CHAT_NOT_FOUND", 404);
       const id = match[1]!;
       const record = await context.engine.readSession(id);
-      assistantFor(record, context, options.namespace);
+      const assistant = assistantFor(record, context, options.namespace);
       if (!match[2] && req.method === "GET") {
         const debug = options.debugPath?.(id);
         if (
@@ -182,7 +231,7 @@ export function createChatHandler(options: ChatHandlerOptions) {
         json(
           res,
           200,
-          await readChatSession(context, options.namespace, id, debug),
+          await readChatSession(context, options.namespace, id, debug, journal),
         );
         return true;
       }
@@ -190,7 +239,21 @@ export function createChatHandler(options: ChatHandlerOptions) {
         const session = await context.engine.loadSession(id);
         if (match[2] === "runs") {
           const input = sendMessageSchema.parse(await body(req));
-          const handle = await session.startRun(input);
+          const available = publicComposer(record.config, assistant);
+          const selected = input.modelId ?? record.config.routing.primary;
+          if (!available.models.some((model) => model.id === selected))
+            throw new ChatError("CHAT_MODEL_UNAVAILABLE", 409);
+          if (
+            input.skillId &&
+            !available.skills.some((skill) => skill.id === input.skillId)
+          )
+            throw new ChatError("CHAT_SKILL_UNAVAILABLE", 409);
+          const { modelId, skillId, ...message } = input;
+          const handle = await session.startRun({
+            ...message,
+            ...(modelId ? { overrides: { model: modelId } } : {}),
+            ...(skillId ? { skill: skillId } : {}),
+          });
           void handle.result.catch(() => {});
           json(res, 202, { runId: handle.runId });
           return true;

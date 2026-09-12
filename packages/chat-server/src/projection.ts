@@ -3,6 +3,8 @@ import {
   type AgentEngine,
   type SessionRecord,
   type ToolDefinition,
+  type SessionAgentConfig,
+  parseConfig,
 } from "@agent-runtime/sdk";
 import {
   ChatError,
@@ -11,8 +13,42 @@ import {
   type ChatSessionSummary,
   chatToolSchema,
   type ChatTool,
+  chatModelSchema,
+  chatSkillSchema,
 } from "@agent-runtime/chat-core";
 import type { ChatContext, ChatAssistantDefinition } from "./types.js";
+import { ProcessJournal, projectProcess } from "./process.js";
+
+export function publicComposer(
+  config: SessionAgentConfig,
+  assistant: ChatAssistantDefinition,
+) {
+  const current = parseConfig(assistant.config);
+  return {
+    defaultModelId: config.routing.primary,
+    models: Object.entries(config.models)
+      .filter(([id]) => Object.hasOwn(current.models, id))
+      .map(([id, model]) =>
+        chatModelSchema.parse({
+          id,
+          label: (assistant.modelDisplay?.[id]?.label ?? model.model).slice(
+            0,
+            100,
+          ),
+          supportsImages: model.capabilities?.images === true,
+          thinking: model.thinking?.enabled === true,
+        }),
+      ),
+    skills: config.skills
+      .filter((skill) => current.skills.some((value) => value.id === skill.id))
+      .map((skill) =>
+        chatSkillSchema.parse({
+          id: skill.id,
+          label: (skill.name ?? skill.id).slice(0, 100),
+        }),
+      ),
+  };
+}
 
 export function publicTools(
   tools: ToolDefinition[],
@@ -51,9 +87,13 @@ export function assistantFor(
   if (!assistant) throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE", 403);
   return assistant;
 }
-const title = (session: SessionRecord) =>
-  session.history.find((m) => m.role === "user")?.content.slice(0, 80) ||
-  "新对话";
+const title = (session: SessionRecord) => {
+  const first = session.history.find((m) => m.role === "user");
+  return (
+    first?.content.slice(0, 80) ||
+    (first?.images?.length ? "图片对话" : "新对话")
+  );
+};
 export async function listChatSessions(
   context: ChatContext,
   namespace: string,
@@ -103,6 +143,7 @@ export async function readChatSession(
   namespace: string,
   id: string,
   debugPath?: string,
+  journal = new ProcessJournal(),
 ): Promise<ChatSession> {
   const { engine } = context;
   const session = await engine.readSession(id);
@@ -111,9 +152,19 @@ export async function readChatSession(
   if (inspection.runs.some((r) => r.acceptedSequence === undefined))
     throw new ChatError("RUN_ORDER_UNAVAILABLE", 409);
   const runs: ChatRun[] = [];
+  const visible = inspection.runs.slice(-50);
+  const process = visible.length
+    ? await journal.read(
+        engine,
+        id,
+        visible[0]!.acceptedSequence!,
+        inspection.snapshotSequence,
+        assistant.thinkingDisplay,
+      )
+    : undefined;
   let activeTools: ChatTool[] | undefined;
   let activeConfigVersion: number | undefined;
-  for (const summary of inspection.runs.slice(-50)) {
+  for (const summary of visible) {
     const r = await engine.readRun(id, summary.id);
     if (r.id === session.activeRun) {
       activeTools = publicTools(r.config.tools, assistant.toolDisplay);
@@ -123,7 +174,20 @@ export async function readChatSession(
       id: r.id,
       sequence: summary.acceptedSequence!,
       state: r.state,
+      modelId: r.config.routing.primary,
+      ...(r.requestedSkill ? { skillId: r.requestedSkill } : {}),
       cancelRequested: r.cancelRequested,
+      ...(process
+        ? {
+            process: projectProcess(
+              r,
+              process.facts,
+              inspection.observedAt,
+              assistant,
+            ),
+          }
+        : {}),
+      ...(r.attachments?.length ? { attachments: r.attachments } : {}),
       input: typeof r.input === "string" ? r.input : "",
       output: r.result?.outputText ?? "",
       draft: ["completed", "cancelled", "failed"].includes(r.state)
@@ -144,6 +208,13 @@ export async function readChatSession(
         total: summary.usage.knownTotals.total,
         complete: summary.usage.complete,
         costComplete: summary.usage.costComplete,
+        costs: Object.entries(summary.usage.costByCurrency).map(
+          ([currency, cost]) => ({
+            currency,
+            amount: cost.estimated,
+            complete: cost.complete,
+          }),
+        ),
       },
       operations: inspection.operations
         .filter((o) => o.runId === r.id)
@@ -157,6 +228,10 @@ export async function readChatSession(
   }
   return {
     id,
+    ...publicComposer(session.config, assistant),
+    supportsImages:
+      session.config.models[session.config.routing.primary]?.capabilities
+        ?.images === true,
     assistantId: assistant.id,
     title: title(session),
     activeRun: session.activeRun,

@@ -4,12 +4,24 @@ import {
   errorCode,
   isActiveRun,
   type ChatConfig,
+  type ChatImage,
   type ChatSession,
   type ChatSessionSummary,
   type ChatTransport,
 } from "./protocol.js";
 
+export interface DraftImage {
+  id: string;
+  name: string;
+  preview: string;
+  status: "uploading" | "ready" | "failed";
+  attachment?: ChatImage;
+  error?: string;
+}
 export interface ChatState {
+  modelId?: string;
+  skillId?: string;
+  images?: DraftImage[];
   connection: "connecting" | "ready" | "disconnected";
   config?: ChatConfig;
   assistantId?: string;
@@ -52,6 +64,9 @@ export function createSessionMemory(
   };
 }
 interface Pending {
+  modelId?: string;
+  skillId?: string;
+  attachments?: ChatImage[];
   createId: string;
   requestId: string;
   input: string;
@@ -63,6 +78,23 @@ export const chatBusy = (state: ChatState) =>
   !!state.awaitingRunId ||
   !!state.session?.runs.some(isActiveRun);
 
+export const composerCatalog = (state: ChatState) => {
+  const assistant = state.config?.assistants.find(
+    (a) => a.id === state.assistantId,
+  );
+  return {
+    models: state.session?.models ?? assistant?.models,
+    skills: state.session?.skills ?? assistant?.skills,
+    defaultModelId: state.session?.defaultModelId ?? assistant?.defaultModelId,
+  };
+};
+export const selectedChatModel = (state: ChatState) => {
+  const catalog = composerCatalog(state);
+  return catalog.models?.find(
+    (model) => model.id === (state.modelId ?? catalog.defaultModelId),
+  );
+};
+
 /** UI-independent owner of request ordering, draft state, polling and cancellation. */
 export class ChatController {
   private state: ChatState = {
@@ -73,6 +105,8 @@ export class ChatController {
     cancelling: false,
     pending: false,
   };
+  private imageFiles = new Map<string, Blob>();
+  private uploads = new Map<string, AbortController>();
   private listeners = new Set<(state: ChatState) => void>();
   private lifetime = new AbortController();
   private viewRequest?: AbortController;
@@ -121,8 +155,11 @@ export class ChatController {
       error instanceof ChatError &&
       (error.status === 401 || error.status === 403)
     ) {
+      this.clearImages();
       this.state.session = undefined;
       this.state.sessions = [];
+      this.state.modelId = undefined;
+      this.state.skillId = undefined;
       this.sessionId = undefined;
       this.options.memory?.write(null);
     }
@@ -166,10 +203,124 @@ export class ChatController {
       }
     }
   }
+  async addImages(files: readonly File[]) {
+    this.assertLive();
+    if (this.pending || this.state.sending)
+      throw new ChatError("CHAT_SEND_PENDING");
+    if (
+      (selectedChatModel(this.state)?.supportsImages ??
+        this.state.session?.supportsImages ??
+        this.state.config?.assistants.find(
+          (a) => a.id === this.state.assistantId,
+        )?.supportsImages) === false
+    )
+      throw new ChatError("MODEL_CAPABILITY_MISMATCH");
+    if (!this.state.config?.images || !this.transport.uploadImage)
+      throw new ChatError("MODEL_CAPABILITY_MISMATCH");
+    if (
+      (this.state.images?.length ?? 0) + files.length >
+      this.state.config.images.maxPerMessage
+    )
+      throw new ChatError("IMAGE_INVALID");
+    for (const file of files) {
+      if (
+        !file.size ||
+        file.size > this.state.config.images.maxBytes ||
+        !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+          file.type,
+        )
+      )
+        throw new ChatError("IMAGE_INVALID");
+    }
+    const ids = files.map((file) => {
+      const id = createChatId();
+      this.imageFiles.set(id, file);
+      (this.state.images ??= []).push({
+        id,
+        name: file.name,
+        preview: URL.createObjectURL(file),
+        status: "uploading",
+      });
+      return id;
+    });
+    this.emit();
+    await Promise.all(ids.map((id) => this.retryImage(id)));
+  }
+  async retryImage(id: string) {
+    this.assertLive();
+    if (this.pending || this.state.sending || this.uploads.has(id)) return;
+    const image = this.state.images?.find((v) => v.id === id),
+      file = this.imageFiles.get(id);
+    if (!image || !file || !this.transport.uploadImage) return;
+    const controller = new AbortController();
+    this.uploads.set(id, controller);
+    image.status = "uploading";
+    image.error = undefined;
+    this.emit();
+    try {
+      const ref = await this.transport.uploadImage(file, controller.signal);
+      if (!this.disposed && this.state.images?.includes(image)) {
+        image.attachment = ref;
+        image.status = "ready";
+      }
+    } catch (error) {
+      if (!this.disposed && this.state.images?.includes(image)) {
+        image.status = "failed";
+        image.error = errorCode(error);
+      }
+    } finally {
+      this.uploads.delete(id);
+      this.emit();
+    }
+  }
+  removeImage(id: string) {
+    if (this.pending || this.state.sending) return;
+    this.uploads.get(id)?.abort();
+    this.uploads.delete(id);
+    const image = this.state.images?.find((v) => v.id === id);
+    if (image) URL.revokeObjectURL(image.preview);
+    this.state.images = this.state.images?.filter((v) => v.id !== id);
+    this.imageFiles.delete(id);
+    this.emit();
+  }
+  private clearImages() {
+    for (const upload of this.uploads.values()) upload.abort();
+    this.uploads.clear();
+    for (const image of this.state.images ?? [])
+      URL.revokeObjectURL(image.preview);
+    this.imageFiles.clear();
+    this.state.images = [];
+  }
   setDraft(value: string) {
     this.assertLive();
     if (this.state.sending || this.pending) return;
     this.state.draft = value.slice(0, 8000);
+    this.emit();
+  }
+  setModel(id: string) {
+    this.assertLive();
+    if (this.state.sending || this.pending)
+      throw new ChatError("CHAT_SEND_PENDING");
+    const model = composerCatalog(this.state).models?.find(
+      (model) => model.id === id,
+    );
+    if (!model) throw new ChatError("CHAT_MODEL_UNAVAILABLE");
+    if (this.state.images?.length && !model.supportsImages)
+      throw new ChatError("MODEL_CAPABILITY_MISMATCH");
+    this.state.modelId = id;
+    this.state.error = undefined;
+    this.emit();
+  }
+  setSkill(id?: string) {
+    this.assertLive();
+    if (this.state.sending || this.pending)
+      throw new ChatError("CHAT_SEND_PENDING");
+    if (
+      id &&
+      !composerCatalog(this.state).skills?.some((skill) => skill.id === id)
+    )
+      throw new ChatError("CHAT_SKILL_UNAVAILABLE");
+    this.state.skillId = id;
     this.emit();
   }
   newSession(assistantId = this.state.assistantId) {
@@ -182,10 +333,13 @@ export class ChatController {
     this.viewRequest?.abort();
     this.sessionId = undefined;
     this.options.memory?.write(null);
+    this.clearImages();
     this.state = {
       ...this.state,
       session: undefined,
       assistantId,
+      modelId: undefined,
+      skillId: undefined,
       draft: "",
       error: undefined,
       awaitingRunId: undefined,
@@ -200,9 +354,12 @@ export class ChatController {
       throw new ChatError("CHAT_SEND_PENDING");
     ++this.generation;
     this.viewRequest?.abort();
+    this.clearImages();
     this.sessionId = id;
     this.options.memory?.write(id);
     this.state.session = undefined;
+    this.state.modelId = undefined;
+    this.state.skillId = undefined;
     this.state.draft = "";
     this.state.error = undefined;
     this.state.awaitingRunId = undefined;
@@ -215,10 +372,22 @@ export class ChatController {
     if (chatBusy(this.state) || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
     const text = input.trim();
-    if (!text || text.length > 8000) throw new ChatError("INVALID_INPUT");
+    if ((!text && !this.state.images?.length) || text.length > 8000)
+      throw new ChatError("INVALID_INPUT");
+    if (this.state.images?.some((image) => image.status !== "ready"))
+      throw new ChatError("IMAGE_UNAVAILABLE");
     if (!this.state.assistantId) throw new ChatError("CHAT_NOT_READY");
+    if (composerCatalog(this.state).models && !selectedChatModel(this.state))
+      throw new ChatError("CHAT_MODEL_UNAVAILABLE");
     this.pending = {
       input: text,
+      ...(selectedChatModel(this.state)
+        ? { modelId: selectedChatModel(this.state)!.id }
+        : {}),
+      ...(this.state.skillId ? { skillId: this.state.skillId } : {}),
+      ...(this.state.images?.length
+        ? { attachments: this.state.images.map((image) => image.attachment!) }
+        : {}),
       assistantId: this.state.assistantId,
       createId: createChatId(),
       requestId: createChatId(),
@@ -260,12 +429,22 @@ export class ChatController {
       }
       const sent = await this.transport.sendMessage(
         pending.sessionId,
-        { requestId: pending.requestId, input: pending.input },
+        {
+          requestId: pending.requestId,
+          input: pending.input,
+          ...(pending.modelId ? { modelId: pending.modelId } : {}),
+          ...(pending.skillId ? { skillId: pending.skillId } : {}),
+          ...(pending.attachments?.length
+            ? { attachments: pending.attachments }
+            : {}),
+        },
         this.lifetime.signal,
       );
       if (this.disposed || generation !== this.generation) return;
       this.state.awaitingRunId = sent.runId;
       this.state.draft = "";
+      this.state.skillId = undefined;
+      this.clearImages();
       this.pending = undefined;
       this.state.pending = false;
       this.state.connection = "ready";
@@ -336,6 +515,8 @@ export class ChatController {
           return;
         this.state.session = session;
         this.state.assistantId = session.assistantId;
+        this.state.modelId ??=
+          session.runs.at(-1)?.modelId ?? session.defaultModelId;
         if (session.runs.some((r) => r.id === this.state.awaitingRunId))
           this.state.awaitingRunId = undefined;
       }
@@ -372,6 +553,7 @@ export class ChatController {
   }
   dispose(options: { clearSession?: boolean } = {}) {
     if (this.disposed) return;
+    this.clearImages();
     this.disposed = true;
     ++this.generation;
     clearTimeout(this.timer);

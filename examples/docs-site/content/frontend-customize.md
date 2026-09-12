@@ -70,7 +70,7 @@ root.append(message.element);
 // 卸载：theme.destroy(); 并由宿主移除自己创建的 DOM。
 ```
 
-主题 API 会校验颜色、对比度和尺寸。优先调用公开 API，避免依赖 Shadow DOM 内部类名。默认文字按纯文本展示，不支持 Markdown 富文本、上传文件、语音或群聊。
+主题 API 会校验颜色、对比度和尺寸。优先调用公开 API，避免依赖 Shadow DOM 内部类名。助手正文支持安全 Markdown 与代码复制，原始 HTML 不执行。后端启用图片接口且所选模型支持视觉时可上传与查看图片，见[图片接入](/docs/images/)。通用文件、语音和群聊尚未提供。
 
 ## 打开、发送与停止
 
@@ -113,3 +113,21 @@ tenantId 和 accountId 来自你已有的登录状态，只用来区分前端存
 界面会提供重新连接或重试发送；401/403 会清掉当前可见会话和历史。宿主负责恢复登录，必要时重建实例。
 
 关闭窗口、卸载组件、放弃重试都不会撤销服务端可能已接收的运行。需要停止时显式调用 cancel。当前控制器通过 HTTP 快照轮询更新，活跃时默认 450ms、空闲时 2500ms；它不是 WebSocket/SSE 客户端。
+
+## 编辑输入和选择模型
+
+输入框会随内容增高，可点击“展开输入框”编辑长文本，Esc 收起；光标和选区保留。空输入框按 ↑ 可以取回上一条文字。通用 SDK 默认 Ctrl/⌘+Enter 发送、Enter 换行；挂载时传 `sendShortcut: "enter"` 可以使用 Enter 发送、Shift+Enter 换行，用户也能通过“输入设置”切换。本文档站已使用 Enter 发送。
+
+后端在 assistant.config.models 声明多个模型、routing.primary 指定默认项。可以通过 assistant.modelDisplay[id].label 提供公开名称，输入框下方会自动显示模型选择器及思考/图片能力。模型只影响下一轮，正在运行的回答保持原配置；有图片草稿时不能切到纯文本模型。
+
+```ts
+// 在 chat.ready 完成后，使用服务端实际返回的 ID。
+chat.controller.setModel("vision");
+chat.controller.setSkill("guide"); // 配置了该 Skill 才可选择
+chat.controller.setDraft("请按指南解释图片中的接入流程");
+// setSkill() 无参数恢复自动；手选 Skill 在发送受理后复位。
+```
+
+界面会自动提供已声明 Skill 的选择器。失败重试沿用原模型和 Skill；刷新恢复最近一轮模型，新会话采用默认模型。旧会话增加模型需要宿主更新 Session 配置，通用聊天桥不会自动修改。模型地址、凭据和技能指令始终留在服务端。
+
+麦克风目前置灰并注明“未接入语音识别服务”。配置普通、思考或视觉聊天模型不会自动获得语音识别；当前没有可启用的语音参数。未发送草稿、模型选择和快捷键偏好不跨刷新保存。

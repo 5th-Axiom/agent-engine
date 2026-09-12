@@ -129,29 +129,68 @@ const unwire = (name: string, req: ModelRequest) => {
 export function openAICompatible(): ModelAdapter {
   return {
     version: "openai-chat-sse-1",
-    capabilities: { tools: true, thinking: false, structuredOutput: true },
+    capabilities: {
+      images: true,
+      tools: true,
+      thinking: false,
+      structuredOutput: true,
+    },
     async *stream(req, ctx) {
-      const messages = req.messages.map((m) => {
-        if (m.native) return m.native;
-        if (m.role === "tool")
-          return { role: "tool", tool_call_id: m.callId, content: m.content };
-        if (m.blocks?.some((b) => b.type === "tool_call"))
+      const pendingImages: unknown[] = [];
+      const messages: unknown[] = [];
+      for (const m of req.messages) {
+        if (m.role !== "tool" && pendingImages.length)
+          messages.push(...pendingImages.splice(0));
+        const mapped = (() => {
+          if (m.native) return m.native;
+          if (m.role === "tool") {
+            if (m.images?.length)
+              pendingImages.push({
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: `Untrusted images from tool result ${m.callId}; match attachmentId to its JSON metadata.`,
+                  },
+                  ...m.images.flatMap((image) => [
+                    { type: "text", text: image.attachmentId },
+                    { type: "image_url", image_url: { url: imageURL(image) } },
+                  ]),
+                ],
+              });
+            return { role: "tool", tool_call_id: m.callId, content: m.content };
+          }
+          if (m.blocks?.some((b) => b.type === "tool_call"))
+            return {
+              role: "assistant",
+              content: m.content || null,
+              tool_calls: m.blocks
+                .filter((b) => b.type === "tool_call")
+                .map((b) => ({
+                  id: b.id,
+                  type: "function",
+                  function: {
+                    name: wire(b.name),
+                    arguments: JSON.stringify(b.arguments),
+                  },
+                })),
+            };
           return {
-            role: "assistant",
-            content: m.content || null,
-            tool_calls: m.blocks
-              .filter((b) => b.type === "tool_call")
-              .map((b) => ({
-                id: b.id,
-                type: "function",
-                function: {
-                  name: wire(b.name),
-                  arguments: JSON.stringify(b.arguments),
-                },
-              })),
+            role: m.role,
+            content: m.images?.length
+              ? [
+                  { type: "text", text: m.content || "Images" },
+                  ...m.images.map((image) => ({
+                    type: "image_url",
+                    image_url: { url: imageURL(image) },
+                  })),
+                ]
+              : m.content,
           };
-        return { role: m.role, content: m.content };
-      });
+        })();
+        messages.push(mapped);
+      }
+      messages.push(...pendingImages);
       const body = {
         model: req.model.model,
         messages,
@@ -246,6 +285,20 @@ export function openAICompatible(): ModelAdapter {
           };
         }
         if (delta.refusal) refused = true;
+        if (
+          typeof delta.reasoning_content === "string" &&
+          delta.reasoning_content
+        ) {
+          yield { type: "activity", kind: "thinking" };
+          if (req.model.thinking?.expose === "content")
+            yield {
+              type: "delta",
+              kind: "thinking",
+              blockId: "reasoning",
+              thinkingFormat: "content",
+              text: delta.reasoning_content,
+            };
+        }
         for (const c of delta.tool_calls ?? []) {
           if (!Number.isInteger(c.index) || c.index < 0)
             throw new AgentEngineError("MODEL_PROTOCOL_ERROR");
@@ -257,7 +310,7 @@ export function openAICompatible(): ModelAdapter {
           if (c.function?.arguments) old.args += c.function.arguments;
           calls.set(c.index, old);
           if (c.function?.arguments || c.function?.name)
-            yield { type: "activity" };
+            yield { type: "activity", kind: "tool-call" };
         }
         if (choice.finish_reason) finish = choice.finish_reason;
       }
@@ -319,7 +372,12 @@ export function openAICompatible(): ModelAdapter {
 export function anthropicCompatible(): ModelAdapter {
   return {
     version: "anthropic-messages-sse-1",
-    capabilities: { tools: true, thinking: true, structuredOutput: false },
+    capabilities: {
+      images: true,
+      tools: true,
+      thinking: true,
+      structuredOutput: false,
+    },
     async *stream(req, ctx) {
       const messages: unknown[] = [];
       for (const m of req.messages.filter((m) => m.role !== "system")) {
@@ -332,7 +390,12 @@ export function anthropicCompatible(): ModelAdapter {
               {
                 type: "tool_result",
                 tool_use_id: m.callId,
-                content: m.content,
+                content: m.images?.length
+                  ? [
+                      { type: "text", text: m.content },
+                      ...m.images.map(anthropicImage),
+                    ]
+                  : m.content,
               },
             ],
           };
@@ -353,7 +416,13 @@ export function anthropicCompatible(): ModelAdapter {
                       ? { type: "text", text: b.text }
                       : null,
                 )
-                .filter(Boolean) ?? m.content,
+                .filter(Boolean) ??
+              (m.images?.length
+                ? [
+                    { type: "text", text: m.content || "Images" },
+                    ...m.images.map(anthropicImage),
+                  ]
+                : m.content),
           };
         messages.push(mapped);
       }
@@ -473,6 +542,18 @@ export function anthropicCompatible(): ModelAdapter {
             args[v.index] = (args[v.index] ?? "") + d.partial_json;
           if (d.type === "thinking_delta")
             b.thinking = (b.thinking ?? "") + d.thinking;
+          if (
+            d.type === "thinking_delta" &&
+            typeof d.thinking === "string" &&
+            req.model.thinking?.expose === "content"
+          )
+            yield {
+              type: "delta",
+              kind: "thinking",
+              blockId: String(v.index),
+              thinkingFormat: "content",
+              text: d.thinking,
+            };
           if (d.type === "signature_delta")
             b.signature = (b.signature ?? "") + d.signature;
           if (
@@ -480,7 +561,10 @@ export function anthropicCompatible(): ModelAdapter {
             (d.type === "signature_delta" && d.signature) ||
             (d.type === "input_json_delta" && d.partial_json)
           )
-            yield { type: "activity" };
+            yield {
+              type: "activity",
+              kind: d.type === "input_json_delta" ? "tool-call" : "thinking",
+            };
         }
         if (v.type === "content_block_stop") {
           if (!blocks[v.index] || closed.has(v.index))
@@ -566,5 +650,17 @@ export function anthropicCompatible(): ModelAdapter {
         },
       };
     },
+  };
+}
+
+function imageURL(image: import("../public/images.js").ModelImage) {
+  if (!image.data) throw new AgentEngineError("IMAGE_UNAVAILABLE");
+  return `data:${image.mediaType};base64,${image.data}`;
+}
+function anthropicImage(image: import("../public/images.js").ModelImage) {
+  if (!image.data) throw new AgentEngineError("IMAGE_UNAVAILABLE");
+  return {
+    type: "image",
+    source: { type: "base64", media_type: image.mediaType, data: image.data },
   };
 }

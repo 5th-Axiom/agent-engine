@@ -60,6 +60,7 @@ window.addEventListener("pageshow", syncReadingTrail);
 if (document.body.dataset.chatAvailable === "true") {
   const getRunSources = await loadReferenceResolver();
   chat = mountChatPage(document.querySelector("#ai-chat"), {
+    sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
     theme: chatTheme(),

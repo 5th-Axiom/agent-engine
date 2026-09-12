@@ -7,6 +7,7 @@ import {
   type ChatTransport,
   type ChatSession,
   type ChatConfig,
+  selectedChatModel,
 } from "@agent-runtime/chat-core";
 import { resolveChatTheme, contrast } from "@agent-runtime/chat-ui";
 const ids = {
@@ -256,4 +257,98 @@ it("async authentication headers time out or abort without a late dispatch", asy
     await Promise.resolve();
     expect(calls).toBe(0);
   }
+});
+
+const composerOptions = {
+  defaultModelId: "text",
+  models: [
+    { id: "text", label: "文字", supportsImages: false, thinking: false },
+    { id: "vision", label: "视觉", supportsImages: true, thinking: false },
+  ],
+  skills: [{ id: "guide", label: "接入指南" }],
+};
+const composerConfig: ChatConfig = {
+  ...config,
+  assistants: [{ ...config.assistants[0]!, ...composerOptions }],
+};
+
+it("freezes the chosen model and skill across lost acceptance and restores the last run without overwriting the next draft selection", async () => {
+  const sent: unknown[] = [];
+  let lost = true;
+  const c = controller(
+    transport({
+      getConfig: async () => composerConfig,
+      readSession: async (id) => ({
+        ...session(id),
+        ...composerOptions,
+        runs: [
+          {
+            id: ids.run,
+            sequence: 1,
+            input: "说明接入",
+            output: "完成",
+            draft: "",
+            state: "completed",
+            modelId: "vision",
+            cancelRequested: false,
+            steps: 1,
+            attempts: 1,
+            operations: [],
+            usage: { complete: false, costComplete: false },
+          },
+        ],
+      }),
+      sendMessage: async (_id, data) => {
+        sent.push(data);
+        if (lost) {
+          lost = false;
+          throw new ChatError("CHAT_CONNECTION_FAILED");
+        }
+        return { runId: ids.run };
+      },
+    }),
+  );
+  await c.start();
+  expect(selectedChatModel(c.snapshot)?.id).toBe("text");
+  c.setModel("vision");
+  c.setSkill("guide");
+  await c.send("说明接入");
+  expect(() => c.setModel("text")).toThrow("CHAT_SEND_PENDING");
+  expect(() => c.setSkill()).toThrow("CHAT_SEND_PENDING");
+  await c.retrySend();
+  expect(sent[0]).toEqual(sent[1]);
+  expect(sent[0]).toMatchObject({ modelId: "vision", skillId: "guide" });
+  expect(c.snapshot.skillId).toBeUndefined();
+  c.setModel("text");
+  c.setDraft("下一条草稿");
+  await c.refresh();
+  expect(c.snapshot).toMatchObject({ modelId: "text", draft: "下一条草稿" });
+  await c.selectSession(ids.a);
+  expect(selectedChatModel(c.snapshot)?.id).toBe("vision");
+  c.newSession();
+  expect(selectedChatModel(c.snapshot)?.id).toBe("text");
+  expect(() => c.setModel("undeclared")).toThrow("CHAT_MODEL_UNAVAILABLE");
+  expect(() => c.setSkill("undeclared")).toThrow("CHAT_SKILL_UNAVAILABLE");
+});
+
+it("does not discard an image draft when a text-only model is selected", async () => {
+  const c = controller(
+    transport({
+      getConfig: async () => ({
+        ...composerConfig,
+        images: { maxBytes: 10000, maxPerMessage: 4 },
+      }),
+      uploadImage: async () => ({ type: "image", attachmentId: ids.b }),
+    }),
+  );
+  await c.start();
+  await expect(
+    c.addImages([new File(["x"], "test.png", { type: "image/png" })]),
+  ).rejects.toThrow("MODEL_CAPABILITY_MISMATCH");
+  c.setModel("vision");
+  c.setDraft("看图");
+  await c.addImages([new File(["x"], "test.png", { type: "image/png" })]);
+  expect(() => c.setModel("text")).toThrow("MODEL_CAPABILITY_MISMATCH");
+  expect(c.snapshot.images).toHaveLength(1);
+  expect(c.snapshot).toMatchObject({ modelId: "vision", draft: "看图" });
 });

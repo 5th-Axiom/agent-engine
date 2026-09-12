@@ -35,6 +35,7 @@
     "dist"
   ],
   "dependencies": {
-    "@agent-runtime/chat-core": "workspace:*"
+    "@agent-runtime/chat-core": "workspace:*",
+    "marked": "18.0.12"
   }
 }

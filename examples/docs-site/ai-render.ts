@@ -2,7 +2,7 @@ import { escapeHTML, icon } from "./render.js";
 import type { SourceFile } from "./knowledge.js";
 
 export function modeNavigation(mode: "ai" | "docs") {
-  return `<nav class="mode-switch" aria-label="文档模式"><a data-mode="ai" href="/ai/" ${mode === "ai" ? 'aria-current="page"' : ""}>${icon("chat")}AI 模式</a><a data-mode="docs" href="/docs/welcome/" ${mode === "docs" ? 'aria-current="page"' : ""}>${icon("book")}传统模式</a></nav>`;
+  return `<nav class="mode-switch" aria-label="文档模式"><a data-mode="ai" href="/ai/" ${mode === "ai" ? 'aria-current="page"' : ""}>${icon("chat")}询问文档</a><a data-mode="docs" href="/docs/welcome/" ${mode === "docs" ? 'aria-current="page"' : ""}>${icon("book")}阅读文档</a></nav>`;
 }
 function head(title: string) {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="light dark"><title>${escapeHTML(title)} · Agent Engine</title><link rel="icon" href="/assets/favicon.svg"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ai.css"><script src="/assets/theme.js"></script></head>`;

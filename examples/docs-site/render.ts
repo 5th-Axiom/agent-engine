@@ -1,5 +1,6 @@
+import hljs from "highlight.js/lib/common";
 import { Marked } from "marked";
-import { articlePath, type Article } from "./content.js";
+import { articlePath, headingSlug, type Article } from "./content.js";
 import { modeNavigation } from "./ai-render.js";
 
 export const escapeHTML = (s: string) =>
@@ -37,14 +38,7 @@ export const icon = (name: string) =>
 export function renderArticle(article: Article, articles: Article[]) {
   const toc: { id: string; text: string; level: number }[] = [];
   const seen = new Map<string, number>();
-  const slug = (s: string) =>
-    s
-      .replace(/<[^>]*>/g, "")
-      .replace(/[*`]/g, "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
-      .replace(/^-|-$/g, "") || "section";
+  const slug = headingSlug;
   const parser = new Marked({
     gfm: true,
     renderer: {
@@ -67,7 +61,7 @@ export function renderArticle(article: Article, articles: Article[]) {
         if (mapped) href = articlePath(mapped) + (hash ? "#" + hash : "");
         if (
           article.id === "welcome" &&
-          ["/docs/frontend/", "/docs/sdk/"].includes(href)
+          ["/docs/frontend/", "/docs/sdk/", "/docs/integration/"].includes(href)
         )
           return `<a class="button product-action" href="${escapeHTML(href)}">${text}${icon("arrow")}</a>`;
         if (/^https?:\/\//i.test(href))
@@ -83,7 +77,11 @@ export function renderArticle(article: Article, articles: Article[]) {
         return escapeHTML(text);
       },
       code({ text, lang }) {
-        return `<div class="code-block"><div class="code-header"><span>${escapeHTML(lang ?? "文本")}</span><button class="copy-code" type="button" aria-label="复制代码">复制</button></div><pre tabindex="0"><code>${escapeHTML(text)}</code></pre></div>`;
+        const [language = "text", ...filename] = (lang ?? "text").split(/\s+/);
+        const code = hljs.getLanguage(language)
+          ? hljs.highlight(text, { language, ignoreIllegals: true }).value
+          : escapeHTML(text);
+        return `<div class="code-block"><div class="code-header"><span>${escapeHTML(filename.join(" ") || language)}</span><button class="copy-code" type="button" aria-label="复制代码" title="复制 ${escapeHTML(filename.join(" ") || language)}">复制</button></div><pre tabindex="0"><code class="hljs language-${escapeHTML(language)}">${code}</code></pre></div>`;
       },
     },
   });
@@ -99,9 +97,10 @@ export function renderArticle(article: Article, articles: Article[]) {
     },
   });
   const body = parser.parse(article.markdown) as string;
-  const index = articles.indexOf(article),
-    previous = articles[index - 1],
-    next = articles[index + 1];
+  const peers = articles.filter((item) => item.group === article.group);
+  const index = peers.indexOf(article),
+    previous = peers[index - 1],
+    next = peers[index + 1];
   const html = `<div class="breadcrumb"><a href="/docs/welcome/">文档</a><span>/</span><span>${escapeHTML(article.group)}</span></div>
   <div class="article-heading"><h1 tabindex="-1">${escapeHTML(article.title)}</h1><button type="button" class="button ask-article" data-ask="${escapeHTML(article.title)}">${icon("chat")}询问本文</button></div>
   <p class="lead">${escapeHTML(article.description)}</p>
@@ -140,7 +139,7 @@ export function renderPage(
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="description" content="${escapeHTML(article.description)}"><meta name="color-scheme" content="light dark"><title>${escapeHTML(article.title)} · Agent Engine 文档</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ai.css"><script src="/assets/theme.js"></script></head><body data-article="${article.id}" data-chat-available="${available}">
 <!-- THESIS: Introduce the product before its guides: one sentence, core features, then a two-column product and usage table.
 OWN-WORLD: White #ffffff, navy #172b42, blue #0758a0, ruled workbench surfaces, system reading font.
-STORY: Understand what Agent Engine does, choose the frontend or backend SDK, then open the setup and complete example. Local demos are appendices.
+STORY: Choose a task, run a complete integration path, then look up precise API details. Delivery forms are independent of scenario navigation.
 FIRST VIEWPORT: Existing header and chapter rail, introduction and features in the readable main column, product table below with working guide links in the right-hand cells. Persistent SDK launcher. Signature: ask this article preserves reading position and fills an editable question. Existing motion respects reduced-motion.
 FORM: Guided manual with chapter navigation, third structural candidate; seed 46dd2b9c. User requested direct code-led delivery; implementation choice delegated.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->

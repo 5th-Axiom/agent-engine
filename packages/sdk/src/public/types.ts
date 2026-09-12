@@ -51,6 +51,7 @@ export interface AuthorizationRequest {
   sideEffect?: "read" | "write";
 }
 export interface EngineOptions {
+  imageStorage?: import("./images.js").ImageStorage;
   store: EngineStore;
   principal: VerifiedPrincipal;
   secrets: {
@@ -95,6 +96,9 @@ export interface EngineOptions {
   fault?: (point: string) => void;
 }
 export interface RunInput {
+  /** Activate a declared Skill before the first model request. */
+  skill?: string;
+  attachments?: import("./images.js").ImageAttachment[];
   requestId?: string;
   ifConfigVersion?: number;
   input: JsonValue;
@@ -170,6 +174,7 @@ export interface RunRecord {
   config: SessionAgentConfig;
   dependencies: Record<string, string>;
   input: JsonValue;
+  attachments?: import("./images.js").ImageAttachment[];
   context: JsonObject;
   metadata: JsonObject;
   output?: OutputConfig;
@@ -195,6 +200,8 @@ export interface RunRecord {
   operationIds: string[];
   operationRefs?: string[];
   pending?: PendingInput;
+  requestedSkill?: string;
+  initialSkillApplied?: boolean;
   activeSkill?: string;
   loadedSkills: Record<string, string>;
   sources: Record<string, JsonValue>;

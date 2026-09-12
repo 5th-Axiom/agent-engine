@@ -7,12 +7,13 @@ export type ModelBlock =
   | { type: "tool_call"; id: string; name: string; arguments: JsonValue }
   | { type: "opaque" };
 export interface ContextDataRef {
-  kind: "knowledge" | "memory" | "tool";
+  kind: "knowledge" | "memory" | "tool" | "image";
   id: string;
   expiresAt?: string;
   source?: JsonValue;
 }
 export interface ModelMessage {
+  images?: import("../public/images.js").ModelImage[];
   role: "system" | "user" | "assistant" | "tool";
   content: string;
   callId?: string;
@@ -46,8 +47,15 @@ export interface ModelResponse {
 }
 export type ModelStreamEvent =
   // Valid private payload progress, without disclosing its contents to consumers.
-  | { type: "activity" }
-  | { type: "delta"; blockId: string; kind: "text" | "thinking"; text: string }
+  | { type: "activity"; kind?: "thinking" | "tool-call" }
+  | {
+      type: "delta";
+      blockId: string;
+      kind: "text" | "thinking";
+      text: string;
+      /** Thinking only: public provider content is distinct from a provider summary. Legacy adapters emit summaries. */
+      thinkingFormat?: "summary" | "content";
+    }
   | {
       type: "usage";
       usage: ProviderUsage;
@@ -60,6 +68,7 @@ export type ModelStreamEvent =
 export interface ModelAdapter {
   version: string;
   capabilities: {
+    images?: boolean;
     tools: boolean;
     thinking: boolean;
     structuredOutput: boolean;

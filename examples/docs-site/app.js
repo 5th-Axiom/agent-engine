@@ -97,6 +97,7 @@ function openChat(question) {
 if (available) {
   const getRunSources = await loadReferenceResolver();
   chat = mountChatWidget({
+    sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
     theme: {
@@ -184,13 +185,57 @@ function search() {
     : "没有找到匹配文档。试试更短的词，或问问文档助手。";
   for (const item of found) {
     const a = document.createElement("a");
-    a.href = item.url;
+    const sections = (
+      item.sections ?? [{ id: "", title: item.title, text: item.text }]
+    )
+      .map((section) => {
+        const text = (section.title + " " + section.text).toLowerCase();
+        return {
+          ...section,
+          score:
+            tokens.reduce(
+              (n, token) =>
+                n +
+                (text.includes(token) ? 1 : 0) +
+                (section.title.toLowerCase().includes(token) ? 3 : 0),
+              0,
+            ) + (text.includes(query) ? 8 : 0),
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+    const section = sections[0];
+    a.href =
+      item.url + (section?.id ? "#" + encodeURIComponent(section.id) : "");
     const group = document.createElement("small");
-    group.textContent = item.group;
+    group.textContent = item.group + (section?.id ? " · " + section.title : "");
     const title = document.createElement("strong");
     title.textContent = item.title;
     const p = document.createElement("p");
-    p.textContent = item.description;
+    const body = section?.text || item.description;
+    const match = body.toLowerCase().indexOf(query);
+    const offsets = tokens
+      .map((token) => body.toLowerCase().indexOf(token))
+      .filter((n) => n >= 0);
+    const offset = Math.max(
+      0,
+      (match >= 0 ? match : offsets.length ? Math.min(...offsets) : 0) - 60,
+    );
+    const excerpt =
+      (offset ? "…" : "") +
+      body.slice(offset, offset + 180).replace(/\s+/g, " ");
+    const needle = [query, ...tokens].find((token) =>
+      excerpt.toLowerCase().includes(token),
+    );
+    const hit = needle ? excerpt.toLowerCase().indexOf(needle) : -1;
+    if (hit >= 0) {
+      const mark = document.createElement("mark");
+      mark.textContent = excerpt.slice(hit, hit + needle.length);
+      p.append(
+        document.createTextNode(excerpt.slice(0, hit)),
+        mark,
+        document.createTextNode(excerpt.slice(hit + needle.length)),
+      );
+    } else p.textContent = excerpt;
     a.append(group, title, p);
     results.append(a);
   }

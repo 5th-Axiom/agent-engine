@@ -6,10 +6,9 @@ const { engine, config } = await createBackend({
   principal: { tenantId: "my-app", subjectId: "server-task" },
 });
 try {
-  const session = await engine.createSession({
-    config,
-    requestId: randomUUID(),
-  });
+  const session = process.env.SESSION_ID
+    ? await engine.loadSession(process.env.SESSION_ID)
+    : await engine.createSession({ config, requestId: randomUUID() });
   const first = await session.run({
     input: "用两句话介绍你能怎样帮助用户。",
     requestId: randomUUID(),

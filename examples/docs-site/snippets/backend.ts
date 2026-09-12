@@ -27,7 +27,7 @@ export async function createBackend(
           : [],
         allowedModelTargets: [
           {
-            provider: "openai-compatible",
+            provider: settings.config.models.primary!.provider,
             origin: settings.modelOrigin,
             credentialScopes: ["MODEL_API_KEY"],
           },

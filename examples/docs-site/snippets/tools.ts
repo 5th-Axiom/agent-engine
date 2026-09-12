@@ -44,3 +44,25 @@ export function inventoryBinding(
     },
   };
 }
+
+// 推荐的新接入方式：参数类型来自 Schema，契约与执行绑定不再重复声明。
+import { defineBoundTool } from "@agent-runtime/sdk";
+import { z } from "zod";
+export function createInventoryTool(
+  readInventory: (
+    sku: string,
+    principal: VerifiedPrincipal,
+    signal: AbortSignal,
+  ) => Promise<{ available: number }>,
+) {
+  return defineBoundTool({
+    name: "inventory.read",
+    description: "查询当前用户可见的商品库存。",
+    version: "1",
+    sideEffect: "read",
+    inputSchema: z.strictObject({ sku: z.string().min(1) }),
+    outputSchema: z.strictObject({ available: z.number().int().nonnegative() }),
+    execute: ({ sku }, context) =>
+      readInventory(sku, context.principal, context.signal),
+  });
+}

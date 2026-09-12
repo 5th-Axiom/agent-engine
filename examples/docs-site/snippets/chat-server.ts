@@ -10,13 +10,20 @@ import { createChatHandler, ChatError } from "@agent-runtime/chat-server";
 export function connectChat(options: {
   engine: AgentEngine;
   config: SessionAgentConfig;
-  frontendOrigin: string;
+  frontendOrigin: string | string[];
   verifyLogin: (req: IncomingMessage) => Promise<VerifiedPrincipal | null>;
 }) {
   return createChatHandler({
     basePath: "/api/agent-chat",
     namespace: "my-product",
-    allowedOrigins: [options.frontendOrigin],
+    images:
+      options.config.models[options.config.routing.primary]?.capabilities
+        ?.images === true,
+    allowedOrigins:
+      typeof options.frontendOrigin === "string"
+        ? [options.frontendOrigin]
+        : options.frontendOrigin,
+    allowCredentials: true,
     resolveContext: async (req) => {
       const principal = await options.verifyLogin(req);
       if (!principal) throw new ChatError("CHAT_UNAUTHENTICATED", 401);

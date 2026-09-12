@@ -9,6 +9,11 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 const paths = {
+  microphone:
+    "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5Z M6 10v2a6 6 0 0 0 12 0v-2 M12 18v4 M8 22h8",
+  expand: "M8 3H3v5 M16 3h5v5 M3 16v5h5 M21 16v5h-5",
+  settings: "M4 7h16 M4 17h16 M9 4v6 M15 14v6",
+  image: "M3 4h18v16H3z M7 8h.01 M3 16l6-5 4 4 3-3 5 5",
   chat: "M5 5h14v10H9l-4 4V5Z M9 9h6 M9 12h4",
   close: "m6 6 12 12 M18 6 6 18",
   send: "m4 4 17 8-17 8 3-8-3-8Z M7 12h14",
@@ -19,6 +24,11 @@ const paths = {
   info: "M12 11v6 M12 7v.1 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
   down: "m6 9 6 6 6-6",
   tool: "m14 5 5 5-9 9-5-5 9-9Z M5 14l-2 7 7-2 M14 5l2-2 5 5-2 2",
+  search: "M10 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14 M15 15l6 6",
+  skill: "m12 3 8 4v10l-8 4-8-4V7l8-4Z M4 7l8 4 8-4 M12 11v10",
+  thinking: "M9 18h6 M10 21h4 M8 14a6 6 0 1 1 8 0l-1 2H9l-1-2Z",
+  memory:
+    "M5 5c0-3 14-3 14 0s-14 3-14 0v14c0 3 14 3 14 0V5 M5 12c0 3 14 3 14 0",
 } as const;
 export type ChatIcon = keyof typeof paths;
 export function createIcon(name: ChatIcon): SVGSVGElement {

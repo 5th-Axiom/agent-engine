@@ -38,6 +38,18 @@ export const runLabels: Record<string, string> = {
   cancelled: "已停止",
 };
 export const errorMessages: Record<string, string> = {
+  CHAT_MODEL_UNAVAILABLE: "该模型当前不可用，请重新选择或新建对话。",
+  CHAT_SKILL_UNAVAILABLE: "该技能当前不可用，请取消选择后重试。",
+  MODEL_HISTORY_INCOMPATIBLE:
+    "所选模型无法继续此会话的原生历史，请使用原模型，或新建对话后切换模型。",
+  MODEL_CONTINUATION_UNAVAILABLE:
+    "会话历史暂时无法恢复，请联系管理员检查服务端配置，或新建对话。",
+  IMAGE_INVALID:
+    "图片格式或大小不符合要求：支持 PNG、JPEG、WebP、GIF，每张最多 5 MiB，每条最多 8 张。",
+  IMAGE_EXPIRED: "图片已过期，请重新上传并新建对话。",
+  IMAGE_UNAVAILABLE: "图片暂时无法读取，请重试上传或移除后发送。",
+  MODEL_CAPABILITY_MISMATCH:
+    "当前模型不支持此输入，请选择支持图片的模型或移除图片。",
   MODEL_AUTH_FAILED: "模型认证失败，请联系管理员检查服务端配置。",
   MODEL_RATE_LIMITED: "模型请求过于频繁，请稍后再试。",
   MODEL_OUTPUT_LIMIT: "回答达到了输出上限，可以要求简短回答。",

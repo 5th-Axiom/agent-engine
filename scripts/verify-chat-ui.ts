@@ -199,7 +199,19 @@ try {
       .locator(".ae-turn-state")
       .last()
       .filter({ hasText: state })
-      .waitFor();
+      .waitFor({ state: "attached" });
+    if (state === "已完成") {
+      await widget
+        .locator(".ae-turn")
+        .last()
+        .locator(".ae-message-agent > .ae-message-text")
+        .waitFor({ state: "visible" });
+    } else {
+      await widget
+        .locator(".ae-turn-state")
+        .last()
+        .waitFor({ state: "visible" });
+    }
   };
   await send("浏览器首条消息 <img src=x onerror=alert(1)>");
   await waitDone();
@@ -263,6 +275,10 @@ try {
     el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true })),
   );
   const beforeKeyboard = await widget.locator(".ae-turn").count();
+  // Candidate confirmation must not send during the composer IME settling window.
+  await input.press("Control+Enter");
+  assert.equal(modelCalls, beforeComposition);
+  await page.waitForTimeout(100);
   await input.press("Control+Enter");
   await page.waitForFunction(
     (n) =>

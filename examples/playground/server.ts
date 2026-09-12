@@ -159,6 +159,9 @@ export async function startPlayground(options: {
   let origin = "";
   const chat = createChatHandler({
     namespace: "playground-embedded",
+    images: options.profiles.some(
+      (profile) => profile.model.capabilities?.images === true,
+    ),
     allowedOrigins: () => [origin],
     resolveContext: async () => ({
       engine,

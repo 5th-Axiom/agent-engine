@@ -201,6 +201,7 @@ export const ModelSchema = z.strictObject({
   apiKey: SecretSchema,
   model: name,
   limits: z.strictObject({
+    maxImageInputTokens: positive.optional(),
     contextWindowTokens: positive,
     maxOutputTokens: positive,
     maxInputTokens: positive.optional(),
@@ -213,6 +214,7 @@ export const ModelSchema = z.strictObject({
     .optional(),
   capabilities: z
     .strictObject({
+      images: z.boolean().optional(),
       streaming: z.boolean().optional(),
       tools: z.boolean().optional(),
       thinking: z.boolean().optional(),
@@ -223,7 +225,7 @@ export const ModelSchema = z.strictObject({
     .strictObject({
       enabled: z.boolean(),
       effort: z.enum(["low", "medium", "high"]).optional(),
-      expose: z.enum(["none", "summary"]).optional(),
+      expose: z.enum(["none", "summary", "content"]).optional(),
       budgetTokens: positive.optional(),
     })
     .optional(),
@@ -296,6 +298,53 @@ export const OutputSchema = z.strictObject({
   mode: z.enum(["provider-native", "prompt-json"]).default("provider-native"),
   maxRepairAttempts: count.optional(),
 });
+/** Authoring accepts structural Zod schemas; persisted configuration is normalized JSON. */
+type Authoring<T> = T extends readonly (infer V)[]
+  ? Authoring<V>[]
+  : T extends object
+    ? {
+        [K in keyof T]: K extends
+          | "inputSchema"
+          | "outputSchema"
+          | "querySchema"
+          | "resultSchema"
+          | "answerSchema"
+          | "schema"
+          ? T[K] | z.ZodType
+          : Authoring<T[K]>;
+      }
+    : T;
+export type SessionConfigInput = Authoring<z.input<typeof SessionConfigSchema>>;
+export type ToolInput = Authoring<z.input<typeof ToolSchema>>;
+export type SkillInput = Authoring<z.input<typeof SkillSchema>>;
+export type KnowledgeBaseInput = Authoring<z.input<typeof KnowledgeSchema>>;
+export type OutputInput = Authoring<z.input<typeof OutputSchema>>;
+/** Paths and issue codes only: never echo credential values or unknown keys. */
+function validationMessage(error: unknown, fallback: string) {
+  if (error instanceof z.ZodError)
+    return (
+      fallback +
+      ": " +
+      error.issues
+        .slice(0, 5)
+        .map(
+          (issue) =>
+            `${
+              issue.path
+                .map((part) =>
+                  String(part)
+                    .replace(/[^a-zA-Z0-9_.-]/g, "_")
+                    .slice(0, 64),
+                )
+                .join(".") || "config"
+            } (${issue.code})`,
+        )
+        .join("; ")
+    );
+  return error instanceof Error && error.name === "AgentEngineError"
+    ? error.message
+    : fallback;
+}
 export type SessionAgentConfig = z.output<typeof SessionConfigSchema>;
 export type ModelConfig = z.output<typeof ModelSchema>;
 export type ToolDefinition = z.output<typeof ToolSchema>;
@@ -432,9 +481,7 @@ export function parseConfig(input: unknown): SessionAgentConfig {
   } catch (e) {
     return fail(
       "CONFIG_INVALID",
-      e instanceof Error && e.name === "AgentEngineError"
-        ? e.message
-        : "Invalid Session configuration",
+      validationMessage(e, "Invalid Session configuration"),
     );
   }
   const unique = (values: string[]) => {
@@ -513,28 +560,41 @@ export function parseOutput(input: unknown): OutputConfig {
     return fail("CONFIG_INVALID", "Invalid output contract");
   }
 }
-export function defineSessionConfig(input: unknown): SessionAgentConfig {
+export function defineSessionConfig(
+  input: SessionConfigInput,
+): SessionAgentConfig {
   return parseConfig(input);
 }
-export function defineTool(input: unknown): ToolDefinition {
+export function defineTool(input: ToolInput): ToolDefinition {
   try {
     return ToolSchema.parse(normalizeDefinitions(input));
-  } catch {
-    return fail("CONFIG_INVALID", "Invalid capability definition");
+  } catch (error) {
+    return fail(
+      "CONFIG_INVALID",
+      validationMessage(error, "Invalid capability definition"),
+    );
   }
 }
-export function defineSkill(input: unknown): SkillDefinition {
+export function defineSkill(input: SkillInput): SkillDefinition {
   try {
     return SkillSchema.parse(normalizeDefinitions(input));
-  } catch {
-    return fail("CONFIG_INVALID", "Invalid capability definition");
+  } catch (error) {
+    return fail(
+      "CONFIG_INVALID",
+      validationMessage(error, "Invalid capability definition"),
+    );
   }
 }
-export function defineKnowledgeBase(input: unknown): KnowledgeBaseDefinition {
+export function defineKnowledgeBase(
+  input: KnowledgeBaseInput,
+): KnowledgeBaseDefinition {
   try {
     return KnowledgeSchema.parse(normalizeDefinitions(input));
-  } catch {
-    return fail("CONFIG_INVALID", "Invalid capability definition");
+  } catch (error) {
+    return fail(
+      "CONFIG_INVALID",
+      validationMessage(error, "Invalid capability definition"),
+    );
   }
 }
 export function configHash(input: SessionAgentConfig): string {

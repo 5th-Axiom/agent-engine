@@ -1,5 +1,7 @@
 # Agent Engine 技术方案
 
+> 2026-09-12 追加实现：图片与场景接入的公开 API 扩展见 [ADR 0006](adr/0006-scenario-usage-and-images.md)。本文 M0–M3 的可靠性、授权和预算约定继续适用。
+
 > 状态：历史设计基线 · 已完成第二轮契约一致性修订；M0–M3 实现与后续审查修复见 [实施清单](implementation-plan.md)\
 > 目标项目：`~/git/agent-engine`\
 > 对照基线：WorkBuddy AI 5.4.2 / CodeBuddy CLI 2.132.0 恢复源码\
@@ -1924,6 +1926,12 @@ const result = await session.run({
 
 `expose: "summary"` 只展示 Provider 实际提供且允许展示的摘要，不要求模型生成或泄露私有推理。即使 `expose: "none"`，运行中的协议续接仍可能需要受保护原生数据；配置检查必须解释这种差别。`maxRepairAttempts` 只能收窄 Engine/Session 的有效修复上限。
 
+#### 2026-09-12：显式展示公开思考内容
+
+新增 `expose: "content"`，允许展示供应商明确返回的公开思考字段，不能把它冒充 `summary`。标准适配器将 reasoning_content / thinking_delta 标注为 content；事件增加可选 format，自定义适配器未标注时沿用 summary。Engine 的 thinkingDisplayRetention 为 none 时仍不记录展示正文。签名、遮蔽块和原生续接的加密与访问规则不变。
+
+聊天宿主必须另行声明 `ChatAssistantDefinition.thinkingDisplay` 才向浏览器提供对应正文；默认为关闭。宿主只能收窄模型展示权限；授权与数据保留检查先于缓存，展示权限变更使缓存失效重读。失败或丢弃 Attempt 的正文不进入过程历史。该新增契约解决默认关闭下无法呈现公开思考的问题，不改变请求 Thinking 能力的路由检查、冻结重试与原生续接要求。实现、配置与验证见[回复展示改进](reply-display-alignment.md)。
+
 ### 5.12 Retry、Repair 和 Fallback
 
 #### 使用方式
@@ -2857,3 +2865,9 @@ const result = await session.run({ input: "开始任务" });
 首版按 M0～M3 完成 Config、Session/Run/Loop、同库事务、统一事件、模型协议、四类能力、Retry/Repair、Usage、只读 Debug 和遥测接入。核心契约先行，但 Skill、知识库和 Memory 不是无限延期项；监控平台、分布式调度和真实重放不进入首版。
 
 最终建设方式是“独立新建 Agent Engine + 复用成熟基础组件 + WorkBuddy 行为基线回归”。具体以第 6.11～6.16 节执行：保留值得借鉴的机制，主动改造不符合目标的边界，用可重复的失败场景证明质量，不把恢复源码直接抽取成功当作交付目标。用户已要求在 `~/git/agent-engine` 创建项目并进入实施；方案契约不代表代码已完成，实际进度与验收证据在目标项目内记录。
+
+### 追加：聊天处理过程的公开投影（2026-09-12）
+
+复用 canonical events 的 sequence / timestamp / Run / Attempt / Operation 标识，新增 chat-server 白名单过程投影与 ChatRun.process，具体契约见[架构评估与实现](chat-process-architecture.md)。SDK 在每个模型 Attempt 首次观察到 thinking、tool-call、text 或通用活动时补发已有 model.streaming 事件；Skill 已授权、即将加载时发 skill.selected。状态信号不包含私有思考内容，Thinking 保留策略继续生效。
+
+聊天传输保持已有授权快照轮询；回读、缓存数量/字符/事件上限及不完整标记明确，缓存命中仍重新授权。describeProcess 是宿主显式安全摘要接口，不把原始事件、原生协议和全部工具载荷暴露给浏览器。新增字段可选兼容旧协议；不改变运行、重试、CAS/事务、预算、审批和结果未知的现有契约，不扩入 M4/M5。

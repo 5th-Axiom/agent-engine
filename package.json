@@ -22,7 +22,13 @@
     "verify:chat-ui": "pnpm build && tsx scripts/verify-chat-ui.ts",
     "pack:chat": "pnpm build && node scripts/pack-chat.mjs",
     "verify:chat-packages": "pnpm pack:chat && node scripts/verify-chat-packages.mjs",
-    "verify:review-fixes": "pnpm build && node scripts/verify-review-fixes.mjs"
+    "verify:review-fixes": "pnpm build && node scripts/verify-review-fixes.mjs",
+    "example:export": "pnpm pack:chat && node scripts/export-integration-examples.mjs",
+    "verify:images-ui": "pnpm build && tsx scripts/verify-images-ui.ts",
+    "smoke:images": "pnpm build && tsx scripts/smoke-images.ts",
+    "verify:chat-process": "pnpm build && tsx scripts/verify-chat-process.ts",
+    "verify:composer": "pnpm build && tsx scripts/verify-composer.ts",
+    "verify:reply-display": "pnpm build && tsx scripts/verify-reply-display.ts"
   },
   "devDependencies": {
     "@agent-runtime/debug": "workspace:*",

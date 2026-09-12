@@ -1,3 +1,13 @@
+## 先运行一个完整例子
+
+完成[环境准备](/docs/installation/)并导出 [backend 示例](/docs/integration/)，本文件与 backend.ts、settings.ts 同目录。
+
+{{code:event-run.ts}}
+
+```sh
+node --env-file=.env --import tsx event-run.ts
+```
+
 自己的页面需要展示“正在回答”“正在查询工具”或停止按钮时，可以使用后端 SDK 的运行和事件接口。现成的前端 SDK 已处理聊天协议与展示，无需接入方再拼一套事件客户端。
 
 以下片段中的 session 和 engine 来自[后端教程](/docs/sdk/)。
@@ -82,3 +92,26 @@ console.log(sessionUsage);
 展示已知用量时同时显示 complete 和 costComplete。未知不是 0；Thinking 属于输出的一部分，不能再重复相加。配置费率计算的是估算费用，不是供应商实际账单。
 
 重试、摘要和输出修复都可能产生用量，迟到的统计会修订对应记录。需要集中排查时，继续[接入 Debug](/docs/debug/)。
+
+## 使用现成聊天界面展示过程
+
+使用 chat-server + chat-ui 时，不需要自己拼事件列表。每轮回答会显示可展开的“处理过程”：执行时展开，完成后收起，主动查看的详情保持展开。Skill、工具、知识、记忆和重试按实际事件出现；模型报告思考信号时显示状态，不提供私有思考正文。
+
+服务器返回可选 ChatRun.process；自定义布局可使用 chat-ui/components 的 createRunProcess。工具参数与结果默认不公开，可在宿主 ChatAssistantDefinition.describeProcess 中按工具名返回允许用户查看的 input / output 字符串摘要。本站的搜索工具会显示查询词和资料摘要。
+
+耗时统计活动执行时间；等待输入时不继续累计。费用仅在有费率数据时估算，缺失的用量明确标记。旧事件过期或超过回读范围会提示记录不完整；不会影响读取已保存的最终回答。等待确认的问题能显示，实际审批、提交答案和核验操作仍需宿主自己的业务界面。
+
+
+## 显示模型返回的思考内容
+
+在服务端完成以下三处设置，现成聊天页面就会单独显示“思考过程”：
+
+1. Engine 的 policy.thinkingDisplayRetention 设置为 "session"。
+2. 会话模型的 thinking.expose 设置为 "content"，保留该模型原来的 enabled、effort、budgetTokens 等请求配置。
+3. 助手对象与 config 同级设置 thinkingDisplay: "content"。
+
+仅需供应商摘要时，第 2、3 项都用 "summary"。普通模型不会因为展示开关而获得 Thinking 能力；OpenAI-compatible 适配器当前不能主动请求 Thinking，应保持 enabled: false，只有实际返回 reasoning_content 时才有内容。Anthropic 协议使用支持 Thinking 的模型并按其能力配置。
+
+宿主默认不公开正文；保留策略为 "none" 时不记录正文。供应商没有提供内容时只展示状态及原因，不补造文字。签名和遮蔽块不进入浏览器。公开过程有大小上限，每块思考最多回读 8000 字符；它不是完整模型载荷。
+
+本站已开启公开内容展示，刷新后发起新问题即可验证；以前没有保留的思考不会补回。执行时可展开阅读，完成后过程默认收起；已结束的基础阶段可从执行详情查看。新文字短时平滑出现，历史直接呈现；向上阅读时不会被强制拉回。

@@ -1,3 +1,9 @@
+## 交付方式
+
+{{delivery}}
+
+以下步骤适用于当前 SDK 开发包路线。未来 CLI、压缩包或安装包会补充自己的获取和环境检查步骤，后续场景保持相同。想直接得到完整目录，使用[完整接入示例](/docs/integration/)。
+
 当前是 **0.1.0-dev 源码开发版，尚未发布到公共 npm**。接入业务项目时先从本仓库生成安装包，再安装到你的项目。不要直接运行 pnpm add @agent-runtime/sdk 并期待公共仓库里已有该包。
 
 ## 按接入路线选包
@@ -21,7 +27,7 @@ pnpm install --frozen-lockfile
 pnpm pack:chat
 ```
 
-完成后，.local/chat-packages/ 内应有 sdk、chat-core、chat-ui、chat-server 四个 .tgz 文件。pack:chat 会先构建，不需要启动数据库或调用模型。
+完成后，.local/chat-packages/ 内应有 sdk、chat-core、chat-ui、chat-server 和 debug 共五个 .tgz 文件。pack:chat 会先构建，不需要启动数据库或调用模型。
 
 ## 2. 安装到你的项目
 
@@ -67,3 +73,9 @@ pnpm add /path/to/agent-engine/.local/chat-packages/agent-runtime-chat-core-0.1.
 前端项目能够导入 mountChatWidget，后端项目能够导入 createAgentEngine，即可继续[前端教程](/docs/frontend/)或[后端教程](/docs/sdk/)。
 
 安装包路径需要在安装时可访问。升级时从同一份新源码重新打包，前后端一起升级到匹配版本；当前开发版不承诺不同提交之间的协议兼容性。
+
+## 准备运行环境
+
+只接前端时不需要数据库和模型凭据；后端 / 全栈需要一个已创建的独立 PostgreSQL 数据库、Node.js ≥ 22.19 和你有权使用的模型。最小环境变量与完整 settings.ts 见[配置模型与密钥](/docs/models/)。
+
+**验收：** 能导入 SDK，数据库可连接，凭据只在服务端解析。接着[创建第一个对话](/docs/sdk/)；有现成聊天接口则直接[嵌入界面](/docs/frontend/)。

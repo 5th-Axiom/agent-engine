@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 const destination = resolve(".local/chat-packages");
 await mkdir(destination, { recursive: true });
-for (const name of ["sdk", "chat-core", "chat-server", "chat-ui"]) {
+for (const name of ["sdk", "chat-core", "chat-server", "chat-ui", "debug"]) {
   const result = spawnSync(
     "pnpm",
     ["pack", "--pack-destination", destination],

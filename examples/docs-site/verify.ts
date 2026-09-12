@@ -3,13 +3,15 @@ import { mkdir, readFile } from "node:fs/promises";
 import { Marked, type Tokens } from "marked";
 import { randomBytes } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
+import { parseConfig } from "@agent-runtime/sdk";
 import {
   createEngineTestHarness,
   scriptedModel,
   toolCall,
   finalText,
 } from "@agent-runtime/testing";
-import { loadArticles, searchArticles } from "./content.js";
+import { articleSections, loadArticles, searchArticles } from "./content.js";
+import { deliveryForms } from "./delivery.js";
 import { renderArticle } from "./render.js";
 import { renderSourcePage } from "./ai-render.js";
 import { readSettings } from "./snippets/settings.js";
@@ -51,18 +53,42 @@ for (const a of articles) {
   assert.ok(page.html.includes("<h1"));
   assert.ok(page.toc.length > 0);
   assert.equal(new Set(page.toc.map((t) => t.id)).size, page.toc.length);
+  for (const section of articleSections(a).filter((section) => section.id))
+    assert.ok(
+      page.html.includes(`id="${section.id}"`),
+      `${a.id}: searchable section has a rendered anchor`,
+    );
   for (const match of page.html.matchAll(/href="(\/docs\/[^"#]+)(?:#[^"]*)?"/g))
     assert.ok(
       articles.some((a) => `/docs/${a.id}/` === match[1]),
       match[1],
     );
 }
+assert.deepEqual(
+  deliveryForms
+    .filter((form) => form.status === "undecided")
+    .map((form) => form.id),
+  ["npm", "cli", "archive", "installer"],
+);
+for (const form of deliveryForms.filter((form) => form.status === "undecided"))
+  assert.ok(
+    !("href" in form),
+    "undecided releases must not pretend to be downloadable",
+  );
+const toolHTML = renderArticle(
+  articles.find((a) => a.id === "tools")!,
+  articles,
+).html;
+assert.ok(
+  toolHTML.includes("tool-run.ts") && toolHTML.includes("hljs-keyword"),
+  "checked source includes filename and syntax highlighting",
+);
 for (const [id, files] of [
   ["frontend", ["frontend.ts"]],
   ["frontend-server", ["chat-server.ts"]],
   ["sdk", ["backend.ts", "run.ts"]],
   ["models", ["settings.ts"]],
-  ["tools", ["tools.ts"]],
+  ["tools", ["tool-run.ts"]],
 ] as const) {
   const article = articles.find((a) => a.id === id)!;
   const blocks = new Marked()
@@ -73,7 +99,7 @@ for (const [id, files] of [
       await readFile(new URL("./snippets/" + file, import.meta.url), "utf8")
     ).trimEnd();
     assert.ok(
-      blocks.some((b) => b.lang === "ts" && b.text === source),
+      blocks.some((b) => b.lang?.split(" ")[0] === "ts" && b.text === source),
       id + ": displayed code must exactly match checked source",
     );
   }
@@ -162,7 +188,7 @@ try {
 const model = scriptedModel([
   toolCall("docs.search", { query: "API Key 密钥文件" }),
   finalText(
-    "合成测试回答：API Key 由服务端 secrets.resolve 读取；本例通过 --env-file 加载 .env。参考：模型配置与密钥管理 /docs/models/",
+    "合成测试回答：API Key 由服务端 secrets.resolve 读取；本例通过 --env-file 加载 .env。参考：配置模型与密钥 /docs/models/",
   ),
   finalText("合成普通聊天回答：你好，今天也可以聊聊你的想法。"),
   toolCall("api.lookup", { query: "mountChatWidget" }),
@@ -176,11 +202,18 @@ const harness = await createEngineTestHarness({
   bindings: { "docs.search.v1": docsBinding(articles), ...knowledge.bindings },
   authorize: async () => true,
 });
+const assistant = docsAssistant(harness.modelConfig.models.primary, knowledge);
+const assistantConfig = parseConfig(assistant.config);
+assistantConfig.models.secondary = {
+  ...assistantConfig.models.primary!,
+  model: "synthetic-secondary",
+};
+assistant.config = assistantConfig;
 const host = await startDocsSite({
   articles,
   knowledge,
   engine: harness.engine,
-  assistant: docsAssistant(harness.modelConfig.models.primary, knowledge),
+  assistant,
   cookieSecret: randomBytes(32),
   port: 0,
 });
@@ -201,21 +234,21 @@ try {
     page.getByRole("button", { name: "打开文档助手", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "产品介绍", exact: true }),
+    page.getByRole("heading", { name: "从这里开始", exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".product-table").getByRole("link", { name: "使用前端 SDK" }),
+    page.locator(".product-table").getByRole("link", { name: "嵌入界面" }),
   ).toBeVisible();
   await expect(
-    page.locator(".product-table").getByRole("link", { name: "使用后端 SDK" }),
+    page.locator(".product-table").getByRole("link", { name: "创建对话" }),
   ).toBeVisible();
   await page.screenshot({
     path: new URL("desktop.png", captures).pathname,
     fullPage: true,
   });
   for (const [label, route] of [
-    ["使用前端 SDK", "frontend"],
-    ["使用后端 SDK", "sdk"],
+    ["嵌入界面", "frontend"],
+    ["创建对话", "sdk"],
   ]) {
     await page
       .locator(".product-table")
@@ -227,7 +260,7 @@ try {
       .getByRole("link", { name: "Agent Engine 文档首页", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "产品介绍", exact: true }),
+      page.getByRole("heading", { name: "从这里开始", exact: true }),
     ).toBeVisible();
   }
   await page.getByRole("button", { name: "切换深色模式" }).click();
@@ -239,12 +272,12 @@ try {
   await page.getByRole("button", { name: "搜索文档…" }).click();
   await page.getByRole("searchbox", { name: "搜索文档内容" }).fill("密钥");
   await expect(page.locator("#search-results a").first()).toContainText(
-    "模型配置与密钥管理",
+    "配置模型与密钥",
   );
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/docs\/models\/$/);
   await expect(
-    page.getByRole("heading", { name: "模型配置与密钥管理", exact: true }),
+    page.getByRole("heading", { name: "配置模型与密钥", exact: true }),
   ).toBeVisible();
   const firstCopy = page.getByRole("button", { name: "复制代码" }).first();
   await firstCopy.click();
@@ -255,9 +288,27 @@ try {
   );
   const settingsCode = await page.locator("pre code").nth(1).textContent();
   assert.ok(settingsCode?.includes('apiKey: { secretRef: "MODEL_API_KEY" }'));
+  await page.getByRole("button", { name: "搜索文档…" }).click();
+  await page
+    .getByRole("searchbox", { name: "搜索文档内容" })
+    .fill("MODEL_IMAGE_TOKENS");
+  const imageSearch = page
+    .locator('#search-results a[href*="/docs/images/"]')
+    .first();
+  await expect(imageSearch.locator("mark")).toContainText("MODEL_IMAGE_TOKENS");
+  const imageSearchHref = await imageSearch.getAttribute("href");
+  assert.ok(
+    imageSearchHref?.includes("#"),
+    "body match links directly to its section",
+  );
+  await imageSearch.click();
+  await expect(page).toHaveURL(/\/docs\/images\/#/);
+  const searchedAnchor = decodeURIComponent(new URL(page.url()).hash.slice(1));
+  await expect(page.locator(`[id="${searchedAnchor}"]`)).toBeVisible();
+  await page.goto(host.url + "/docs/models/");
   await page.getByRole("button", { name: "询问本文", exact: true }).click();
   await expect(page.locator("[data-agent-chat] textarea")).toHaveValue(
-    /模型配置与密钥管理/,
+    /配置模型与密钥/,
   );
   await page
     .locator("[data-agent-chat] textarea")
@@ -273,7 +324,7 @@ try {
   assert.equal(harness.calls.forBinding("docs.search.v1").length, 1);
   await expect(
     page.locator("[data-agent-chat] .ae-turn").first().locator(".ae-sources"),
-  ).toContainText("模型配置与密钥管理");
+  ).toContainText("配置模型与密钥");
   await page.locator("[data-agent-chat] textarea").fill("你好，今天聊点别的");
   await page
     .locator("[data-agent-chat]")
@@ -289,7 +340,7 @@ try {
   const readingY = await page.evaluate(() => window.scrollY);
   // Click the visible sticky link without Playwright scrolling its DOM position to the top.
   const modeBox = await page
-    .getByRole("link", { name: "AI 模式", exact: true })
+    .getByRole("link", { name: "询问文档", exact: true })
     .boundingBox();
   await page.mouse.click(
     modeBox!.x + modeBox!.width / 2,
@@ -297,7 +348,7 @@ try {
   );
   await expect(page).toHaveURL(/\/ai\/$/);
   await expect(page.locator("#reading-trail a")).toContainText(
-    "模型配置与密钥管理",
+    "配置模型与密钥",
   );
   await expect(page.locator("[data-agent-chat]")).toHaveAttribute(
     "data-presentation",
@@ -322,10 +373,26 @@ try {
   const old = await owner.readSession(remembered!);
   const oldConfig = structuredClone(old.config);
   oldConfig.tools = oldConfig.tools?.filter((t) => t.name === "docs.search");
+  delete oldConfig.models.secondary;
   delete oldConfig.metadata!.docsAssistantVersion;
   await (
     await owner.loadSession(old.id)
   ).replaceConfig({ ifVersion: old.version, config: oldConfig });
+  const readsBeforeUpgrade = model.requests.length;
+  const migrated = await (
+    await page.request.get(host.url + "/api/agent-chat/sessions/" + old.id)
+  ).json();
+  assert.deepEqual(
+    migrated.models.map((m: { id: string }) => m.id),
+    ["primary", "secondary"],
+  );
+  assert.equal(migrated.runs.length, 2);
+  assert.equal(migrated.configVersion, old.version + 2);
+  assert.equal(
+    model.requests.length,
+    readsBeforeUpgrade,
+    "reading idle history updates choices without calling a model",
+  );
   await page
     .locator("[data-agent-chat] textarea")
     .fill("查询 mountChatWidget 的源码");
@@ -414,7 +481,10 @@ try {
   await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(sdk.locator("textarea")).toHaveValue("返回文档时也保留草稿");
-  await page.getByRole("link", { name: "传统模式", exact: true }).click();
+  await page
+    .locator(".mode-switch")
+    .getByRole("link", { name: "阅读文档", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/docs\/models\/$/);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(readingY);
   await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
@@ -515,7 +585,7 @@ try {
       otherPage.locator("[data-agent-chat] textarea"),
     ).toBeInViewport();
     await expect(
-      otherPage.getByRole("link", { name: "传统模式", exact: true }),
+      otherPage.getByRole("link", { name: "阅读文档", exact: true }),
     ).toBeVisible();
     if (width === 320 || width === 390 || width === 768)
       await otherPage.screenshot({
@@ -568,14 +638,14 @@ try {
     .locator("[data-agent-chat]")
     .getByRole("button", { name: "收起聊天" })
     .click();
-  await page
+  const scenarios = page
     .locator(".sidebar .nav-group")
-    .filter({ has: page.locator("summary", { hasText: "前端 SDK" }) })
-    .locator("summary")
-    .click();
+    .filter({ has: page.locator("summary", { hasText: "使用场景" }) });
+  if ((await scenarios.getAttribute("open")) === null)
+    await scenarios.locator("summary").click();
   await page
     .locator(".sidebar")
-    .getByRole("link", { name: "前端 SDK：接入聊天界面", exact: true })
+    .getByRole("link", { name: "嵌入聊天界面", exact: true })
     .click();
   await expect(page).toHaveURL(/\/docs\/frontend\/$/);
   await page.getByRole("tab", { name: "React", exact: true }).click();
@@ -635,11 +705,11 @@ try {
   await page.getByRole("button", { name: "打开文档目录" }).click();
   await page
     .locator("#mobile-nav summary")
-    .filter({ hasText: "后端 SDK" })
+    .filter({ hasText: "使用场景" })
     .click();
   await page
     .locator("#mobile-nav")
-    .getByRole("link", { name: "模型配置与密钥管理", exact: true })
+    .getByRole("link", { name: "配置模型与密钥", exact: true })
     .click();
   await expect(page).toHaveURL(/\/docs\/models\/$/);
   await expect(page.locator("#mobile-nav")).not.toBeVisible();
@@ -716,7 +786,9 @@ try {
       page.getByRole("heading", { name: "文档助手尚未连接" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "阅读文档", exact: true }),
+      page
+        .locator(".mode-switch")
+        .getByRole("link", { name: "阅读文档", exact: true }),
     ).toBeVisible();
     await page.screenshot({
       path: new URL("ai-offline.png", captures).pathname,
@@ -739,6 +811,7 @@ try {
       articles: articles.length,
       checks: [
         "render-links",
+        "idle-history-model-catalog-migration",
         "rendered-code-matches-checked-source",
         "backend-config-binding-and-session",
         "html-safety",

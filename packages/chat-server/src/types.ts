@@ -1,10 +1,23 @@
 import type { IncomingMessage } from "node:http";
-import type { AgentEngine } from "@agent-runtime/sdk";
+import type { AgentEngine, JsonValue } from "@agent-runtime/sdk";
 import type { ChatAssistant, ChatTool } from "@agent-runtime/chat-core";
-export interface ChatAssistantDefinition extends Omit<ChatAssistant, "tools"> {
+export interface ChatAssistantDefinition extends Omit<
+  ChatAssistant,
+  "tools" | "models" | "skills" | "defaultModelId"
+> {
   config: unknown;
+  /** Labels only. Actual model availability comes from the configured allowlist. */
+  modelDisplay?: Record<string, { label: string }>;
+  /** Explicit host permission to show provider summaries or public thinking content; default none. Native/signature blocks are never displayed. */
+  thinkingDisplay?: "summary" | "content";
   /** Optional user-facing copy keyed by configured tool name. Never put private instructions here. */
   toolDisplay?: Record<string, Pick<ChatTool, "label" | "description">>;
+  /** Opt-in host allowlist of safe query/result summaries. Never return credentials or private prompts. */
+  describeProcess?: (operation: {
+    name: string;
+    input?: JsonValue;
+    output?: JsonValue;
+  }) => { input?: string; output?: string } | undefined;
 }
 export interface ChatContext {
   /** Engine must already be scoped to the authenticated caller. Never derive identity from the request body. */
@@ -13,6 +26,8 @@ export interface ChatContext {
   defaultAssistant?: string;
 }
 export interface ChatHandlerOptions {
+  /** Enable authenticated image upload/read routes; Engine requires protocolKey. */
+  images?: boolean;
   basePath?: string;
   namespace: string;
   allowedOrigins: string[] | (() => string[]);

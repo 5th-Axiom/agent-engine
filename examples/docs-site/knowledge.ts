@@ -109,7 +109,7 @@ const outputSchema = {
 function tool(
   name: string,
   description: string,
-  properties: Record<string, unknown>,
+  properties: Record<string, import("@agent-runtime/sdk").JsonValue>,
   required: string[],
 ) {
   return defineTool({

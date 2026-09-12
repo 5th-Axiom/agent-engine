@@ -89,7 +89,7 @@ Policy、业务键、Skill Loader 和真正的业务执行均受能力额度/信
 
 ## 前端聊天 SDK
 
-`chat-core` 提供受限聊天协议/状态控制器；`chat-ui` 提供四层组件、悬浮入口和嵌入页；`chat-server` 通过 Node HTTP 对接已验证用户的 Engine。浏览器只传助手 ID 和文本，模型、凭据与工具授权留在服务器。完整安装、宿主鉴权、React/Vue、主题和生命周期示例见[前端 SDK 接入教程](frontend-sdk.md)，边界见 [ADR 0005](adr/0005-embeddable-chat-sdk.md)。
+`chat-core` 提供受限聊天协议/状态控制器；`chat-ui` 提供四层组件、悬浮入口和嵌入页；`chat-server` 通过 Node HTTP 对接已验证用户的 Engine。浏览器传助手 ID、文本和可选的已授权图片引用，模型、凭据与工具授权留在服务器。完整安装、宿主鉴权、React/Vue、主题和生命周期示例见[前端 SDK 接入教程](frontend-sdk.md)，边界见 [ADR 0005](adr/0005-embeddable-chat-sdk.md) 和 [ADR 0006](adr/0006-scenario-usage-and-images.md)。
 
 
 ## 会话分页与审查修复后的配置边界
@@ -99,3 +99,9 @@ Policy、业务键、Skill Loader 和真正的业务执行均受能力额度/信
 Engine 的预算硬上限在会话未填写预算时仍生效；有效配置将这类字段的来源标记为 `policy-ceiling`。显式超限或费用币种不一致会拒绝配置。Run 的 `overrides.tools` 同时与 Skill 的 `allowedTools` 取交集，空交集不能调用业务工具。
 
 标准模型协议将未知能力和最多 256 个调用内的超限批次送入有界输入修复；业务上限仍是每批 16 个，超限批次零执行。256 是适配器的传输保护上限，达到更高索引时以 `MODEL_OUTPUT_LIMIT` 结束，不扩大业务能力额度。Thinking、签名与工具参数的有效数据片段可重置流空闲计时；纯心跳不重置，也不公开私有正文。
+
+## 场景接入与图片扩展
+
+本轮新增 defineBoundTool（同源工具定义/绑定与 Zod 类型推导）、SessionConfigInput 等作者类型，以及 uploadImage/readImage/deleteImage 和 RunInput.attachments。RunInput.skill 可在首次模型请求前显式选择已声明的 Skill。图片需 protocolKey、实际模型 capabilities.images=true 与 limits.maxImageInputTokens；现成 Chat UI 支持上传和安全 Markdown。普通快照只有附件引用，模型发送前读取已冻结内容并重新授权。完整约定见 [ADR 0006](adr/0006-scenario-usage-and-images.md)。
+
+传统文档按环境、对话、图片、工具、Skill、知识、记忆、进度、Debug、登录与界面场景组织；精确符号参考在 examples/docs-site/content/api.md。pnpm example:export 导出可独立安装的后端、前端与全栈目录。所有包仍为本地开发版，CLI/公共 npm/压缩包/安装包形态待确定。

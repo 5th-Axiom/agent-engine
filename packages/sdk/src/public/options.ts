@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { imageAttachmentSchema } from "./images.js";
 import { DefaultsSchema, SecretSchema, LoopSchema } from "../config/schema.js";
 import { fail } from "../errors/index.js";
 import type { EngineOptions } from "./types.js";
@@ -48,6 +49,9 @@ export const EngineOptionsSchema = z.strictObject({
       )
     );
   }),
+  imageStorage: z
+    .strictObject({ version: name, put: fn, get: fn, remove: fn })
+    .optional(),
   principal: PrincipalSchema,
   secrets: z.strictObject({ resolve: fn }),
   authorize: fn.optional(),
@@ -166,6 +170,8 @@ export function validateEngineOptions(options: EngineOptions): void {
 }
 
 export const RunInputSchema = z.strictObject({
+  skill: name.optional(),
+  attachments: z.array(imageAttachmentSchema).max(8).optional(),
   requestId: name.optional(),
   ifConfigVersion: z.number().int().positive().optional(),
   input: z.unknown(),

@@ -1178,3 +1178,27 @@ dialog::backdrop {
     width: 45%;
   }
 }
+
+/* Code surfaces stay dark in both themes. */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal {
+  color: #e5a9ea;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-attr {
+  color: #8ddbc0;
+}
+.hljs-title,
+.hljs-built_in,
+.hljs-number {
+  color: #95c6ff;
+}
+.hljs-comment {
+  color: #a3afbd;
+}
+.search-results mark {
+  background: #f5dc97;
+  color: #382b0b;
+}

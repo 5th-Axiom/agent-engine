@@ -1,3 +1,13 @@
+## 先运行一个完整例子
+
+完成[环境准备](/docs/installation/)并导出 [backend 示例](/docs/integration/)，本文件与 backend.ts、settings.ts 同目录。Debug 还需在 .env 设置至少 16 个字符的 DEBUG_TOKEN；完整导出目录已包含 Debug 包。
+
+{{code:debug-run.ts}}
+
+```sh
+node --env-file=.env --import tsx debug-run.ts
+```
+
 后端 SDK 可搭配 @agent-runtime/debug 提供只读调试页面，查看会话、运行、模型尝试、工具执行和用量。它是开发者入口，不是聊天界面的一部分，也不是执行重放工具。
 
 ## 1. 安装 Debug 包

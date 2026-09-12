@@ -17,3 +17,6 @@ export {
   PrincipalSchema,
   RunInputSchema,
 } from "./public/options.js";
+
+export * from "./public/images.js";
+export * from "./public/define-bound-tool.js";

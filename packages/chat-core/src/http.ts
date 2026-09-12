@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ChatError,
+  chatImageSchema,
   configSchema,
   sessionsSchema,
   sessionSchema,
@@ -135,6 +136,38 @@ export function createHttpChatTransport(
   const sessionPath = (id: string) =>
     "/sessions/" + encodeURIComponent(z.uuid().parse(id));
   return {
+    uploadImage: async (file, signal) => {
+      if (!file.size || file.size > 5 * 1024 * 1024)
+        throw new ChatError("IMAGE_INVALID");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 8192)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      return request("/images", chatImageSchema, signal, {
+        mediaType: file.type,
+        data: btoa(binary),
+        filename: "name" in file ? String(file.name).slice(0, 120) : "image",
+      });
+    },
+    readImage: async (id, signal) => {
+      const value = await request(
+        "/images/" + z.uuid().parse(id),
+        z.object({
+          mediaType: z.enum([
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ]),
+          data: z.string().max(7_000_000),
+        }),
+        signal,
+      );
+      return new Blob(
+        [Uint8Array.from(atob(value.data), (c) => c.charCodeAt(0))],
+        { type: value.mediaType },
+      );
+    },
     getConfig: (s) => request("/config", configSchema, s),
     listSessions: (s) => request("/sessions", sessionsSchema, s),
     readSession: (id, s) => request(sessionPath(id), sessionSchema, s),

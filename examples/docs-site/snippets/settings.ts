@@ -11,6 +11,7 @@ export function readSettings(env = process.env) {
   const credentials: Record<string, string> = {
     MODEL_API_KEY: required("MODEL_API_KEY"),
     PROTOCOL_KEY: required("PROTOCOL_KEY"),
+    ...(env.DEBUG_TOKEN ? { DEBUG_TOKEN: env.DEBUG_TOKEN } : {}),
   };
   return {
     databaseURL: required("DATABASE_URL"),
@@ -26,12 +27,21 @@ export function readSettings(env = process.env) {
     config: defineSessionConfig({
       models: {
         primary: {
-          provider: "openai-compatible",
+          provider: env.MODEL_PROVIDER ?? "openai-compatible",
           baseURL,
           apiKey: { secretRef: "MODEL_API_KEY" },
           model: required("MODEL_NAME"),
           // 示例值，按供应商的模型能力填写。
-          limits: { contextWindowTokens: 32000, maxOutputTokens: 1024 },
+          limits: {
+            contextWindowTokens: Number(env.MODEL_CONTEXT_TOKENS ?? 32000),
+            maxOutputTokens: Number(env.MODEL_OUTPUT_TOKENS ?? 1024),
+            ...(env.MODEL_IMAGES === "true"
+              ? { maxImageInputTokens: Number(required("MODEL_IMAGE_TOKENS")) }
+              : {}),
+          },
+          ...(env.MODEL_IMAGES === "true"
+            ? { capabilities: { images: true } }
+            : {}),
         },
       },
       routing: { primary: "primary" },

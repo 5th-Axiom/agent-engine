@@ -3,14 +3,36 @@ import { z } from "zod";
 export const assistantIdSchema = z
   .string()
   .regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/);
+export const chatModelSchema = z.object({
+  id: z.string().min(1).max(128),
+  label: z.string().min(1).max(100),
+  supportsImages: z.boolean(),
+  thinking: z.boolean(),
+});
+export type ChatModel = z.infer<typeof chatModelSchema>;
+export const chatSkillSchema = z.object({
+  id: z.string().min(1).max(128),
+  label: z.string().min(1).max(100),
+});
+export type ChatSkill = z.infer<typeof chatSkillSchema>;
 export const createSessionSchema = z.strictObject({
   requestId: z.uuid(),
   assistantId: assistantIdSchema,
 });
-export const sendMessageSchema = z.strictObject({
-  requestId: z.uuid(),
-  input: z.string().trim().min(1).max(8000),
+export const chatImageSchema = z.strictObject({
+  type: z.literal("image"),
+  attachmentId: z.uuid(),
 });
+export type ChatImage = z.infer<typeof chatImageSchema>;
+export const sendMessageSchema = z
+  .strictObject({
+    requestId: z.uuid(),
+    input: z.string().trim().max(8000),
+    modelId: z.string().min(1).max(128).optional(),
+    skillId: z.string().min(1).max(128).optional(),
+    attachments: z.array(chatImageSchema).max(8).optional(),
+  })
+  .refine((v) => !!v.input || !!v.attachments?.length);
 export const cancelRunSchema = z.strictObject({ runId: z.uuid() });
 /** Public catalog only. Executor configuration, schemas and credentials stay on the server. */
 export const chatToolSchema = z.object({
@@ -26,10 +48,48 @@ const usageSchema = z.object({
   total: z.number().nonnegative().optional(),
   complete: z.boolean(),
   costComplete: z.boolean(),
+  costs: z
+    .array(
+      z.object({
+        currency: z.string().max(32),
+        amount: z.string().max(100),
+        complete: z.boolean(),
+      }),
+    )
+    .optional(),
 });
+/** Public execution facts only; raw events, private reasoning and native payloads are excluded. */
+export const processEntrySchema = z.object({
+  id: z.string().max(200),
+  sequence: z.number().int().nonnegative(),
+  kind: z.enum([
+    "model",
+    "thinking",
+    "tool",
+    "skill",
+    "knowledge",
+    "memory",
+    "context",
+    "retry",
+    "waiting",
+    "warning",
+    "message",
+    "run",
+  ]),
+  label: z.string().max(200),
+  state: z.enum(["running", "completed", "failed", "waiting", "cancelled"]),
+  startedAt: z.number(),
+  endedAt: z.number().optional(),
+  input: z.string().max(2000).optional(),
+  output: z.string().max(8000).optional(),
+});
+export type ChatProcessEntry = z.infer<typeof processEntrySchema>;
 export const runSchema = z.object({
   id: z.uuid(),
   sequence: z.number().int().nonnegative(),
+  modelId: z.string().optional(),
+  skillId: z.string().optional(),
+  attachments: z.array(chatImageSchema).optional(),
   input: z.string(),
   output: z.string(),
   draft: z.string(),
@@ -44,6 +104,22 @@ export const runSchema = z.object({
     "cancelled",
   ]),
   cancelRequested: z.boolean(),
+  process: z
+    .object({
+      entries: z.array(processEntrySchema).max(600),
+      thinkingDisplay: z.enum(["none", "summary", "content"]).optional(),
+      complete: z.boolean(),
+      observedAt: z.number(),
+      activeMs: z.number().nonnegative(),
+      pending: z
+        .object({
+          kind: z.enum(["question", "structured_input", "permission"]),
+          question: z.string().max(4000),
+          expiresAt: z.number(),
+        })
+        .optional(),
+    })
+    .optional(),
   errorCode: z
     .string()
     .regex(/^[A-Z][A-Z0-9_]{0,100}$/)
@@ -61,12 +137,22 @@ export const runSchema = z.object({
   ),
 });
 export const assistantSchema = z.object({
+  models: z.array(chatModelSchema).optional(),
+  defaultModelId: z.string().optional(),
+  skills: z.array(chatSkillSchema).optional(),
+  supportsImages: z.boolean().optional(),
   id: assistantIdSchema,
   label: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   tools: z.array(chatToolSchema).optional(),
 });
 export const configSchema = z.object({
+  images: z
+    .object({
+      maxBytes: z.number().positive(),
+      maxPerMessage: z.number().positive(),
+    })
+    .optional(),
   protocolVersion: z.literal(1),
   assistants: z.array(assistantSchema).min(1),
   defaultAssistant: assistantIdSchema,
@@ -80,6 +166,10 @@ export const sessionSummarySchema = z.object({
   active: z.boolean(),
 });
 export const sessionSchema = z.object({
+  models: z.array(chatModelSchema).optional(),
+  defaultModelId: z.string().optional(),
+  skills: z.array(chatSkillSchema).optional(),
+  supportsImages: z.boolean().optional(),
   id: z.uuid(),
   assistantId: assistantIdSchema,
   title: z.string(),
@@ -105,6 +195,8 @@ export type ChatRun = z.infer<typeof runSchema>;
 export type ChatSession = z.infer<typeof sessionSchema>;
 export type ChatSessionSummary = z.infer<typeof sessionSummarySchema>;
 export interface ChatTransport {
+  uploadImage?(file: Blob, signal?: AbortSignal): Promise<ChatImage>;
+  readImage?(id: string, signal?: AbortSignal): Promise<Blob>;
   getConfig(signal?: AbortSignal): Promise<ChatConfig>;
   listSessions(signal?: AbortSignal): Promise<ChatSessionSummary[]>;
   readSession(id: string, signal?: AbortSignal): Promise<ChatSession>;

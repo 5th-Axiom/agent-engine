@@ -1,14 +1,16 @@
 import { closeResources } from "../../scripts/lib/close-resources.js";
-import { randomBytes, createHmac } from "node:crypto";
+import { randomBytes, createHmac, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 import {
   createAgentEngine,
   PostgresStore,
   AgentEngineError,
+  parseConfig,
 } from "@agent-runtime/sdk";
 import {
   loadLocalModel,
+  loadLocalModels,
   LocalModelConfigError,
 } from "../../scripts/lib/local-model-config.js";
 import { loadArticles } from "./content.js";
@@ -38,6 +40,14 @@ try {
       process.env.AGENT_DOCS_MODEL_PROFILE,
       fileURLToPath(new URL("../../", import.meta.url)),
     );
+    const configured = await loadLocalModels(
+      fileURLToPath(new URL("../../", import.meta.url)),
+    );
+    const profiles = configured.profiles;
+    const secretRefs = new Set(
+      profiles.map((profile) => profile.model.apiKey.secretRef),
+    );
+    secretRefs.add(local.protocolKey.secretRef);
     if (!process.env.AGENT_DOCS_DATABASE_URL) {
       const admin = new Client({
         connectionString: defaultDatabase.replace(
@@ -81,20 +91,29 @@ try {
       store,
       principal: { tenantId: "docs-site", subjectId: "docs-host" },
       protocolKey: local.protocolKey,
-      secrets: local.secrets,
+      secrets: {
+        resolve: async (ref) => {
+          const profile = profiles.find(
+            (profile) =>
+              profile.model.apiKey.secretRef === ref ||
+              profile.protocolKey.secretRef === ref,
+          );
+          if (!profile)
+            throw new LocalModelConfigError("LOCAL_SECRET_NOT_FOUND");
+          return profile.secrets.resolve(ref);
+        },
+      },
       authorize: async ({ principal, sideEffect, action, resource }) => {
         if (
           principal.tenantId !== "docs-site" ||
-          sideEffect === "write" ||
+          (sideEffect === "write" &&
+            !(action === "data" && resource === "image:upload")) ||
           action === "resolve"
         )
           return false;
-        if (action === "secret")
-          return [
-            local.model.apiKey.secretRef,
-            local.protocolKey.secretRef,
-          ].includes(resource);
-        if (action === "model") return resource === local.model.baseURL;
+        if (action === "secret") return secretRefs.has(resource);
+        if (action === "model")
+          return profiles.some((profile) => resource === profile.model.baseURL);
         if (action === "capability")
           return [
             "docs.search",
@@ -109,19 +128,25 @@ try {
       },
       limits: { maxConcurrentModelRequests: 2, maxAcceptedRuns: 8 },
       policy: {
-        allowedOrigins: [new URL(local.model.baseURL).origin],
-        allowPrivateOrigins: local.allowPrivateNetwork
-          ? [new URL(local.model.baseURL).origin]
-          : [],
-        allowedModelTargets: [
-          {
-            provider: local.model.provider,
-            origin: new URL(local.model.baseURL).origin,
-            credentialScopes: [local.model.apiKey.secretRef],
-          },
+        allowedOrigins: [
+          ...new Set(
+            profiles.map((profile) => new URL(profile.model.baseURL).origin),
+          ),
         ],
+        allowPrivateOrigins: [
+          ...new Set(
+            profiles
+              .filter((profile) => profile.allowPrivateNetwork)
+              .map((profile) => new URL(profile.model.baseURL).origin),
+          ),
+        ],
+        allowedModelTargets: profiles.map((profile) => ({
+          provider: profile.model.provider,
+          origin: new URL(profile.model.baseURL).origin,
+          credentialScopes: [profile.model.apiKey.secretRef],
+        })),
         allowedExecutorTypes: ["binding"],
-        thinkingDisplayRetention: "none",
+        thinkingDisplayRetention: "session",
       },
     });
     const output = Number(process.env.AGENT_DOCS_MAX_OUTPUT_TOKENS ?? 1536);
@@ -139,6 +164,44 @@ try {
       },
       knowledge,
     );
+    const assistantConfig = parseConfig(assistant.config);
+    assistant.thinkingDisplay = "content";
+    assistant.modelDisplay = { primary: { label: local.profileName } };
+    for (const profile of profiles) {
+      if (profile.profileName === local.profileName) continue;
+      assistantConfig.models[profile.profileName] = {
+        ...profile.model,
+        limits: {
+          ...profile.model.limits,
+          maxOutputTokens: Math.min(
+            output,
+            profile.model.limits.maxOutputTokens,
+          ),
+        },
+      };
+      assistant.modelDisplay[profile.profileName] = {
+        label: profile.profileName,
+      };
+    }
+    for (const model of Object.values(assistantConfig.models)) {
+      model.thinking = {
+        ...model.thinking,
+        enabled: model.thinking?.enabled ?? false,
+        expose: "content",
+      };
+    }
+    assistantConfig.metadata = {
+      ...assistantConfig.metadata,
+      docsAssistantVersion:
+        "reply-v2:" +
+        String(assistantConfig.metadata?.docsAssistantVersion) +
+        ":" +
+        createHash("sha256")
+          .update(JSON.stringify(assistantConfig.models))
+          .digest("hex")
+          .slice(0, 16),
+    };
+    assistant.config = assistantConfig;
   }
   host = await startDocsSite({
     articles,

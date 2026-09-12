@@ -69,7 +69,10 @@ export const eventPayloadSchemas = {
   }),
   "content.thinking.delta": message.extend({
     blockId: id,
-    data: z.object({ text: z.string() }),
+    data: z.object({
+      text: z.string(),
+      format: z.enum(["summary", "content"]).optional(),
+    }),
   }),
   "content.message.committed": message.extend({ data: details }),
   "content.message.discarded": message.extend({ data: details }),

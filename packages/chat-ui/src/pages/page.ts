@@ -16,6 +16,8 @@ import {
 import { defaultChatCopy, explainChatError, type ChatCopy } from "../copy.js";
 
 export interface ChatPageOptions extends TimelineOptions {
+  /** Preserve legacy SDK behavior by default; docs host uses Enter to send. */
+  sendShortcut?: "enter" | "mod-enter";
   copy?: Partial<ChatCopy>;
   suggestions?: string[];
   onClose?: () => void;
@@ -238,7 +240,10 @@ export function createChatPage(
       }),
     );
   welcome.append(suggestions);
-  const timeline = createMessageTimeline(copy, options);
+  const timeline = createMessageTimeline(copy, {
+    ...options,
+    readImage: controller.transport.readImage?.bind(controller.transport),
+  });
   transcript.append(welcome, timeline.element);
   let following = true;
   let lastSession: string | undefined;
@@ -267,12 +272,24 @@ export function createChatPage(
     },
     { passive: true },
   );
+  const followContent = () => {
+    if (following) transcript.scrollTop = transcript.scrollHeight;
+  };
+  transcript.addEventListener("contentresize", followContent);
+  const contentSize = new ResizeObserver(followContent);
+  contentSize.observe(timeline.element);
   const composer = createComposer({
     copy,
+    sendShortcut: options.sendShortcut,
+    onModel: (id) => safe(() => controller.setModel(id)),
+    onSkill: (id) => safe(() => controller.setSkill(id)),
     onDraft: (value) => {
       localError = undefined;
       controller.setDraft(value);
     },
+    onImages: (files) => safe(() => controller.addImages(files)),
+    onRemoveImage: (id) => controller.removeImage(id),
+    onRetryImage: (id) => safe(() => controller.retryImage(id)),
     onSend: () => safe(() => controller.send()),
     onCancel: () => safe(() => controller.cancel()),
   });
@@ -432,8 +449,12 @@ export function createChatPage(
     focus: composer.focus,
     transcript,
     destroy: () => {
+      timeline.destroy();
+      composer.destroy();
       unsubscribe();
       resize.disconnect();
+      contentSize.disconnect();
+      transcript.removeEventListener("contentresize", followContent);
       root.remove();
     },
   };

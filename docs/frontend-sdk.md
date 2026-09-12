@@ -299,10 +299,19 @@ const theme = applyChatTheme(target, { mode: "light" });
 const message = createMessage({ sender: "agent", name: "助手", text: "你好" });
 root.append(message.element);
 // message.update({ sender: 'agent', name: '助手', text: '新的内容' });
+// message.destroy();
 // theme.destroy();
 ```
 
-完整组件示例见 [`examples/embedded/app.js`](../examples/embedded/app.js)。消息当前按纯文本展示，HTML 不会执行；首版没有 Markdown 富文本、图片/文件上传、语音或群聊。
+完整组件示例见 [`examples/embedded/app.js`](../examples/embedded/app.js)。助手消息支持安全 Markdown（段落、列表、表格、链接和可复制代码块），原始 HTML 不执行、Markdown 远程图片不自动加载。图片通过单独鉴权的附件接口处理；通用文件、语音和群聊尚未提供。
+
+### 接入图片
+
+服务端给 `createChatHandler` 设置 `images: true`，Engine 提供稳定的 `protocolKey`。Session 使用实际支持视觉的模型，同时配置 `capabilities.images: true` 与 `limits.maxImageInputTokens`。接口会公布选中助手和历史会话的视觉能力，文本模型的图片按钮不可用。
+
+现有 `createHttpChatTransport`、`mountChatPage` 和 `mountChatWidget` 自动提供选择、粘贴、拖拽、预览、移除与上传重试；允许纯图片消息。支持 PNG/JPEG/WebP/GIF，单张 5 MiB，每条 8 张。上传完成后才能发送，发送失败重试沿用附件引用与请求 ID。刷新从已鉴权接口恢复预览；切换会话、换账号和销毁时释放本地预览资源。未发送的图片草稿不持久化。
+
+自定义 Transport 可实现 `uploadImage(file, signal?)` 和 `readImage(id, signal?)`。低层时间线需要传 `createMessageTimeline(copy, { readImage })` 并在卸载时 `destroy()`；现成页面已代办。控制器提供 `addImages(files)`、`retryImage(id)`、`removeImage(id)`、`clearImages()`，状态在 `snapshot.images`。图片默认保留 30 天，失效后明确报错。完整服务端调用与历史工具图片见[图片场景](../examples/docs-site/content/images.md)和 [API 参考](../examples/docs-site/content/api.md)。
 
 ### 给每条回答附上资料链接
 
@@ -356,3 +365,43 @@ pnpm verify:chat-packages
 ```
 
 第一条还会执行真实 PostgreSQL 集成/恢复测试，需按上手指南准备专用测试库；第二条用确定性模型在 Chromium 验证聊天，不需要模型 Key。去掉 `--functional-only` 会输出本地截图。第三条会打包，再在独立临时项目安装并验证导出、声明和浏览器构建，需要下载依赖；仅生成安装包用 `pnpm pack:chat`。真实模型验证结果和安装包验证记录见[前端 SDK 验收记录](frontend-sdk-acceptance.md)。
+
+## 10. 在回答旁展示处理过程
+
+整页和悬浮入口都会读取 `ChatRun.process`，接入方无需订阅原始引擎事件。执行时默认展开；完成后收起为可展开摘要，正在查看的详情保持展开。过程显示真实发生的模型阶段、工具、Skill、知识/记忆、重试和等待，最终回答继续支持 Markdown。没有模型思考信号就不显示“思考”；私有思考内容不会传到浏览器。
+
+默认仅显示步骤名称、状态与时间。需要显示业务查询和结果摘要时，在服务器的 `ChatAssistantDefinition` 上增加 `describeProcess`：
+
+```ts
+// 放进已有 assistant 定义；只允许自己确认可公开的字段。
+describeProcess({ name, input, output }) {
+  if (name !== "inventory.read") return;
+  const record = (value: unknown): Record<string, unknown> =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown> : {};
+  const query = record(input), result = record(output);
+  return {
+    input: typeof query.sku === "string" ? `商品：${query.sku}` : undefined,
+    output: typeof result.available === "number" ? `可用库存：${result.available}` : undefined,
+  };
+}
+```
+
+不要将整个输入或结果 JSON 原样返回。这个回调运行在宿主，不能替代工具授权；抛错只会省略摘要。自定义界面可从 `@agent-runtime/chat-ui/components` 导入 `createRunProcess`，调用 `view.update(run)` 和 `view.destroy()`；旧服务缺少 process 时不显示该区域。
+
+用量缺失不是零，有费率时才显示估算费用。事件过期或超出有界回读范围时会提示过程不完整。等待输入、审批或结果核验只展示问题与状态，提交答案和审批仍由宿主接入 Engine 对应接口。架构依据、协议变化与验证见[聊天过程展示](chat-process-architecture.md)。
+
+## 11. 编辑输入、选择模型与 Skill
+
+输入区支持自动增高、就地展开（Esc 收起）、原生撤销/重做、空输入按 ↑ 找回上一条文字，以及中文输入法保护。挂载时可传 `sendShortcut: "enter"`，采用 Enter 发送、Shift+Enter 换行；缺省仍为 `"mod-enter"`，用户也可在输入设置中切换。文档站已显式使用 Enter 发送。
+
+在服务端 `assistant.config.models` 配置多个模型；可用 `assistant.modelDisplay[id].label` 提供公开名称。前端自动呈现目录及思考/图片标识，`chat.controller.setModel(id)` 选择下一轮模型。配置了 Skill 就会出现技能选择器，`chat.controller.setSkill(id)` 显式选择、无参数恢复自动，受理后复位。服务端只接受目录 ID，不接受浏览器传入地址、Key 或技能指令。
+
+模型和 Skill 随请求冻结，结果不明时重试不会换模型。刷新恢复最近一轮模型，轮询不覆盖正在编辑的下一条选择；新会话使用默认模型。旧会话仅提供已保存配置和宿主当前可用 ID 的交集，新增模型需要宿主显式更新该 Session。语音尚未接入，麦克风置灰并解释原因。API、配置示例、能力边界和验证见[输入编辑与模型选择](composer-alignment.md)。
+
+
+### 展示公开思考与流式正文
+
+模型 `thinking.expose: "content"`、Engine 策略 `thinkingDisplayRetention: "session"` 和宿主 `thinkingDisplay: "content"` 共同开启公开思考正文；默认仍只展示状态。`summary` 仅展示供应商摘要。完整配置、协议限制与 API 兼容见[回复展示改进](reply-display-alignment.md)。思考与回答分别呈现，不展示原生签名和遮蔽块；未返回正文时明确提示。
+
+整页和浮窗自动处理短时文字缓冲、稳定 Markdown 节点、历史立即呈现及减少动态效果。直接使用 `createMessage` 时，可传 `streaming: true`，卸载调用 `destroy()`。已完成的基础模型阶段收在执行详情，当前阶段、工具和可展示思考留在过程区。

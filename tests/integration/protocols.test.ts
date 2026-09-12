@@ -347,3 +347,118 @@ it.each([
     }
   },
 );
+
+it.each(["openai-compatible", "anthropic-compatible"] as const)(
+  "%s exposes only opt-in public thinking, never native signatures",
+  async (provider) => {
+    const s = await server(() =>
+      provider === "openai-compatible"
+        ? frame({
+            choices: [
+              {
+                delta: { reasoning_content: "合成公开思考" },
+                finish_reason: null,
+              },
+            ],
+          }) +
+          frame({
+            choices: [{ delta: { content: "结论" }, finish_reason: "stop" }],
+          }) +
+          "data: [DONE]\n\n"
+        : frame({
+            type: "message_start",
+            message: { usage: { input_tokens: 10, output_tokens: 0 } },
+          }) +
+          frame({
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "thinking", thinking: "" },
+          }) +
+          frame({
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "thinking_delta", thinking: "合成公开思考" },
+          }) +
+          frame({
+            type: "content_block_delta",
+            index: 0,
+            delta: {
+              type: "signature_delta",
+              signature: "NEVER_SHOW_SIGNATURE",
+            },
+          }) +
+          frame({ type: "content_block_stop", index: 0 }) +
+          frame({
+            type: "content_block_start",
+            index: 1,
+            content_block: { type: "text", text: "" },
+          }) +
+          frame({
+            type: "content_block_delta",
+            index: 1,
+            delta: { type: "text_delta", text: "结论" },
+          }) +
+          frame({ type: "content_block_stop", index: 1 }) +
+          frame({
+            type: "message_delta",
+            delta: { stop_reason: "end_turn" },
+            usage: { output_tokens: 10 },
+          }) +
+          frame({ type: "message_stop" }),
+    );
+    try {
+      for (const retention of ["none", "session"] as const) {
+        const e = await createAgentEngine({
+          store: new MemoryStore(),
+          principal: { tenantId: "display", subjectId: "test" },
+          authorize: async () => true,
+          secrets: { resolve: async () => "synthetic-test-key" },
+          protocolKey: { secretRef: "protocol" },
+          policy: {
+            allowedOrigins: [s.origin],
+            allowPrivateOrigins: [s.origin],
+            thinkingDisplayRetention: retention,
+          },
+        });
+        try {
+          const session = await e.createSession({
+            config: {
+              models: {
+                p: {
+                  provider,
+                  model: "test",
+                  baseURL: s.origin + "/v1",
+                  apiKey: { secretRef: "model" },
+                  limits: { contextWindowTokens: 32000, maxOutputTokens: 2048 },
+                  thinking: {
+                    enabled: provider === "anthropic-compatible",
+                    budgetTokens: 1024,
+                    expose: "content",
+                  },
+                },
+              },
+              routing: { primary: "p" },
+            },
+          });
+          const result = await session.run({ input: "test" });
+          expect(result.outputText).toBe("结论");
+          const events = (await e.listEvents(session.id)).events;
+          const thought = events.filter(
+            (event) => event.type === "content.thinking.delta",
+          );
+          if (retention === "none") expect(thought).toHaveLength(0);
+          else
+            expect(thought[0]?.data).toMatchObject({
+              text: "合成公开思考",
+              format: "content",
+            });
+          expect(JSON.stringify(events)).not.toContain("NEVER_SHOW_SIGNATURE");
+        } finally {
+          await e.close();
+        }
+      }
+    } finally {
+      await s.close();
+    }
+  },
+);

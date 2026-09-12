@@ -1,4 +1,9 @@
 import {
+  ImageRepository,
+  collectImageAttachments,
+  type UploadImageInput,
+} from "./images.js";
+import {
   retentionDeadline,
   redactRun,
   redactSession,
@@ -344,6 +349,56 @@ export class AgentEngine {
     if (!this.options.authorize)
       fail("ACCESS_DENIED", "Scoped identities require a host authorizer");
     return new AgentEngine(this.options, this.owner, clone(principal));
+  }
+  private images() {
+    return new ImageRepository({
+      principal: this.principal,
+      transaction: (fn) => this.transaction(fn),
+      authorize: (id, effect) => this.authorize("data", id, effect),
+      key: async () => {
+        if (!this.options.protocolKey)
+          fail("CONFIG_INVALID", "Image storage requires protocolKey");
+        return this.secret(this.options.protocolKey.secretRef);
+      },
+      now: () => this.clock.now(),
+      storage: this.options.imageStorage,
+    });
+  }
+  async uploadImage(input: UploadImageInput) {
+    this.ensureOpen();
+    return this.images().upload(input);
+  }
+  async readImage(id: string) {
+    this.ensureOpen();
+    return this.images().read(id);
+  }
+  async deleteImage(id: string) {
+    this.ensureOpen();
+    return this.images().remove(id);
+  }
+  private imageRequestSize(request: ModelRequest) {
+    const count = request.messages.reduce(
+      (sum, m) => sum + (m.images?.length ?? 0),
+      0,
+    );
+    if (
+      count &&
+      (!this.adapters[request.model.provider]?.capabilities.images ||
+        request.model.capabilities?.images !== true)
+    )
+      fail(
+        "MODEL_CAPABILITY_MISMATCH",
+        "The selected model does not declare image support",
+      );
+    if (count && !request.model.limits.maxImageInputTokens)
+      fail(
+        "BUDGET_UNVERIFIABLE",
+        "Image input requires limits.maxImageInputTokens per image",
+      );
+    return (
+      Buffer.byteLength(JSON.stringify(request)) +
+      count * (request.model.limits.maxImageInputTokens ?? 0)
+    );
   }
   async authorize(
     action: Parameters<NonNullable<EngineOptions["authorize"]>>[0]["action"],
@@ -852,6 +907,10 @@ export class AgentEngine {
       input.output === undefined ? undefined : parseOutput(input.output);
     const normalized = {
       input: clean,
+      ...(input.skill ? { skill: input.skill } : {}),
+      ...(input.attachments?.length
+        ? { attachments: json(input.attachments) }
+        : {}),
       context,
       ...(output ? { output } : {}),
       ...(input.overrides ? { overrides: json(input.overrides) } : {}),
@@ -861,6 +920,18 @@ export class AgentEngine {
     };
     const fingerprint = hash(normalized),
       requestId = input.requestId ?? randomUUID();
+    const refs = [
+      ...(input.attachments ?? []),
+      ...collectImageAttachments(clean),
+    ];
+    const prior = await this.transaction(async (tx) =>
+      (await tx.list<RunRecord>("runs")).find(
+        (r) => r.sessionId === sessionId && r.requestId === requestId,
+      ),
+    );
+    if (prior && prior.requestHash !== fingerprint)
+      fail("RUN_REQUEST_CONFLICT");
+    const images = prior ? [] : await this.images().freeze(refs);
     const run = await this.transaction(async (tx) => {
       const current = await this.sessionRecord(tx, sessionId);
       this.assertRetained(current);
@@ -954,6 +1025,11 @@ export class AgentEngine {
             conservativeCost(1, 1, m.pricing) === undefined)
         )
           fail("BUDGET_UNVERIFIABLE");
+      if (
+        input.skill &&
+        !config.skills.some((skill) => skill.id === input.skill)
+      )
+        fail("CAPABILITY_NOT_FOUND", "Skill is not declared in this Session");
       const r: RunRecord = {
         id: randomUUID(),
         sessionId,
@@ -971,6 +1047,8 @@ export class AgentEngine {
         config,
         dependencies: this.dependencies(config),
         input: clean,
+        ...(input.skill ? { requestedSkill: input.skill } : {}),
+        ...(refs.length ? { attachments: refs } : {}),
         context,
         metadata: json(input.metadata ?? {}) as JsonObject,
         ...(output ? { output } : {}),
@@ -982,6 +1060,16 @@ export class AgentEngine {
           {
             role: "user",
             content: typeof clean === "string" ? clean : JSON.stringify(clean),
+            ...(images.length
+              ? {
+                  images,
+                  dataRefs: images.map((image) => ({
+                    kind: "image" as const,
+                    id: image.attachmentId,
+                    expiresAt: image.expiresAt,
+                  })),
+                }
+              : {}),
           },
         ],
         historyPrefixLength: (current.contextView ?? current.history).length,
@@ -1009,6 +1097,12 @@ export class AgentEngine {
         capabilityInvocations: 0,
         activeMs: 0,
       };
+      this.imageRequestSize({
+        model: config.models[config.routing.primary]!,
+        messages: r.messages,
+        tools: [],
+        purpose: "decision",
+      });
       current.activeRun = r.id;
       await tx.put("sessions", sessionId, current);
       const accepted = await tx.append(sessionId, {
@@ -1352,6 +1446,16 @@ export class AgentEngine {
           return;
         }
         this.checkBudget(r);
+        if (r.requestedSkill && !r.initialSkillApplied) {
+          await scoped.activateSkill(
+            r,
+            r.requestedSkill,
+            hash([r.id, "initial-skill"]),
+            controller.signal,
+            true,
+          );
+          continue;
+        }
         if (!r.memoryReadDone) {
           await scoped.readInitialMemory(r, controller.signal);
           continue;
@@ -1734,6 +1838,83 @@ export class AgentEngine {
           ?.allowedTools.includes(t.name),
     );
   }
+  private async activateSkill(
+    r: RunRecord,
+    id: string,
+    operationId: string,
+    signal: AbortSignal,
+    initial = false,
+  ) {
+    const skill = r.config.skills.find((skill) => skill.id === id);
+    if (!skill) fail("CAPABILITY_NOT_FOUND");
+    await this.authorize("capability", "engine.skill.select");
+    await this.owner.mutate(r.id, async (run, tx) => {
+      await this.owner.event(tx, run, {
+        type: "skill.selected",
+        runId: run.id,
+        operationId,
+        data: { name: skill.id, capabilityKind: "skill" },
+      });
+    });
+    try {
+      let text = r.loadedSkills[skill.id] ?? skill.instructions;
+      if (!text && skill.source) {
+        const result = await this.invokeBinding(
+          skill.source.loaderKey,
+          { id: skill.id, version: skill.source.version },
+          r,
+          signal,
+          operationId,
+        );
+        if (
+          !result ||
+          typeof result !== "object" ||
+          Array.isArray(result) ||
+          result.version !== skill.source.version ||
+          typeof result.instructions !== "string" ||
+          !result.instructions ||
+          result.instructions.length > 64000
+        )
+          fail("TOOL_OUTPUT_INVALID");
+        text = result.instructions;
+        if (skill.source.hash && hash(text) !== skill.source.hash)
+          fail("RECOVERY_DEPENDENCY_MISMATCH");
+      }
+      await this.owner.mutate(r.id, async (run, tx) => {
+        if (run.cancelRequested) fail("RUN_CANCELLED");
+        run.activeSkill = skill.id;
+        run.loadedSkills[skill.id] = text!;
+        if (initial) run.initialSkillApplied = true;
+        await this.owner.event(tx, run, {
+          type: "skill.loaded",
+          runId: run.id,
+          operationId,
+          data: {
+            name: skill.id,
+            capabilityKind: "skill",
+            detail: {
+              hash: hash(text!),
+              ...(initial ? { source: "run-input" } : {}),
+            },
+          },
+        });
+      });
+    } catch (error) {
+      await this.owner.mutate(r.id, async (run, tx) =>
+        this.owner.event(tx, run, {
+          type: "skill.failed",
+          runId: run.id,
+          operationId,
+          data: {
+            name: skill.id,
+            capabilityKind: "skill",
+            detail: { code: asEngineError(error).code },
+          },
+        }),
+      );
+      throw error;
+    }
+  }
   private contracts(r: RunRecord): ModelRequest["tools"] {
     if (r.outputRepairs) return [];
     const tools = this.visibleTools(r).map((t) => ({
@@ -1885,7 +2066,7 @@ export class AgentEngine {
         hash: hash(request),
         contextEstimate: {
           method: "utf8-byte-upper-bound" as const,
-          total: Buffer.byteLength(JSON.stringify(request)),
+          total: this.imageRequestSize(request),
           messages: Buffer.byteLength(JSON.stringify(request.messages)),
           capabilities: Buffer.byteLength(JSON.stringify(request.tools)),
           reservedOutput: Math.max(
@@ -1915,7 +2096,7 @@ export class AgentEngine {
       await this.authorize("model", model.baseURL);
       await this.authorize("data", r.sessionId);
       await this.options.store.assertHeld();
-      const input = Buffer.byteLength(JSON.stringify(step!.request));
+      const input = this.imageRequestSize(step!.request);
       const output = model.limits.maxOutputTokens;
       const inputLimit = Math.min(
         r.config.context?.maxInputTokens ?? Infinity,
@@ -2007,6 +2188,20 @@ export class AgentEngine {
               protocolBinding(r, model, adapter),
             );
           }
+        this.imageRequestSize(request);
+        for (const message of request.messages)
+          for (const image of message.images ?? []) {
+            const stored = await abortable(
+              this.readImage(image.attachmentId),
+              combined,
+            );
+            if (
+              stored.sha256 !== image.sha256 ||
+              stored.mediaType !== image.mediaType
+            )
+              fail("IMAGE_UNAVAILABLE");
+            image.data = stored.data.toString("base64");
+          }
         const secret = await abortable(
           this.secret(model.apiKey.secretRef),
           combined,
@@ -2025,6 +2220,7 @@ export class AgentEngine {
             if (r.cancelRequested) fail("RUN_CANCELLED");
             r.usage.find((u) => u.id === attemptId)!.dispatchState = "sent";
           });
+          const observedPhases = new Set<string>();
           for await (const event of boundedStream(
             adapter.stream(request, {
               signal: combined,
@@ -2040,10 +2236,30 @@ export class AgentEngine {
             model.timeouts?.streamIdleMs ?? 30000,
           )) {
             if (event.type === "failed") throw event.error;
+            const phase =
+              event.type === "activity"
+                ? (event.kind ?? "working")
+                : event.type === "delta"
+                  ? event.kind
+                  : undefined;
+            if (phase && !observedPhases.has(phase)) {
+              observedPhases.add(phase);
+              await this.owner.mutate(id, async (run, tx) => {
+                await this.owner.event(tx, run, {
+                  type: "model.streaming",
+                  runId: id,
+                  stepId,
+                  attemptId,
+                  data: { phase },
+                });
+              });
+            }
             if (
               event.type === "delta" &&
               (event.kind === "text" ||
-                (model.thinking?.expose === "summary" &&
+                ((model.thinking?.expose === "content" ||
+                  (model.thinking?.expose === "summary" &&
+                    event.thinkingFormat !== "content")) &&
                   this.options.policy?.thinkingDisplayRetention !== "none"))
             )
               await this.owner.mutate(id, async (r, tx) => {
@@ -2068,7 +2284,12 @@ export class AgentEngine {
                   attemptId,
                   messageId,
                   blockId: event.blockId,
-                  data: { text: event.text },
+                  data: {
+                    text: event.text,
+                    ...(event.kind === "thinking"
+                      ? { format: event.thinkingFormat ?? "summary" }
+                      : {}),
+                  },
                 });
               });
             if (event.type === "usage")
@@ -2640,7 +2861,7 @@ export class AgentEngine {
         ) -
         256,
     );
-    const size = Buffer.byteLength(JSON.stringify(request));
+    const size = this.imageRequestSize(request);
     if (size <= limit * config.triggerAtRatio!) return false;
     if (r.compaction) {
       if (size > limit)
@@ -2925,70 +3146,23 @@ export class AgentEngine {
             );
             continue;
           }
-          let text = r.loadedSkills[skill.id] ?? skill.instructions;
-          if (!text && skill.source) {
-            try {
-              const result = await this.invokeBinding(
-                skill.source.loaderKey,
-                { id: skill.id, version: skill.source.version },
-                r,
-                signal,
-                hash([r.id, a.id]),
-              );
-              if (
-                typeof result !== "object" ||
-                !result ||
-                Array.isArray(result) ||
-                result.version !== skill.source.version ||
-                typeof result.instructions !== "string" ||
-                result.instructions.length > 64000
-              )
-                fail("TOOL_OUTPUT_INVALID");
-              text = result.instructions;
-              if (skill.source.hash && hash(text) !== skill.source.hash)
-                fail("RECOVERY_DEPENDENCY_MISMATCH");
-            } catch (error) {
-              const err = asEngineError(error);
-              if (
-                signal.aborted ||
-                [
-                  "BUDGET_EXCEEDED",
-                  "ACCESS_DENIED",
-                  "STORE_UNAVAILABLE",
-                  "STORE_LOCK_LOST",
-                ].includes(err.code)
-              )
-                throw error;
-              await this.owner.mutate(r.id, async (run, tx) =>
-                this.owner.event(tx, run, {
-                  type: "skill.failed",
-                  runId: run.id,
-                  operationId: hash([run.id, a.id]),
-                  data: {
-                    name: skill.id,
-                    capabilityKind: "skill",
-                    detail: { code: err.code },
-                  },
-                }),
-              );
-              await this.observation(r, a.id, { code: err.code }, i);
-              continue;
-            }
+          try {
+            await this.activateSkill(r, skill.id, hash([r.id, a.id]), signal);
+          } catch (error) {
+            const err = asEngineError(error);
+            if (
+              signal.aborted ||
+              [
+                "BUDGET_EXCEEDED",
+                "ACCESS_DENIED",
+                "STORE_UNAVAILABLE",
+                "STORE_LOCK_LOST",
+              ].includes(err.code)
+            )
+              throw error;
+            await this.observation(r, a.id, { code: err.code }, i);
+            continue;
           }
-          await this.owner.mutate(r.id, async (r, tx) => {
-            r.activeSkill = skill.id;
-            r.loadedSkills[skill.id] = text!;
-            await this.owner.event(tx, r, {
-              type: "skill.loaded",
-              runId: r.id,
-              operationId: hash([r.id, a.id]),
-              data: {
-                name: skill.id,
-                capabilityKind: "skill",
-                detail: { hash: hash(text!) },
-              },
-            });
-          });
         } else
           await this.owner.mutate(r.id, async (r, tx) => {
             delete r.activeSkill;
@@ -3646,6 +3820,10 @@ export class AgentEngine {
       ).values(),
     ];
     for (const ref of refs) {
+      if (ref.kind === "image") {
+        await this.images().metadata(ref.id, transaction);
+        continue;
+      }
       if (ref.expiresAt && !(Date.parse(ref.expiresAt) > this.clock.now()))
         fail("ACCESS_DENIED", "Context source expired");
       if (
@@ -3694,6 +3872,16 @@ export class AgentEngine {
     dataRefs?: ContextDataRef[],
     operationId?: string,
   ) {
+    const images = await this.images().freeze(collectImageAttachments(value));
+    if (images.length)
+      dataRefs = [
+        ...(dataRefs ?? []),
+        ...images.map((image) => ({
+          kind: "image" as const,
+          id: image.attachmentId,
+          expiresAt: image.expiresAt,
+        })),
+      ];
     await this.owner.mutate(r.id, async (r) => {
       if (!(
         value &&
@@ -3706,6 +3894,7 @@ export class AgentEngine {
         role: "tool",
         callId,
         content: JSON.stringify(value),
+        ...(images.length ? { images } : {}),
         ...(dataRefs?.length ? { dataRefs } : {}),
         ...(operationId ? { operationId } : {}),
       });
@@ -4184,6 +4373,7 @@ export class AgentEngine {
   }
   async sweepExpiredData() {
     if (this.root) fail("ACCESS_DENIED");
+    await this.images().sweep(!!this.options.authorize);
     const now = this.clock.now();
     const expired = await this.transaction(async (tx) => {
       const sessions = await tx.list<SessionRecord>("sessions"),
@@ -4669,6 +4859,7 @@ export class AgentEngine {
           ),
           error: o.error,
         })),
+        observedAt: this.clock.now(),
         snapshotSequence: await tx.head(id),
       };
     });
