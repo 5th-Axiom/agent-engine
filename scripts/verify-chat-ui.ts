@@ -304,6 +304,38 @@ try {
     .getByRole("button", { name: "回到最新消息", exact: true })
     .click();
   await waitDone();
+  // A settled transcript must expose navigation immediately, without another poll update.
+  await widget.locator(".ae-transcript").evaluate((el) => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll"));
+  });
+  assert.equal(
+    await widget
+      .getByRole("button", { name: "回到最新消息", exact: true })
+      .isVisible(),
+    true,
+  );
+  await send("阅读历史后继续提问");
+  await waitDone();
+  assert.ok(
+    await widget.locator(".ae-transcript").evaluate((el) => {
+      const message = el.querySelector(".ae-turn:last-child")!;
+      const viewport = el.getBoundingClientRect();
+      const rect = message.getBoundingClientRect();
+      return (
+        rect.top < viewport.bottom &&
+        rect.bottom > viewport.top &&
+        el.scrollHeight - el.scrollTop - el.clientHeight < 2
+      );
+    }),
+    "sending from history must reveal the new turn and follow its reply",
+  );
+  assert.equal(
+    await widget
+      .getByRole("button", { name: "回到最新消息", exact: true })
+      .isVisible(),
+    false,
+  );
   await send("取消验证");
   await widget.getByText("等待取消的草稿", { exact: true }).waitFor();
   await widget.getByRole("button", { name: "停止", exact: true }).click();

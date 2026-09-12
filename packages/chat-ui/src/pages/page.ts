@@ -331,7 +331,7 @@ export function createChatPage(
           transcript.scrollTop -
           transcript.clientHeight <
         64;
-      if (following) jump.hidden = true;
+      jump.hidden = following || !timeline.element.childElementCount;
     },
     { passive: true },
   );
@@ -407,7 +407,17 @@ export function createChatPage(
     }
   });
   let assistants = "";
+  let wasSending = false;
   const unsubscribe = controller.subscribe((state: ChatState) => {
+    // Sending expresses a new intent to follow this turn, even after reading history.
+    // Passive polling and streamed text must still preserve an explicit scroll back.
+    const startedSending = state.sending && !wasSending;
+    wasSending = state.sending;
+    if (startedSending) {
+      following = true;
+      jump.hidden = true;
+      followContent();
+    }
     connection.textContent =
       state.connection === "ready"
         ? "已连接"
@@ -481,6 +491,7 @@ export function createChatPage(
       }
     }
     composer.update(state);
+    if (startedSending) followContent();
     const visibleError = state.error ?? localError;
     feedback.hidden = !visibleError;
     feedbackText.textContent = visibleError
