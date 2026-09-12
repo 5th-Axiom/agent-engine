@@ -8,6 +8,7 @@ import {
   type ChatSession,
   type ChatSessionSummary,
   type ChatTransport,
+  type ChatInputResolution,
 } from "./protocol.js";
 
 export interface DraftImage {
@@ -20,6 +21,7 @@ export interface DraftImage {
 }
 export interface ChatState {
   contextRef?: string;
+  preparingSession?: boolean;
   modelId?: string;
   skillId?: string;
   images?: DraftImage[];
@@ -77,6 +79,7 @@ interface Pending {
 }
 export const chatBusy = (state: ChatState) =>
   state.sending ||
+  state.preparingSession === true ||
   !!state.awaitingRunId ||
   !!state.session?.runs.some(isActiveRun);
 
@@ -116,6 +119,7 @@ export class ChatController {
   private generation = 0;
   private pending?: Pending;
   private sessionId?: string;
+  private preparationId?: string;
   private disposed = false;
   private started = false;
   private refreshNumber = 0;
@@ -295,7 +299,8 @@ export class ChatController {
   }
   setDraft(value: string) {
     this.assertLive();
-    if (this.state.sending || this.pending) return;
+    if (this.state.sending || this.state.preparingSession || this.pending)
+      return;
     this.state.draft = value.slice(0, 8000);
     this.emit();
   }
@@ -309,7 +314,7 @@ export class ChatController {
   }
   setModel(id: string) {
     this.assertLive();
-    if (this.state.sending || this.pending)
+    if (this.state.sending || this.state.preparingSession || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
     const model = composerCatalog(this.state).models?.find(
       (model) => model.id === id,
@@ -323,7 +328,7 @@ export class ChatController {
   }
   setSkill(id?: string) {
     this.assertLive();
-    if (this.state.sending || this.pending)
+    if (this.state.sending || this.state.preparingSession || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
     if (
       id &&
@@ -335,13 +340,14 @@ export class ChatController {
   }
   newSession(assistantId = this.state.assistantId) {
     this.assertLive();
-    if (this.state.sending || this.pending)
+    if (this.state.sending || this.state.preparingSession || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
     if (!this.state.config?.assistants.some((a) => a.id === assistantId))
       throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE");
     ++this.generation;
     this.viewRequest?.abort();
     this.sessionId = undefined;
+    this.preparationId = undefined;
     this.options.memory?.write(null);
     this.clearImages();
     this.state = {
@@ -358,9 +364,46 @@ export class ChatController {
     this.emit();
     this.schedule();
   }
+  /** Resolve the current request and refresh authoritative Run state. */
+  async resolveInput(input: ChatInputResolution): Promise<void> {
+    this.assertLive();
+    if (!this.sessionId || !this.transport.resolveInput)
+      throw new ChatError("CHAT_INTERACTION_UNAVAILABLE");
+    await this.transport.resolveInput(
+      this.sessionId,
+      input,
+      this.lifetime.signal,
+    );
+    await this.refresh();
+  }
+  /** Materialize an empty session for configuration without sending a message. */
+  async ensureSession(): Promise<string> {
+    this.assertLive();
+    if (this.sessionId) return this.sessionId;
+    if (this.state.sending || this.state.preparingSession || this.pending)
+      throw new ChatError("CHAT_SEND_PENDING");
+    if (!this.state.assistantId) throw new ChatError("CHAT_NOT_READY");
+    this.state.preparingSession = true;
+    this.emit();
+    try {
+      this.preparationId ??= createChatId();
+      const created = await this.transport.createSession(
+        { requestId: this.preparationId, assistantId: this.state.assistantId },
+        this.lifetime.signal,
+      );
+      this.assertLive();
+      this.sessionId = created.id;
+      this.options.memory?.write(created.id);
+      await this.refresh();
+      return created.id;
+    } finally {
+      this.state.preparingSession = false;
+      this.emit();
+    }
+  }
   async selectSession(id: string) {
     this.assertLive();
-    if (this.state.sending || this.pending)
+    if (this.state.sending || this.state.preparingSession || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
     ++this.generation;
     this.viewRequest?.abort();
@@ -400,7 +443,7 @@ export class ChatController {
         ? { attachments: this.state.images.map((image) => image.attachment!) }
         : {}),
       assistantId: this.state.assistantId,
-      createId: createChatId(),
+      createId: this.preparationId ?? createChatId(),
       requestId: createChatId(),
       sessionId: this.sessionId,
     };
@@ -525,6 +568,22 @@ export class ChatController {
           session.snapshotSequence < this.state.session.snapshotSequence
         )
           return;
+        const previous = this.state.session;
+        if (
+          previous &&
+          previous.defaultModelId !== session.defaultModelId &&
+          this.state.modelId === previous?.defaultModelId &&
+          !this.pending &&
+          !this.state.images?.length
+        )
+          this.state.modelId = session.defaultModelId;
+        if (
+          !this.pending &&
+          this.state.skillId &&
+          session.skills &&
+          !session.skills.some((s) => s.id === this.state.skillId)
+        )
+          this.state.skillId = undefined;
         this.state.session = session;
         this.state.assistantId = session.assistantId;
         this.state.modelId ??=

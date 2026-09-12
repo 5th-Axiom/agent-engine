@@ -1,10 +1,16 @@
 import {
   ChatController,
+  ChatError,
   errorCode,
   createChatId,
   type ChatState,
 } from "@agent-runtime/chat-core";
-import { createButton, createStatus, element } from "../atoms/index.js";
+import {
+  createButton,
+  createStatus,
+  createIcon,
+  element,
+} from "../atoms/index.js";
 import {
   createComposer,
   createMessageTimeline,
@@ -18,6 +24,8 @@ import { defaultChatCopy, explainChatError, type ChatCopy } from "../copy.js";
 export interface ChatPageOptions extends TimelineOptions {
   /** Host-owned scope controls, placed below the header. The host owns listeners and cleanup. */
   contextBar?: HTMLElement;
+  /** Same-origin settings webpage; opens a separate tab for the current session. */
+  settingsUrl?: string;
   /** Preserve legacy SDK behavior by default; docs host uses Enter to send. */
   sendShortcut?: "enter" | "mod-enter";
   copy?: Partial<ChatCopy>;
@@ -31,6 +39,15 @@ export function createChatPage(
 ) {
   const copy = { ...defaultChatCopy, ...options.copy };
   const root = element("section", "ae-page");
+  const settingsRefresh = () => {
+    if (
+      options.settingsUrl &&
+      !controller.snapshot.sending &&
+      !controller.snapshot.preparingSession
+    )
+      void controller.refresh();
+  };
+  window.addEventListener("focus", settingsRefresh);
   root.setAttribute("aria-label", copy.title);
   const main = element("div", "ae-chat-main");
   const sidebar = element("aside", "ae-sidebar");
@@ -219,7 +236,50 @@ export function createChatPage(
   quickNew.hidden = true;
   sidebar.insertBefore(newButton, history.element);
   sidebar.insertBefore(assistantLabel, history.element);
-  toolbar.append(quickNew, infoButton, toolsButton);
+  const settingsLink = element(
+    "a",
+    "ae-button ae-button-quiet ae-settings-link",
+  );
+  settingsLink.append(createIcon("settings"), element("span", "", "配置"));
+  settingsLink.target = "_blank";
+  settingsLink.rel = "noopener noreferrer";
+  settingsLink.setAttribute("aria-label", "会话配置（新标签页）");
+  const settingsUrl = (sessionId?: string) => {
+    const url = new URL(options.settingsUrl!, location.href);
+    if (
+      url.origin !== location.origin ||
+      !/^https?:$/.test(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      throw new ChatError("CHAT_INVALID_SETTINGS_URL");
+    if (sessionId) url.searchParams.set("session", sessionId);
+    return url.href;
+  };
+  if (options.settingsUrl) settingsUrl();
+  settingsLink.addEventListener("click", (event) => {
+    if (controller.snapshot.session) return;
+    event.preventDefault();
+    if (controller.snapshot.preparingSession) return;
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      safe(() => {
+        throw new ChatError("CHAT_POPUP_BLOCKED");
+      });
+      return;
+    }
+    tab.opener = null;
+    tab.document.title = "正在打开会话配置";
+    safe(async () => {
+      try {
+        tab.location.href = settingsUrl(await controller.ensureSession());
+      } catch (error) {
+        tab.close();
+        throw error;
+      }
+    });
+  });
+  toolbar.append(quickNew, infoButton, toolsButton, settingsLink);
   // Keep frequent actions in the header; details still open in the main body.
   header.insertBefore(toolbar, header.children[2] ?? null);
   const transcript = element("div", "ae-transcript");
@@ -243,6 +303,7 @@ export function createChatPage(
     );
   welcome.append(suggestions);
   const timeline = createMessageTimeline(copy, {
+    resolveInput: (input) => controller.resolveInput(input),
     ...options,
     readImage: controller.transport.readImage?.bind(controller.transport),
   });
@@ -376,6 +437,19 @@ export function createChatPage(
       state.sending || state.pending,
       state.config?.assistants ?? [],
     );
+    settingsLink.hidden =
+      !options.settingsUrl ||
+      !(
+        state.session?.settingsEnabled ??
+        state.config?.assistants.find((a) => a.id === state.assistantId)
+          ?.settingsEnabled
+      );
+    if (!settingsLink.hidden)
+      settingsLink.href = settingsUrl(state.session?.id);
+    settingsLink.setAttribute(
+      "aria-disabled",
+      String(state.preparingSession === true),
+    );
     const currentAssistant = state.config?.assistants.find(
       (a) => a.id === state.assistantId,
     );
@@ -453,6 +527,7 @@ export function createChatPage(
     focus: composer.focus,
     transcript,
     destroy: () => {
+      window.removeEventListener("focus", settingsRefresh);
       timeline.destroy();
       composer.destroy();
       unsubscribe();

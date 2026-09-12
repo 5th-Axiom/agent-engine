@@ -14,6 +14,11 @@ import {
   LocalModelConfigError,
 } from "../../scripts/lib/local-model-config.js";
 import { loadArticles } from "./content.js";
+import {
+  createDocsCapabilities,
+  type DocsCapabilities,
+} from "./capabilities.js";
+import { startDocsRemoteCapabilities } from "./remote-capabilities.js";
 import { docsAssistant, docsBinding, startDocsSite } from "./server.js";
 import {
   createKnowledge,
@@ -27,6 +32,9 @@ const readOnly = process.argv.includes("--read-only");
 let engine: Awaited<ReturnType<typeof createAgentEngine>> | undefined;
 let store: PostgresStore | undefined;
 let host: Awaited<ReturnType<typeof startDocsSite>> | undefined;
+let remote: Awaited<ReturnType<typeof startDocsRemoteCapabilities>> | undefined;
+let capabilities: DocsCapabilities | undefined;
+let memoryCleanup: ReturnType<typeof setInterval> | undefined;
 try {
   const port = Number(process.env.AGENT_DOCS_PORT ?? 4320);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
@@ -81,6 +89,17 @@ try {
       throw new Error("DOCS_DATABASE_MUST_BE_SEPARATE");
     store = PostgresStore.fromConnectionString(databaseUrl);
     await store.migrate();
+    capabilities = createDocsCapabilities({
+      articles,
+      store,
+      memoryKey: Buffer.from(
+        await local.secrets.resolve(local.protocolKey.secretRef),
+      ),
+    });
+    remote = await startDocsRemoteCapabilities(
+      articles,
+      Number(process.env.AGENT_DOCS_CAPABILITY_PORT ?? 4321),
+    );
     cookieSecret = createHmac(
       "sha256",
       await local.secrets.resolve(local.protocolKey.secretRef),
@@ -107,8 +126,10 @@ try {
         if (
           principal.tenantId !== "docs-site" ||
           (sideEffect === "write" &&
-            !(action === "data" && resource === "image:upload")) ||
-          action === "resolve"
+            !(action === "data" && resource === "image:upload") &&
+            !["engine.memory.write.preferences", "docs.memory.v1"].includes(
+              resource,
+            ))
         )
           return false;
         if (action === "secret") return secretRefs.has(resource);
@@ -119,21 +140,37 @@ try {
             "docs.search",
             "docs.search.v1",
             ...knowledgeTools.flatMap((t) => [t.name, t.name + ".v1"]),
+            ...Object.keys(capabilities!.bindings),
+            "engine.skill.select",
+            "engine.skill.exit",
+            "knowledge:manual",
+            "memory:preferences",
+            "engine.knowledge.manual",
+            "engine.memory.read.preferences",
+            "engine.memory.write.preferences",
+            "engine.question",
+            "engine.form.integration",
+            "docs.httpCatalog",
+            "docs.mcpSearch",
           ].includes(resource);
         return true;
       },
       bindings: {
         "docs.search.v1": docsBinding(articles),
         ...knowledge.bindings,
+        ...capabilities.bindings,
       },
+      remoteContracts: remote.contracts,
       limits: { maxConcurrentModelRequests: 2, maxAcceptedRuns: 8 },
       policy: {
         allowedOrigins: [
+          remote.origin,
           ...new Set(
             profiles.map((profile) => new URL(profile.model.baseURL).origin),
           ),
         ],
         allowPrivateOrigins: [
+          remote.origin,
           ...new Set(
             profiles
               .filter((profile) => profile.allowPrivateNetwork)
@@ -145,10 +182,18 @@ try {
           origin: new URL(profile.model.baseURL).origin,
           credentialScopes: [profile.model.apiKey.secretRef],
         })),
-        allowedExecutorTypes: ["binding"],
+        allowedExecutorTypes: ["binding", "http", "mcp"],
         thinkingDisplayRetention: "session",
       },
     });
+    // Store transactions require the fencing lock acquired by Engine startup.
+    await capabilities.sweepExpired();
+    memoryCleanup = setInterval(() => {
+      void capabilities!.sweepExpired().catch(() => {
+        console.error("DOCS_MEMORY_CLEANUP_FAILED");
+      });
+    }, 60000);
+    memoryCleanup.unref();
     const output = Number(process.env.AGENT_DOCS_MAX_OUTPUT_TOKENS ?? 1536);
     if (
       !Number.isInteger(output) ||
@@ -165,6 +210,18 @@ try {
       knowledge,
     );
     const assistantConfig = parseConfig(assistant.config);
+    assistantConfig.tools.push(...remote.tools);
+    assistant.toolDisplay = {
+      ...assistant.toolDisplay,
+      "docs.httpCatalog": {
+        label: "HTTP 文章目录",
+        description: "通过本地 HTTP 服务读取公开文档目录。",
+      },
+      "docs.mcpSearch": {
+        label: "MCP 手册搜索",
+        description: "通过已连接的 MCP 服务检索公开手册。",
+      },
+    };
     assistant.thinkingDisplay = "content";
     assistant.modelDisplay = { primary: { label: local.profileName } };
     for (const profile of profiles) {
@@ -209,6 +266,7 @@ try {
     engine,
     assistant,
     cookieSecret,
+    capabilities,
     port,
   });
   console.log(
@@ -218,7 +276,8 @@ try {
   const close = async () => {
     if (closing) return;
     closing = true;
-    await closeResources(host, engine ?? store);
+    clearInterval(memoryCleanup);
+    await closeResources(host, engine ?? store, remote);
   };
   process.once("SIGINT", () => {
     void close().catch(() => {
@@ -240,6 +299,7 @@ try {
   console.error(
     `${code}：请检查模型配置、独立数据库和端口。仅阅读可使用：pnpm exec tsx examples/docs-site/start.ts --read-only`,
   );
-  await closeResources(host, engine ?? store).catch(() => {});
+  clearInterval(memoryCleanup);
+  await closeResources(host, engine ?? store, remote).catch(() => {});
   process.exitCode = 1;
 }

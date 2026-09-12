@@ -284,3 +284,24 @@
     display: none;
   }
 }
+
+.settings-mode {
+  height: 100dvh;
+  background: var(--canvas);
+  overflow: hidden;
+}
+.settings-mode #chat-settings {
+  height: calc(100dvh - var(--header));
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.settings-loading {
+  padding: 40px 24px;
+  margin: auto;
+  max-width: 1080px;
+}
+
+.settings-links { display:flex; gap:24px; flex-wrap:wrap; max-width:1040px; margin:20px auto 0; padding:0 24px; font-size:14px; }
+.settings-links a { min-height:44px; display:flex; align-items:center; }

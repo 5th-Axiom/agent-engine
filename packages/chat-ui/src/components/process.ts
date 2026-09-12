@@ -4,6 +4,8 @@ import {
   type ChatProcessEntry,
 } from "@agent-runtime/chat-core";
 import { createIcon, element, type ChatIcon } from "../atoms/index.js";
+import { createPendingInput } from "./pending-input.js";
+import type { ChatInputResolution } from "@agent-runtime/chat-core";
 import { createStreamingMarkdown } from "./streaming.js";
 
 const stateLabels = {
@@ -33,7 +35,9 @@ const duration = (ms: number) =>
     : ms < 60000
       ? `${Math.floor(ms / 1000)} 秒`
       : `${Math.floor(ms / 60000)} 分 ${Math.floor((ms % 60000) / 1000)} 秒`;
-export function createRunProcess() {
+export function createRunProcess(
+  resolveInput?: (input: ChatInputResolution) => Promise<void>,
+) {
   const root = element("section", "ae-process");
   root.setAttribute("aria-label", "本轮处理过程");
   const disclosure = element("details", "ae-process-disclosure");
@@ -43,8 +47,9 @@ export function createRunProcess() {
   header.append(heading, timing, createIcon("down"));
   const list = element("ol", "ae-process-list");
   const notice = element("p", "ae-process-notice");
-  const pending = element("div", "ae-process-pending");
-  pending.setAttribute("role", "status");
+  const pendingView = createPendingInput(resolveInput);
+  const pending = pendingView.element;
+  pending.classList.add("ae-process-pending");
   const footer = element("p", "ae-process-usage");
   disclosure.append(header, list, notice);
   root.append(disclosure, pending, footer);
@@ -89,6 +94,7 @@ export function createRunProcess() {
   return {
     element: root,
     destroy() {
+      pendingView.destroy();
       if (timer) clearInterval(timer);
       visible.disconnect();
       document.removeEventListener("visibilitychange", visibility);
@@ -239,23 +245,7 @@ export function createRunProcess() {
       notice.hidden = run.process.complete;
       notice.textContent =
         "较早的过程记录已超出回读或保留范围；这里展示当前可用记录。";
-      pending.hidden = !run.process.pending;
-      if (run.process.pending) {
-        const p = run.process.pending;
-        pending.replaceChildren(
-          element(
-            "strong",
-            "",
-            p.kind === "permission" ? "等待确认" : "等待补充信息",
-          ),
-          element("p", "", p.question),
-          element(
-            "p",
-            "ae-process-notice",
-            "由接入方处理后继续；也可以停止本轮运行。",
-          ),
-        );
-      }
+      pendingView.update(run.process.pending);
       const costs = run.usage.costs?.filter(
         (cost) => cost.amount !== "0" || cost.complete,
       );

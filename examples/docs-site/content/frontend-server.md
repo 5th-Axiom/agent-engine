@@ -35,6 +35,16 @@ toolDisplay: {
 
 将 inventory.lookup 换成 config.tools 中实际工具的 name。这个字段只提供公开文案，不会注册工具或扩大权限；未配置的工具不会因此出现在清单。label 最多 100 字符，description 最多 500 字符。原始模型工具说明、参数 Schema、执行器和密钥配置不会自动展示给用户。
 
+### 开放会话配置
+
+在助手对象（与 `config` 同级）增加 `settings: true`，再按[前端配置页接入](/docs/frontend-customize/#在独立网页配置当前会话)提供网页和入口。未声明时默认关闭。
+
+网页通过 GET/POST `/api/agent-chat/sessions/:id/settings` 读取和保存。前端只提交 `ifVersion` 与能力选择，后端从助手配置构造下一份 Session 配置，再调用已有的 `replaceConfig`；仍需用户拥有该会话及更新配置权限。未声明能力、任意配置字段及权限提升被拒绝。
+
+工具使用 `toolDisplay`；Skill、知识库、记忆存储可分别通过 `skillDisplay[id]`、`knowledgeDisplay[id]`、`memoryDisplay[id]` 提供公开 label/description。不要放入密钥、内部地址或模型指令。配置页不会注册新工具或安装 Skill。
+
+如果你的宿主主动升级旧会话配置，在已有的版本比较更新之前调用 `restoreChatPreferences(nextHostConfig, previousSessionConfig)`（由 chat-server 导出），保留用户选择。新增能力默认不被自动启用，已撤销能力从选择中删除。
+
 ## 2. 接入现有服务启动代码
 
 下面是宿主集成片段，verifyExistingLogin 和 authorizeAgentRequest 来自**你自己的登录与权限模块**，需替换为实际实现；它们不是 SDK 内置方法。
@@ -94,7 +104,7 @@ getBusinessAccessToken 由你的登录模块提供。它返回业务令牌，不
 
 - 前后端的接口前缀一致，浏览器能取得助手列表并完成一次回答。
 - 未登录请求被拒绝；切换账号后不能看到上一账号的会话。
-- 浏览器提交助手 ID、文本和可选的已授权图片引用，不能修改模型、工具或用户身份。
+- 浏览器提交助手 ID、文本、可选的已授权图片引用和已声明模型/Skill ID。仅在开放配置时保存受限能力选择；不能修改模型地址、凭据、执行器或用户身份。
 - 重启后保持 namespace、数据库及 PROTOCOL_KEY 稳定，以便恢复原有会话。
 
 模型、工具及系统说明在后端的 config 中配置。前端 SDK 自动展示聊天状态和常见错误，更多界面行为见[主题、组件与对话管理](/docs/frontend-customize/)。

@@ -6,6 +6,19 @@ export interface ChatAssistantDefinition extends Omit<
   "tools" | "models" | "skills" | "defaultModelId"
 > {
   config: unknown;
+  /** Explicitly allow session-scoped settings. Credentials and permission ceilings are never editable. */
+  settings?: boolean;
+  /** Explicit host opt-in to submit questions, forms and permission decisions. */
+  interaction?: boolean;
+  /** Public pending-input copy only; original capability arguments are never forwarded automatically. */
+  describePending?: (pending: {
+    kind: "permission" | "question" | "structured_input";
+    question: string;
+    input?: JsonValue;
+  }) => { question: string; details?: string };
+  skillDisplay?: Record<string, { label?: string; description?: string }>;
+  knowledgeDisplay?: Record<string, { label?: string; description?: string }>;
+  memoryDisplay?: Record<string, { label?: string }>;
   /** Labels only. Actual model availability comes from the configured allowlist. */
   modelDisplay?: Record<string, { label: string }>;
   /** Explicit host permission to show provider summaries or public thinking content; default none. Native/signature blocks are never displayed. */

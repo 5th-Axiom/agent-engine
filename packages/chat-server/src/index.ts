@@ -1,3 +1,8 @@
+import {
+  chatAssistantConfig,
+  applyChatPreferences,
+  readChatSettings,
+} from "./settings.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { ProcessJournal } from "./process.js";
 import { z } from "zod";
@@ -15,6 +20,7 @@ import {
   createSessionSchema,
   sendMessageSchema,
   cancelRunSchema,
+  updateChatSettingsSchema,
 } from "@agent-runtime/chat-core";
 import {
   assistantFor,
@@ -23,8 +29,10 @@ import {
   publicTools,
   publicComposer,
 } from "./projection.js";
+import { resolveChatInputSchema } from "@agent-runtime/chat-core";
 import type { ChatHandlerOptions } from "./types.js";
 export * from "./types.js";
+export { chatAssistantConfig, restoreChatPreferences } from "./settings.js";
 export { ChatError } from "@agent-runtime/chat-core";
 
 function json(res: ServerResponse, status: number, value: unknown) {
@@ -121,6 +129,7 @@ export function createChatHandler(options: ChatHandlerOptions) {
       const publicAssistants = context.assistants.map((a) =>
         assistantSchema.parse({
           ...a,
+          ...(a.settings ? { settingsEnabled: true } : {}),
           ...publicComposer(parseConfig(a.config), a),
           supportsImages:
             parseConfig(a.config).models[parseConfig(a.config).routing.primary]
@@ -187,16 +196,7 @@ export function createChatHandler(options: ChatHandlerOptions) {
           (a) => a.id === data.assistantId,
         );
         if (!assistant) throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE", 403);
-        const config = parseConfig(assistant.config);
-        for (const model of Object.values(config.models))
-          if (model.thinking) {
-            if (!assistant.thinkingDisplay) model.thinking.expose = "none";
-            else if (
-              assistant.thinkingDisplay === "summary" &&
-              model.thinking.expose === "content"
-            )
-              model.thinking.expose = "summary";
-          }
+        const config = chatAssistantConfig(assistant);
         config.metadata = {
           ...config.metadata,
           agentChat: {
@@ -211,14 +211,56 @@ export function createChatHandler(options: ChatHandlerOptions) {
         json(res, 201, { id: session.id });
         return true;
       }
-      const match = /^\/sessions\/([a-f0-9-]{36})(?:\/(runs|cancel))?$/i.exec(
-        route,
-      );
+      const match =
+        /^\/sessions\/([a-f0-9-]{36})(?:\/(runs|cancel|settings|input))?$/i.exec(
+          route,
+        );
       if (!match || !z.uuid().safeParse(match[1]).success)
         throw new ChatError("CHAT_NOT_FOUND", 404);
       const id = match[1]!;
       const record = await context.engine.readSession(id);
       const assistant = assistantFor(record, context, options.namespace);
+      if (match[2] === "input") {
+        if (req.method !== "POST")
+          throw new ChatError("CHAT_METHOD_NOT_ALLOWED", 405);
+        if (!assistant.interaction)
+          throw new ChatError("CHAT_INTERACTION_UNAVAILABLE", 403);
+        const { id: pendingId, ...value } = resolveChatInputSchema.parse(
+          await body(req),
+        );
+        await (
+          await context.engine.loadSession(id)
+        ).resolveInput(pendingId, value);
+        json(res, 200, { accepted: true });
+        return true;
+      }
+      if (match[2] === "settings") {
+        const current = readChatSettings(record, assistant);
+        if (req.method === "GET") {
+          json(res, 200, current);
+          return true;
+        }
+        if (!current.editable) throw new ChatError("SESSION_ARCHIVED", 409);
+        const input = updateChatSettingsSchema.parse(await body(req));
+        const next = applyChatPreferences(
+          chatAssistantConfig(assistant),
+          input.preferences,
+        );
+        next.metadata = {
+          ...record.config.metadata,
+          ...next.metadata,
+          agentChat: record.config.metadata!.agentChat!,
+        };
+        await (
+          await context.engine.loadSession(id)
+        ).replaceConfig({ ifVersion: input.ifVersion, config: next });
+        json(
+          res,
+          200,
+          readChatSettings(await context.engine.readSession(id), assistant),
+        );
+        return true;
+      }
       if (!match[2] && req.method === "GET") {
         const debug = options.debugPath?.(id);
         if (
@@ -257,7 +299,6 @@ export function createChatHandler(options: ChatHandlerOptions) {
             requestId: input.requestId,
             ...(contextRef ? { contextRef } : {}),
           });
-
           const handle = await session.startRun({
             ...message,
             ...(runContext ? { context: runContext } : {}),

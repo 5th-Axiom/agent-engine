@@ -24,7 +24,7 @@ system 跟随系统深浅变化。默认桌面浮窗为 420 × 680，受视口�
 
 ## 对话列表、当前会话与工具
 
-聊天区域左侧是对话列表，点击条目即可继续之前的聊天；蓝色背景表示当前会话。“新对话”会打开空白聊天，第一条消息发送后才创建会话。
+聊天区域左侧是对话列表，点击条目即可继续之前的聊天；蓝色背景表示当前会话。“新对话”会打开空白聊天，发送首条消息或首次打开配置时创建会话。
 
 聊天容器宽度达到 760px 时默认显示左栏；较窄时点击标题左边的“对话列表”按钮展开，选中会话后自动收起。希望桌面浮窗常驻左栏，可将上面的 panelWidth 改为 880；本文档站采用 440px 宽的右侧助手栏（窄屏全屏）。实际尺寸仍受视口限制。
 
@@ -36,6 +36,29 @@ system 跟随系统深浅变化。默认桌面浮窗为 420 × 680，受视口�
 这些入口是页面层的通用能力，mountChatPage 和 mountChatWidget 都自带。打开面板不会发送消息或调用工具；点击关闭或按 Esc 返回聊天，输入草稿会保留。
 
 工具清单由 chat-server 从该会话的配置生成。如果本轮回答仍使用旧配置，面板会另列“本轮回答的工具”。旧版或自定义服务未返回工具清单时显示“当前服务未提供工具清单”，不会误报为零个工具。名称和说明可由后端助手的 toolDisplay 提供，见[连接后端与用户登录](/docs/frontend-server/)。
+
+## 在独立网页配置当前会话
+
+后端助手显式配置 `settings: true` 后，在已有的 IM 挂载选项中加入 `settingsUrl: "/agent/settings/"`，顶部会出现「配置」。点击在新标签页打开该同源页面，并自动附加当前会话的 `session` 参数。首次打开会创建空会话，不调用模型，聊天草稿保留。
+
+在你的网站提供 `/agent/settings/` 页面，准备一个有明确高度的容器，例如 `<main id="settings" style="height:100dvh"></main>`，页面脚本如下：
+
+```ts
+import { mountChatSettingsPage, createHttpChatTransport } from "@agent-runtime/chat-ui";
+
+const sessionId = new URL(location.href).searchParams.get("session");
+if (!sessionId) throw new Error("请从聊天配置入口打开");
+const settings = mountChatSettingsPage(document.querySelector<HTMLElement>("#settings")!, {
+  transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
+  sessionId,
+  theme: { mode: "system" },
+});
+// 页面卸载或切换账号时：settings.destroy()
+```
+
+使用与 IM 相同的业务登录方式。网页提供四类配置：工具、Skill、知识与记忆、回答与上下文。保存后只影响该会话的后续发言；正在执行的回答和其他会话保持原配置。恢复默认后仍需点击保存，多标签页冲突时先重新载入。
+
+开关只能启停后端已接入的能力；未接入的 Skill、记忆存储显示说明或禁用状态。默认模型可跨刷新保存，输入框的单轮选择优先。关闭记忆读取不会清除本会话聊天记录或已有记忆，见[读取记忆](/docs/memory/)。本站右上角可直接体验，后端开放方式见[连接后端与用户登录](/docs/frontend-server/#开放会话配置)。
 
 ## 四层分别怎样用
 

@@ -1832,10 +1832,11 @@ export class AgentEngine {
   private visibleTools(r: RunRecord) {
     return r.config.tools.filter(
       (t) =>
-        !r.activeSkill ||
-        r.config.skills
-          .find((s) => s.id === r.activeSkill)
-          ?.allowedTools.includes(t.name),
+        t.permission !== "deny" &&
+        (!r.activeSkill ||
+          r.config.skills
+            .find((s) => s.id === r.activeSkill)
+            ?.allowedTools.includes(t.name)),
     );
   }
   private async activateSkill(
@@ -1950,16 +1951,17 @@ export class AgentEngine {
         inputSchema: kb.querySchema,
       });
     for (const m of r.config.memory.stores) {
-      tools.push({
-        name: `engine.memory.read.${m.id}`,
-        description: "Read authorized memory",
-        inputSchema: {
-          type: "object",
-          properties: { query: { type: "string" } },
-          required: ["query"],
-          additionalProperties: false,
-        },
-      });
+      if (m.read.enabled !== false)
+        tools.push({
+          name: `engine.memory.read.${m.id}`,
+          description: "Read authorized memory",
+          inputSchema: {
+            type: "object",
+            properties: { query: { type: "string" } },
+            required: ["query"],
+            additionalProperties: false,
+          },
+        });
       if (m.write)
         tools.push({
           name: `engine.memory.write.${m.id}`,
@@ -2623,7 +2625,8 @@ export class AgentEngine {
   private async readInitialMemory(r: RunRecord, signal: AbortSignal) {
     const observations: ModelMessage[] = [];
     for (const memory of r.config.memory.stores) {
-      if (memory.read.strategy === "none") continue;
+      if (memory.read.enabled === false || memory.read.strategy === "none")
+        continue;
       await this.authorize("capability", `memory:${memory.id}`);
       const opId = hash([r.id, "initial-memory", memory.id]);
       const existing = await this.transaction((tx) =>

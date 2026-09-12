@@ -1352,6 +1352,8 @@ Adapter Registry 只是“Engine 知道如何执行某种引用”，不是 Agen
 - 已接受 Run 的快照不受普通配置更新影响；恢复不重新冻结；
 - 之后新接受的 Run 冻结新配置；安全撤销在每次能力调用前重新检查。
 
+2026-09-12 会话配置网页追加：宿主显式 `settings: true` 后，聊天桥把前端提交的 ID/布尔偏好映射到宿主配置能力上限，继续调用带 `ifVersion` 的 Session 配置替换；浏览器不接收原始配置，也不能新增执行器或扩权。静态 `tools[].permission: "deny"` 同时从模型工具目录排除，在分发前拒绝，不触发被禁工具的业务权限 Binding 或旧回执读取；`require-approval` 的审批及回执检查保留。宿主升级配置时可用 `restoreChatPreferences` 保留用户限制，新增能力不自动开启。API 和兼容变化见 [IM 会话配置](chat-settings.md)。
+
 ### 5.3 Model Provider
 
 #### 使用方式
@@ -1784,6 +1786,8 @@ await engine.createSession({
 首版不建设文档采集、切片、向量索引或知识库管理平台。这些由 Retriever 背后的服务负责，Engine 负责定义、配置引用、调用、结果约束和事件。大结果按配置裁剪，并保留受控来源引用；失败可返回错误 Observation，不无限检索。
 
 ### 5.9 Memory Service
+
+2026-09-12 配置网页追加：`memory.stores[].read.enabled?: boolean` 缺省允许读取，false 同时关闭自动读取及显式 `engine.memory.read.<id>`；独立写入能力不受影响。`read.strategy: "none"` 保持只关闭自动读取的原语义。关闭读取不删除历史存储或已经进入聊天上下文的数据，Run 已冻结的配置仍继续使用。设计原因及接入见 [IM 会话配置](chat-settings.md)。
 
 #### 使用方式
 
@@ -2871,3 +2875,11 @@ const result = await session.run({ input: "开始任务" });
 复用 canonical events 的 sequence / timestamp / Run / Attempt / Operation 标识，新增 chat-server 白名单过程投影与 ChatRun.process，具体契约见[架构评估与实现](chat-process-architecture.md)。SDK 在每个模型 Attempt 首次观察到 thinking、tool-call、text 或通用活动时补发已有 model.streaming 事件；Skill 已授权、即将加载时发 skill.selected。状态信号不包含私有思考内容，Thinking 保留策略继续生效。
 
 聊天传输保持已有授权快照轮询；回读、缓存数量/字符/事件上限及不完整标记明确，缓存命中仍重新授权。describeProcess 是宿主显式安全摘要接口，不把原始事件、原生协议和全部工具载荷暴露给浏览器。新增字段可选兼容旧协议；不改变运行、重试、CAS/事务、预算、审批和结果未知的现有契约，不扩入 M4/M5。
+
+### 2026-09-12 文档能力宿主与 Chat Pending 回复
+
+文档宿主装配已实现的 Skill、Knowledge、Memory、HTTP/MCP 与 interaction，不修改 M0–M3 执行/恢复契约。长期记忆按可信浏览器主体隔离、审批后执行，以稳定密钥加密，版本 CAS 和删除 tombstone 防止旧操作作用于重建记录。
+
+Chat 新增宿主显式 `interaction` 与 `describePending`；只有开启后公开 pending ID/受限 Schema/安全预览。`resolveChatInputSchema` 严格区分三种回复，`POST sessions/:id/input` 经已有身份与 Origin 检查调用 Session.resolveInput；Controller/Transport 与原生 pending 组件形成闭环，旧宿主默认仍只展示等待。批量写审批预览按 Run 当前工具游标定位，不用第一条调用推测。
+
+文档工作台通过 SDK 公开检查与生命周期 API读取当前身份的会话；13 类实验使用独立 MemoryStore 和确定性模型，报告保存到宿主 Store。该运行验证不声称可验证供应商兼容、进程崩溃或真实 replay；这些仍由既有隔离自动验收与授权 provider smoke 提供证据。API 和配置边界详见 docs/docs-capability-coverage.md。

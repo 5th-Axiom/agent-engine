@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-12T09:22:07.274916+00:00",
+  "generatedAt": "2026-09-12T10:55:44.489527+00:00",
   "title": "Design System: Agent Engine Chat UI",
   "extensions": {
     "colorMeta": {
@@ -84,7 +84,7 @@
       },
       "body": {
         "displayName": "正文",
-        "purpose": "页面正文与助手选项。"
+        "purpose": "页面正文与助手选项。 原生待处理字段采用相同 16px 默认字号与行高；宿主能力页新增 17px 小标题单独记录在文档站规范。"
       },
       "message": {
         "displayName": "消息文本",
@@ -161,6 +161,30 @@
       "composer-select-narrow": {
         "displayName": "窄容器输入区选择器",
         "purpose": "SDK 主区域小于 480px 时使用；保持可读字号，选择器横向内边距 8px，并允许选择区换行。"
+      },
+      "settings-title": {
+        "displayName": "配置页标题",
+        "purpose": "独立会话配置页的 h1；沿用 SDK 系统字体，固定字号。"
+      },
+      "settings-title-narrow": {
+        "displayName": "窄屏配置页标题",
+        "purpose": "视口不大于 680px 的配置页 h1；与聊天及文章标题分开记录。"
+      },
+      "settings-section-title": {
+        "displayName": "配置分类标题",
+        "purpose": "工具、Skill、知识与记忆、回答与上下文的 h2。"
+      },
+      "settings-body": {
+        "displayName": "配置页正文",
+        "purpose": "设置页面基础文字与桌面搜索、模型选择。"
+      },
+      "settings-item": {
+        "displayName": "配置项目名",
+        "purpose": "开关行内的 strong，区分下方用途与权限说明。"
+      },
+      "settings-description": {
+        "displayName": "配置辅助说明",
+        "purpose": "分类简介、会话范围与版本；导航及底栏操作使用相同字号。"
       }
     },
     "shadows": [],
@@ -199,6 +223,11 @@
         "name": "received-text-buffer",
         "value": "220ms active / 100ms settling; grapheme boundaries",
         "purpose": "仅平滑呈现已收到的活动文本；历史、重试撤回、后台与减少动态效果立即显示目标。保留 DOM、焦点、选区与阅读位置，卸载清理逐帧及偏好监听；不是供应商首字延迟承诺。"
+      },
+      {
+        "name": "settings-switch",
+        "value": "transform 150ms ease-out",
+        "purpose": "会话配置原生 checkbox 滑块位移；减少动态效果时禁用，不添加页面入场动画。"
       }
     ],
     "breakpoints": [
@@ -213,6 +242,10 @@
       {
         "name": "widget-mobile-viewport",
         "value": "600px"
+      },
+      {
+        "name": "settings-two-column-tabs",
+        "value": "680px"
       }
     ]
   },
@@ -303,6 +336,22 @@
       "description": "原生外层与内层 disclosure 的可交互静态预览，示例处于用户主动展开后的完成状态。查询、摘要、耗时和 Token 均为合成展示值；不执行工具、提交审批或模拟实时更新。最终回答与用量在折叠之外。 当前阶段优先显示于标题，完成的排队／模型阶段置于执行详情。实际运行仅在模型、宿主与保留策略共同允许时展示独立公开思考区，供应商摘要与正文保持区别；此静态样例没有补造思考内容或活动动画。",
       "html": "<div class=\"ds-process-host\"><section class=\"ds-process\" aria-label=\"本轮处理过程\"><details class=\"ds-process-disclosure\" open><summary class=\"ds-process-header\"><span>处理过程</span><span class=\"ds-process-timing\">已处理 3 秒</span><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><ol class=\"ds-process-list\"><li class=\"ds-process-row\" data-state=\"completed\" data-kind=\"message\"><div class=\"ds-message-text ds-process-message\"><p>我先查一下会话接入文档。</p></div></li><li class=\"ds-process-row\" data-state=\"completed\" data-kind=\"tool\"><details class=\"ds-process-detail\" open><summary><div class=\"ds-process-line\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m14 5 5 5-9 9-5-5 9-9Z M5 14l-2 7 7-2 M14 5l2-2 5 5-2 2\"/></svg><span class=\"ds-process-label\">搜索文档</span><span class=\"ds-process-state\">已完成</span><span class=\"ds-process-duration\">1 秒</span></div><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"ds-process-detail-body\" tabindex=\"0\" role=\"region\" aria-label=\"搜索文档详情\"><p class=\"ds-process-input\">loadSession 续聊</p><p class=\"ds-process-output\">保存 session.id，再调用 engine.loadSession(sessionId)。</p></div></details></li></ol></details><p class=\"ds-process-usage\">已用 162 Token（待结算）</p></section><p class=\"ds-message-text ds-process-final\">保存会话 ID，下次加载后继续发送问题。</p><details class=\"ds-process-execution\"><summary>执行详情 · 162 Token</summary><p>请求模型 · 已完成 · 1000 ms</p></details></div>",
       "css": ".ds-process-host{container:process-preview / inline-size;font-family:var(--ae-chat-font-family,-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",\"Microsoft YaHei\",sans-serif);font-size:var(--ae-chat-font-size,16px);line-height:1.6;color:var(--ae-chat-text,#172b42);background:var(--ae-chat-canvas,#ffffff)}.ds-process{margin:4px 0 14px;color:var(--ae-chat-muted,#48596a);font-size:var(--ae-chat-small-font-size,13px)}.ds-process-header{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}.ds-process-header>span:first-child{flex:1;font-weight:500;color:var(--ae-chat-text,#172b42)}.ds-process-header::-webkit-details-marker{display:none}.ds-process-header>.ds-icon{width:14px;height:14px;flex:none}.ds-process-disclosure[open]>.ds-process-header>.ds-icon{transform:rotate(180deg)}.ds-process-header{min-height:40px}.ds-process-header:focus-visible,.ds-process-detail-body:focus-visible{outline:2px solid var(--ae-chat-focus,#0758a0);outline-offset:2px}.ds-process-timing,.ds-process-duration{font-variant-numeric:tabular-nums;white-space:nowrap}.ds-process-list{list-style:none;margin:0;padding:0 0 4px}.ds-process-row{padding:1px 0;overflow-wrap:anywhere}.ds-process-line{display:flex;align-items:center;gap:8px;min-height:36px;flex:1;min-width:0}.ds-process-line>.ds-icon{width:18px;height:18px;flex:none}.ds-process-label{flex:1;min-width:0}.ds-process-state,.ds-process-duration{font-size:12px}.ds-process-row[data-state=running] .ds-process-state{color:var(--ae-chat-accent-text,#0758a0);font-weight:600}.ds-process-row[data-state=failed] .ds-process-state{color:var(--ae-chat-danger,#99252c)}.ds-process-row[data-state=waiting] .ds-process-state{color:var(--ae-chat-text,#172b42);font-weight:600}.ds-process-detail>summary{display:flex;align-items:center;gap:8px;cursor:pointer;min-height:40px;list-style:none;border-radius:4px}.ds-process-detail>summary::-webkit-details-marker{display:none}.ds-process-detail>summary>.ds-icon{width:14px;height:14px;flex:none;transition:transform 140ms cubic-bezier(.16,1,.3,1)}.ds-process-detail[open]>summary>.ds-icon{transform:rotate(180deg)}.ds-process-detail>summary:hover{background:var(--ae-chat-surface,#f6f8fa)}.ds-process-detail>summary:focus-visible{outline:2px solid var(--ae-chat-focus,#0758a0);outline-offset:2px}.ds-process-detail-body{margin:4px 0 12px 27px;padding:4px 0;white-space:pre-wrap;max-height:240px;overflow:auto;scrollbar-width:thin}.ds-process-input{color:var(--ae-chat-text,#172b42);margin-bottom:8px}.ds-process-output{margin:0}.ds-process-usage{margin:6px 0 0;font-variant-numeric:tabular-nums}.ds-process-notice{font-size:12px;margin:8px 0}.ds-process-pending{margin:12px 0;padding:12px;background:var(--ae-chat-surface,#f6f8fa);color:var(--ae-chat-text,#172b42);border:1px solid var(--ae-chat-border,#dce2e8);border-radius:8px}.ds-process-pending p{margin:6px 0 0}.ds-process-message{color:var(--ae-chat-text,#172b42);padding:10px 0}@container process-preview (width < 480px){.ds-process-header{flex-wrap:wrap;gap:4px 12px}.ds-process-duration{display:none}}@media(prefers-reduced-motion:reduce){.ds-process-detail>summary>.ds-icon{transition:none}}.ds-process-host .ds-message-text{font-size:var(--ae-chat-font-size,16px);line-height:1.8;overflow-wrap:anywhere}.ds-process-final{margin:0}.ds-process-host .ds-process-message p{margin:0 0 12px}.ds-process-input{margin-top:0}@supports(interpolate-size:allow-keywords){.ds-process-disclosure,.ds-process-detail{interpolate-size:allow-keywords}.ds-process-disclosure::details-content,.ds-process-detail::details-content{height:0;opacity:0;overflow:clip;transition:height 180ms cubic-bezier(.16,1,.3,1),opacity 120ms ease,content-visibility 180ms allow-discrete}.ds-process-disclosure[open]::details-content,.ds-process-detail[open]::details-content{height:auto;opacity:1}}@media(prefers-reduced-motion:reduce){.ds-process-disclosure::details-content,.ds-process-detail::details-content{transition:none}}.ds-process-execution{margin-top:4px;font-size:var(--ae-chat-small-font-size,13px);color:var(--ae-chat-muted,#48596a)}.ds-process-execution>summary{cursor:pointer;padding:10px 0;min-height:44px}.ds-process-execution>summary:focus-visible{outline:2px solid var(--ae-chat-focus,#0758a0);outline-offset:2px}.ds-process-execution p{margin:4px 0}"
+    },
+    {
+      "name": "会话配置开关行",
+      "kind": "custom",
+      "refersTo": "settings-row",
+      "description": "真实设置行样式的独立预览，以合成“用户偏好”说明读取与写入分别控制。此片段显示未开放写入的状态，不连接存储或保存配置；标准文档宿主已接入可审批的 preferences，其他宿主按实际权限显示。",
+      "html": "<section class=\"ds-settings-preview\" aria-label=\"记忆读写配置示例\"><label class=\"ds-settings-row\"><span class=\"ds-settings-row-copy\"><strong>读取历史记忆 · 用户偏好</strong><span class=\"ds-settings-description\">在后续发言中读取该存储。关闭不会删除已有记忆或已进入对话的信息。</span></span><input class=\"ds-settings-switch\" type=\"checkbox\" role=\"switch\" aria-label=\"读取历史记忆 · 用户偏好\" checked></label><label class=\"ds-settings-row\"><span class=\"ds-settings-row-copy\"><strong>保存新的记忆 · 用户偏好</strong><span class=\"ds-settings-description\">此存储未开放写入。</span></span><input class=\"ds-settings-switch\" type=\"checkbox\" role=\"switch\" aria-label=\"保存新的记忆 · 用户偏好\" disabled></label></section>",
+      "css": ".ds-settings-preview{font:15px/1.6 var(--ae-chat-font-family,-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",\"Microsoft YaHei\",sans-serif);color:var(--ae-chat-text,#172b42);background:var(--ae-chat-canvas,#ffffff)}.ds-settings-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 0;border-bottom:1px solid var(--ae-chat-border,#dce2e8);cursor:pointer}.ds-settings-row-copy{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}.ds-settings-row strong{font-size:15px;font-weight:600}.ds-settings-description{color:var(--ae-chat-muted,#48596a);font-size:14px}.ds-settings-switch{appearance:none;box-sizing:border-box;flex:0 0 42px;width:42px;height:24px;border:1px solid var(--ae-chat-muted,#48596a);border-radius:12px;background:var(--ae-chat-surface,#f6f8fa);position:relative;cursor:pointer;margin:0}.ds-settings-switch::after{content:\"\";display:block;width:16px;height:16px;border-radius:50%;position:absolute;top:3px;left:3px;background:var(--ae-chat-muted,#48596a);transition:transform 150ms ease-out}.ds-settings-switch:checked{background:var(--ae-chat-accent,#0758a0);border-color:var(--ae-chat-accent,#0758a0)}.ds-settings-switch:checked::after{background:var(--ae-chat-on-accent,#ffffff);transform:translateX(18px)}.ds-settings-switch:disabled{cursor:not-allowed;opacity:.65}.ds-settings-switch:focus-visible{outline:3px solid var(--ae-chat-focus,#0758a0);outline-offset:3px}@media(max-width:680px){.ds-settings-row{gap:16px}}@media(prefers-reduced-motion:reduce){.ds-settings-switch::after{transition:none}}"
+    },
+    {
+      "name": "问题、表单与审批",
+      "kind": "custom",
+      "refersTo": "pending-field",
+      "description": "共享原生待处理输入的静态预览，示例字段与偏好为合成数据。控件可以编辑，不连接 resolveInput 或保存记忆；实际页面在宿主开放 interaction 后提交并继续同一 Run，缺少请求标识或回调时只显示接入方处理说明。",
+      "html": "<div class=\"ds-pending-host\"><section class=\"ds-pending\"><strong>等待补充信息</strong><p>请补充接入需求。</p><form><label class=\"ds-pending-field\"><span>接入目标</span><select aria-label=\"接入目标\"><option>后端 SDK</option><option>前端 SDK</option><option>完整示例</option></select></label><label class=\"ds-pending-field\"><span>你希望完成什么</span><textarea rows=\"3\" aria-label=\"你希望完成什么\">支持多轮对话和工具调用。</textarea></label><div class=\"ds-pending-actions\"><button type=\"button\" class=\"ds-pending-button ds-pending-primary\">提交并继续</button></div><p class=\"ds-pending-status\" role=\"status\">静态预览，未提交。</p></form></section><section class=\"ds-pending\"><strong>等待确认</strong><p>允许保存这条长期记忆吗？</p><p class=\"ds-pending-preview\">接入偏好：使用 TypeScript；回答包含最小示例和验证步骤。</p><div class=\"ds-pending-actions\"><button type=\"button\" class=\"ds-pending-button\">不允许</button><button type=\"button\" class=\"ds-pending-button ds-pending-primary\">允许这一次</button></div></section></div>",
+      "css": ".ds-pending-host{font-family:var(--ae-chat-font-family,-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",\"Microsoft YaHei\",sans-serif);font-size:var(--ae-chat-small-font-size,13px);line-height:1.6;color:var(--ae-chat-text,#172b42)}.ds-pending{padding:12px;margin:12px 0;border:1px solid var(--ae-chat-border,#dce2e8);border-radius:8px;background:var(--ae-chat-surface,#f6f8fa)}.ds-pending p{margin:6px 0}.ds-pending-field{display:flex;flex-direction:column;gap:8px;margin:14px 0}.ds-pending-field textarea,.ds-pending-field select{font:inherit;font-size:16px;color:var(--ae-chat-text,#172b42);background:var(--ae-chat-canvas,#fff);border:1px solid var(--ae-chat-border,#dce2e8);border-radius:var(--ae-chat-control-radius,6px);padding:10px;max-width:100%;min-height:44px}.ds-pending-field textarea{resize:vertical;min-height:90px}.ds-pending-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.ds-pending-preview{white-space:pre-wrap;overflow-wrap:anywhere}.ds-pending .ds-pending-status{font-size:13px;margin:8px 0 0}.ds-pending-button{font:inherit;font-size:14px;font-weight:500;min-height:44px;padding:9px 14px;border:1px solid var(--ae-chat-border,#dce2e8);border-radius:var(--ae-chat-control-radius,6px);background:var(--ae-chat-canvas,#fff);color:var(--ae-chat-text,#172b42);cursor:pointer}.ds-pending-primary{background:var(--ae-chat-accent,#0758a0);border-color:var(--ae-chat-accent,#0758a0);color:var(--ae-chat-on-accent,#fff)}.ds-pending-button:hover{background:var(--ae-chat-surface,#f6f8fa);border-color:var(--ae-chat-accent-text,#0758a0)}.ds-pending-primary:hover{background:var(--ae-chat-accent,#0758a0);filter:brightness(.93)}.ds-pending-button:focus-visible{outline:3px solid var(--ae-chat-focus,#0758a0);outline-offset:3px}.ds-pending-field :focus-visible{outline:2px solid var(--ae-chat-accent-text,#0758a0);outline-offset:3px}.ds-pending-button:disabled{color:var(--ae-chat-disabled-text,#48596a);background:var(--ae-chat-disabled-background,#f6f8fa);cursor:default}"
     }
   ],
   "narrative": {
@@ -315,7 +364,9 @@
       "原生控件、清楚的焦点和明确状态支持键盘及触屏操作。",
       "每个挂载实例在 Shadow DOM 内应用样式，宿主保留自己的视觉身份。",
       "图片预览与上传恢复靠近输入位置，助手 Markdown 以阅读层级和可复制代码呈现。",
-      "真实活动按顺序组成可展开的处理过程，最终回答单独阅读；查看详情时保留焦点和内部滚动位置。"
+      "真实活动按顺序组成可展开的处理过程，最终回答单独阅读；查看详情时保留焦点和内部滚动位置。",
+      "独立会话配置网页沿用同一主题，以分类、开关、明确保存和可恢复状态管理后续发言的设置。",
+      "问题、结构化表单和审批复用原生待处理输入，过程收起时仍可操作，轮询保留同一请求的字段节点。"
     ],
     "rules": [
       {
@@ -337,6 +388,11 @@
         "name": "The Received Text Rule",
         "body": "仅平滑呈现已经收到的文字，单次活动更新在约（220ms）内按字素分帧追上，终态收尾缩短至最多（100ms）；历史、重试撤回、后台页面和减少动态效果偏好立即显示目标文本。保留未变化的节点、焦点、选区与用户阅读位置，不补造思考或回答，不重放历史打字。",
         "section": "components"
+      },
+      {
+        "name": "The Confirmed Settings Rule",
+        "body": "配置读取与保存使用不同状态文案；明确失权（401／403）或宿主关闭配置能力后清除旧目录和草稿、禁用编辑与保存，只有成功重新读取当前会话配置后才恢复。",
+        "section": "components"
       }
     ],
     "dos": [
@@ -350,7 +406,9 @@
       "**Do** 保留图片完整比例、明确上传状态与恢复操作，按服务端配置显示可用动作。",
       "**Do** 按真实顺序展示处理过程，保留主动展开、键盘焦点和详情内部滚动，把最终回答、用量与待处理问题留在外层折叠之外。",
       "**Do** 保留原生编辑节点、中文输入法保护、输入焦点和选区，让窄屏模型／Skill 选择器以可读字号换行。",
-      "**Do** 保留公开思考、供应商摘要、工具和最终回答的独立层级；短缓冲更新保持代码、复制、焦点、选区及上翻阅读位置。"
+      "**Do** 保留公开思考、供应商摘要、工具和最终回答的独立层级；短缓冲更新保持代码、复制、焦点、选区及上翻阅读位置。",
+      "**Do** 保留配置分类、读写记忆的独立开关、未接入原因和始终可见的保存状态，让当前会话与后续发言的作用范围明确可读。",
+      "**Do** 让待处理表单留在过程折叠之外，保留同一请求的原生输入、明确提交状态及服务端授权边界。"
     ],
     "donts": [
       "**Don't** 把接入示例的导航、库存表或业务内容提升为 SDK 的通用组件契约。",
@@ -361,9 +419,10 @@
       "**Don't** 将模型文字作为 HTML 注入、自动加载 Markdown 外链图片，或让展示组件直接处理模型密钥。",
       "**Don't** 把未提供工具清单显示为零，或从原始配置自动暴露工具提示、Schema 和执行器细节。",
       "**Don't** 把未发送图片写入持久化草稿，或把无权读取／到期图片伪装成可用预览。",
-      "**Don't** 把私有推理或原始工具载荷用作过程摘要，补造未发生的步骤、进度或费用，或把等待文案冒充宿主审批表单。",
+      "**Don't** 把私有推理或原始工具载荷用作过程摘要，补造未发生的步骤、进度或费用，或在缺少宿主请求标识与解析回调时显示可提交的审批动作。",
       "**Don't** 用可点击占位动作暗示未接入的语音或附件能力，也不为容纳工具栏而裁切正常选择名称或缩小窄屏选择器字号。",
-      "**Don't** 把未获授权的推理、原生签名或遮蔽块当作公开思考，也不补造未收到的文本、重放历史打字或持续播放离屏状态动画。"
+      "**Don't** 把未获授权的推理、原生签名或遮蔽块当作公开思考，也不补造未收到的文本、重放历史打字或持续播放离屏状态动画。",
+      "**Don't** 将读取配置显示为保存、把明确失权后的旧目录留作可编辑内容，或用开关暗示能够扩大宿主权限、删除聊天记录和追改活动 Run。"
     ]
   }
 }

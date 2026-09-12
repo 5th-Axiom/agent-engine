@@ -41,19 +41,24 @@ const entry = join(consumer, "check.ts");
 await writeFile(
   entry,
   `
-import {mountChatWidget, mountChatPage, createHttpChatTransport} from '@agent-runtime/chat-ui';
+import {mountChatWidget, mountChatPage, mountChatSettingsPage, createHttpChatTransport} from '@agent-runtime/chat-ui';
 import {resolveChatTheme} from '@agent-runtime/chat-ui/tokens';
 import {createButton} from '@agent-runtime/chat-ui/atoms';
-import {createMessage} from '@agent-runtime/chat-ui/components';
-import {createChatPage} from '@agent-runtime/chat-ui/pages';
+import {createMessage, createPendingInput} from '@agent-runtime/chat-ui/components';
+import {createChatPage, mountChatSettingsPage as settingsPage} from '@agent-runtime/chat-ui/pages';
 import {installChatStyles} from '@agent-runtime/chat-ui/styles';
-import {ChatController} from '@agent-runtime/chat-core';
-import {createChatHandler} from '@agent-runtime/chat-server';
+import {ChatController, chatSettingsSchema, chatPreferencesSchema, resolveChatInputSchema, type ChatInputResolution, type ChatPreferences} from '@agent-runtime/chat-core';
+import {createChatHandler, restoreChatPreferences} from '@agent-runtime/chat-server';
 import {createAgentEngine} from '@agent-runtime/sdk';
 const transport=createHttpChatTransport({baseURL:'https://admin.example.com/api/agent-chat'});
 const controller=new ChatController(transport);
 resolveChatTheme({mode:'dark',skin:'rounded',accent:'#a63212'});
-for(const fn of [mountChatWidget,mountChatPage,createChatPage,createButton,createMessage,installChatStyles,createChatHandler,createAgentEngine]) if(typeof fn!=='function') throw Error('EXPORT_MISSING');
+const preferences: ChatPreferences = {modelId:'primary', enabledTools:[], enabledSkills:[], enabledKnowledgeBases:[], memory:[], showThinking:false, compactContext:false};
+chatPreferencesSchema.parse(preferences);
+const resolution:ChatInputResolution={id:'ca50994e-f6e4-4167-8ec2-183610f95b48',kind:'question',answer:'后端 SDK'};resolveChatInputSchema.parse(resolution);
+if(!transport.resolveInput || !controller.resolveInput) throw Error('INTERACTION_EXPORT_MISSING');
+if(!chatSettingsSchema || !transport.readSettings || !transport.updateSettings || !controller.ensureSession) throw Error('SETTINGS_EXPORT_MISSING');
+for(const fn of [mountChatWidget,mountChatPage,mountChatSettingsPage,settingsPage,restoreChatPreferences,createChatPage,createButton,createMessage,createPendingInput,installChatStyles,createChatHandler,createAgentEngine]) if(typeof fn!=='function') throw Error('EXPORT_MISSING');
 controller.dispose();
 `,
 );
@@ -88,7 +93,7 @@ if (execute.status !== 0) {
 const front = join(consumer, "frontend.ts");
 await writeFile(
   front,
-  `export {mountChatWidget, createHttpChatTransport} from '@agent-runtime/chat-ui';`,
+  `export {mountChatWidget, mountChatSettingsPage, createHttpChatTransport} from '@agent-runtime/chat-ui';`,
 );
 const bundle = await build({
   entryPoints: [front],

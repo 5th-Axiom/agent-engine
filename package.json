@@ -28,7 +28,9 @@
     "smoke:images": "pnpm build && tsx scripts/smoke-images.ts",
     "verify:chat-process": "pnpm build && tsx scripts/verify-chat-process.ts",
     "verify:composer": "pnpm build && tsx scripts/verify-composer.ts",
-    "verify:reply-display": "pnpm build && tsx scripts/verify-reply-display.ts"
+    "verify:reply-display": "pnpm build && tsx scripts/verify-reply-display.ts",
+    "verify:chat-settings": "pnpm build && tsx scripts/verify-chat-settings.ts",
+    "verify:docs-capabilities": "pnpm build && tsx scripts/verify-docs-capabilities.ts"
   },
   "devDependencies": {
     "@agent-runtime/debug": "workspace:*",

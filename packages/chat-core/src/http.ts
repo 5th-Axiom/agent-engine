@@ -1,3 +1,4 @@
+import { chatSettingsSchema, updateChatSettingsSchema } from "./settings.js";
 import { z } from "zod";
 import {
   ChatError,
@@ -11,6 +12,7 @@ import {
   createSessionSchema,
   sendMessageSchema,
   cancelRunSchema,
+  resolveChatInputSchema,
   type ChatTransport,
 } from "./protocol.js";
 
@@ -136,6 +138,23 @@ export function createHttpChatTransport(
   const sessionPath = (id: string) =>
     "/sessions/" + encodeURIComponent(z.uuid().parse(id));
   return {
+    resolveInput: async (id, input, s) => {
+      await request(
+        sessionPath(id) + "/input",
+        z.object({ accepted: z.literal(true) }),
+        s,
+        resolveChatInputSchema.parse(input),
+      );
+    },
+    readSettings: (id, s) =>
+      request(sessionPath(id) + "/settings", chatSettingsSchema, s),
+    updateSettings: (id, input, s) =>
+      request(
+        sessionPath(id) + "/settings",
+        chatSettingsSchema,
+        s,
+        updateChatSettingsSchema.parse(input),
+      ),
     uploadImage: async (file, signal) => {
       if (!file.size || file.size > 5 * 1024 * 1024)
         throw new ChatError("IMAGE_INVALID");

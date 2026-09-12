@@ -228,6 +228,7 @@ export async function readChatSession(
   }
   return {
     id,
+    ...(assistant.settings ? { settingsEnabled: true } : {}),
     ...publicComposer(session.config, assistant),
     supportsImages:
       session.config.models[session.config.routing.primary]?.capabilities

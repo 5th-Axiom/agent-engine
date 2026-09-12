@@ -100,6 +100,7 @@ if (available) {
     sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
+    settingsUrl: "/ai/settings/",
     theme: {
       ...chatTheme(),
       tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 1000 },

@@ -247,7 +247,13 @@ it.each(["deny", "require-approval"])(
         });
       }
       expect((await run.result).outputText).not.toContain("RESTRICTED_RECEIPT");
-      expect(policyCalls).toBeGreaterThan(before);
+      if (permission === "deny") {
+        // A statically disabled capability is rejected before policy/receipt lookup.
+        expect(model.requests[2]!.tools).not.toEqual(
+          expect.arrayContaining([expect.objectContaining({ name: "write" })]),
+        );
+        expect(policyCalls).toBe(before);
+      } else expect(policyCalls).toBeGreaterThan(before);
       expect(calls).toBe(1);
       expect(
         (await opts.store.transaction((tx) => tx.list<any>("operations")))[0]

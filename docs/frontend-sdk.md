@@ -276,6 +276,14 @@ const page = mountChatPage(target, {
 
 页面会随容器宽度变化；较窄时收起键盘提示并调整间距。挂载多个实例时，默认各自拥有控制器和对话；不会全局复用同一个聊天状态。
 
+### 独立会话配置页
+
+助手在服务端设置 `settings: true` 后，挂载 IM 时传 `settingsUrl: "/agent/settings/"`。顶部「配置」会在新标签页打开该同源网页，并传入 `session` 参数；首条消息之前打开也能创建空会话，保留草稿且不调用模型。
+
+网页使用公开 `mountChatSettingsPage(target, { transport, sessionId, theme?, helpLinks?, styleNonce? })`。容器需明确高度，transport 使用相同业务身份；退出账号或卸载时销毁页面实例。四类配置覆盖工具、Skill、知识与记忆、回答与上下文，只保存当前会话后续轮次的受限选择。已受理运行保持冻结，版本冲突不覆盖，失权后清除旧目录并锁定编辑。
+
+具体代码、HTTP 接口、默认模型优先级、记忆 `read.enabled` 与宿主迁移规则见[IM 会话配置](chat-settings.md)。独立配置页同时从根入口与 `/pages` 导出。
+
 ### 左侧对话列表和信息面板
 
 聊天容器宽度达到 760px 时默认展示 232px 的左侧对话列表，当前会话有选中标记；较窄时通过标题左侧的按钮展开。需要在桌面浮窗中常驻左栏，可设置 `theme.tokens.panelWidth: 880`。新对话按钮位于左栏顶部，左栏收起时使用页头的加号入口；发送第一条消息后会话才写入列表。手机上选中会话会收起左栏并返回聊天。
@@ -409,3 +417,13 @@ describeProcess({ name, input, output }) {
 ### 宿主页面范围
 
 `controller.setContextRef()` 为下一轮设置不透明范围引用，重试保持原引用。Chat Server 的可选 `resolveRunContext` 在身份与 session 授权后解析；宿主必须持久复用首次解析并重检权限。`contextBar` 可挂载环境/对象控件。完整契约、旧客户端行为和例子见[可信页面上下文](chat-context.md)。
+
+## 回答问题、表单与审批
+
+`ChatAssistantDefinition.interaction: true` 显式开放用户回复。Session 中仍需声明 questions / structuredInputs 或可产生审批的写工具；服务端保留原 SDK 的身份、Schema、到期、幂等与状态检查。
+
+IM 自动展示并提交原生控件，跨轮询保留尚未提交的表单值。自定义 UI 可调用 `ChatController.resolveInput(input)`，或 `ChatTransport.resolveInput(sessionId, input)`；`createPendingInput` 由 chat-ui 根入口与 `/components` 导出。简单 string/boolean/number/integer/enum/object 使用原生控件，复杂 Schema 使用 JSON 文本输入，最终以服务端校验为准。
+
+新增 HTTP `POST /sessions/:id/input`，请求为 `ChatInputResolution`：permission 包含 `id/kind/decision`，question 与 structured_input 包含 `id/kind/answer`。`describePending` 可公开 question/details 预览；原始工具输入不自动投影。未开启 interaction 的旧宿主与未实现 resolveInput 的自定义 transport 仍只展示等待说明。
+
+完整文档宿主和配置验证见 [能力接入总结](docs-capability-coverage.md)。

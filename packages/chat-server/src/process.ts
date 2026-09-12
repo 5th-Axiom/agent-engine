@@ -514,8 +514,34 @@ export function projectProcess(
           kind: run.pending.kind,
           question: run.pending.question.slice(0, 4000),
           expiresAt: run.pending.expiresAt,
+          ...(assistant.interaction
+            ? {
+                id: run.pending.id,
+                ...(run.pending.schema !== undefined &&
+                JSON.stringify(run.pending.schema).length <= 16000
+                  ? { schema: run.pending.schema }
+                  : {}),
+              }
+            : {}),
         }
       : undefined;
+  if (pending && assistant.interaction && assistant.describePending) {
+    try {
+      const call = run.decision?.blocks.filter((b) => b.type === "tool_call")[
+        run.cursor
+      ];
+      const display = assistant.describePending({
+        kind: pending.kind,
+        question: pending.question,
+        ...(call?.type === "tool_call" ? { input: call.arguments } : {}),
+      });
+      pending.question = display.question.slice(0, 4000);
+      if (display.details)
+        Object.assign(pending, { details: display.details.slice(0, 4000) });
+    } catch {
+      /* Optional presentation must not affect pending state. */
+    }
+  }
   return {
     thinkingDisplay: assistant.thinkingDisplay ?? "none",
     entries: result.slice(-600).map((item) => processEntrySchema.parse(item)),

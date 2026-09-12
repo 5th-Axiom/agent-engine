@@ -12,6 +12,7 @@ Agent Engine 帮你把 AI 模型接进自己的程序：模型负责理解和回
 | ------------------------------ | --------------------------------------------------- |
 | 浏览带聊天助手的官方文档站     | [文档站启动与维护](examples/docs-site/README.md)    |
 | 把 IM 图标接进自己的管理后台   | [前端 SDK 接入教程](docs/frontend-sdk.md)           |
+| 在 IM 调整工具、Skill 和记忆开关 | [会话配置网页与 API](docs/chat-settings.md) |
 | 给聊天传递可信页面范围 | [宿主上下文与范围冻结](docs/chat-context.md) |
 | 从零安装、启动项目             | [新手上手指南](docs/getting-started.md)             |
 | 聊天、测试工具、查看 Debug     | [测试页面操作手册](docs/local-playground.md)        |
@@ -70,3 +71,5 @@ pnpm playground
 聊天输入区现支持长文本展开、快捷键设置、模型和 Skill 选择；服务端从已声明配置生成可用目录，选择按 Run 冻结。语音未接入时麦克风置灰。接入与兼容性说明见[输入编辑与模型选择](docs/composer-alignment.md)。
 
 回复渲染、公开思考配置和 API 变更见[回复展示改进](docs/reply-display-alignment.md)。
+
+文档助手现已接入 Skill、正式知识库、审批写入的跨会话记忆、HTTP/MCP 与问题表单；从「能力与记忆」打开配置实验及会话调试。接入范围、API 变化和验证证据见 [文档站能力覆盖](docs/docs-capability-coverage.md)。

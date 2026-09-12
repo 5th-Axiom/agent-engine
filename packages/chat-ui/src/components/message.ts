@@ -1,6 +1,6 @@
 import { createStreamingMarkdown } from "./streaming.js";
 import { createRunProcess } from "./process.js";
-import type { ChatRun } from "@agent-runtime/chat-core";
+import type { ChatRun, ChatInputResolution } from "@agent-runtime/chat-core";
 import { element } from "../atoms/index.js";
 import {
   defaultChatCopy,
@@ -19,6 +19,7 @@ export interface ChatSourceLink {
   href: string;
 }
 export interface TimelineOptions {
+  resolveInput?: (input: ChatInputResolution) => Promise<void>;
   readImage?: (id: string, signal?: AbortSignal) => Promise<Blob>;
   /** Resolve public reference links for a completed reply. No model HTML is rendered. */
   getRunSources?: (run: ChatRun) => readonly ChatSourceLink[];
@@ -167,7 +168,7 @@ export function createMessageTimeline(
           });
           const status = element("p", "ae-turn-state");
           const details = createRunDetails(copy);
-          const process = createRunProcess();
+          const process = createRunProcess(options.resolveInput);
           agent.element.insertBefore(
             process.element,
             agent.element.querySelector(".ae-message-text"),

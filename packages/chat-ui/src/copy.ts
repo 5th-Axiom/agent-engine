@@ -38,6 +38,11 @@ export const runLabels: Record<string, string> = {
   cancelled: "已停止",
 };
 export const errorMessages: Record<string, string> = {
+  CHAT_POPUP_BLOCKED: "浏览器拦截了配置页，请允许打开新标签页后重试。",
+  CONFIG_VERSION_CONFLICT: "配置已在其他页面修改。请载入最新配置后重新调整。",
+  CHAT_SETTINGS_UNAVAILABLE: "部分选项已被宿主调整，请载入最新配置。",
+  CHAT_SETTINGS_DISABLED: "宿主尚未开放会话配置。",
+  CHAT_SETTINGS_SESSION_REQUIRED: "请从聊天界面的配置入口打开当前会话。",
   CHAT_MODEL_UNAVAILABLE: "该模型当前不可用，请重新选择或新建对话。",
   CHAT_SKILL_UNAVAILABLE: "该技能当前不可用，请取消选择后重试。",
   MODEL_HISTORY_INCOMPATIBLE:

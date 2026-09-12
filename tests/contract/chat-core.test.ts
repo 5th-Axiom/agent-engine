@@ -352,3 +352,34 @@ it("does not discard an image draft when a text-only model is selected", async (
   expect(c.snapshot.images).toHaveLength(1);
   expect(c.snapshot).toMatchObject({ modelId: "vision", draft: "看图" });
 });
+
+it("prepares one configurable session without a message, guards concurrent edits, and preserves the draft", async () => {
+  const gate = deferred<{ id: string }>();
+  const creates: unknown[] = [];
+  let sends = 0;
+  const c = controller(
+    transport({
+      createSession: async (input) => {
+        creates.push(input);
+        return gate.promise;
+      },
+      sendMessage: async () => {
+        sends++;
+        return { runId: ids.run };
+      },
+    }),
+  );
+  await c.start();
+  c.setDraft("keep this draft");
+  const preparing = c.ensureSession();
+  expect(c.snapshot.preparingSession).toBe(true);
+  await expect(c.send()).rejects.toMatchObject({ code: "CHAT_SEND_PENDING" });
+  expect(() => c.newSession()).toThrow("CHAT_SEND_PENDING");
+  gate.resolve({ id: ids.a });
+  expect(await preparing).toBe(ids.a);
+  expect(await c.ensureSession()).toBe(ids.a);
+  expect(creates).toHaveLength(1);
+  expect(sends).toBe(0);
+  expect(c.snapshot.draft).toBe("keep this draft");
+  expect(c.snapshot.preparingSession).toBe(false);
+});

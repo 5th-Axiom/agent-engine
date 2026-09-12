@@ -1,0 +1,357 @@
+.capability-mode {
+  background: var(--canvas);
+  color: var(--text);
+}
+.capability-mode .site-header {
+  gap: 20px;
+}
+.cap-help {
+  margin-left: auto;
+}
+.cap-main {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 40px 28px 72px;
+}
+.cap-main h1 {
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+  margin: 0 0 12px;
+}
+.cap-intro,
+.cap-note {
+  color: var(--muted);
+  max-width: 75ch;
+  line-height: 1.8;
+}
+.cap-intro {
+  margin: 0 0 28px;
+}
+.cap-nav {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 28px;
+}
+.cap-nav a {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.cap-nav a[aria-current] {
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.cap-nav a:hover {
+  color: var(--accent);
+}
+.cap-panel[hidden] {
+  display: none;
+}
+.cap-panel h2 {
+  font-size: 22px;
+  margin: 0;
+  line-height: 1.5;
+}
+.cap-panel h3 {
+  font-size: 17px;
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.cap-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 12px;
+}
+.cap-group {
+  margin: 0 0 32px;
+}
+.cap-group > h2 {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.cap-row {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: start;
+}
+.cap-row p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.cap-row code {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.cap-row a {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.cap-tag {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cap-main button,
+.cap-main select,
+.cap-main textarea {
+  font: inherit;
+}
+.cap-main button,
+.cap-main select {
+  min-height: 44px;
+}
+.cap-main button {
+  cursor: pointer;
+}
+.cap-main button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.cap-main select {
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: var(--canvas);
+  margin: 8px 0 12px;
+}
+.cap-main a:focus-visible,
+.cap-main button:focus-visible,
+.cap-main input:focus-visible,
+.cap-main select:focus-visible,
+.cap-main summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.cap-main a {
+  text-underline-offset: 3px;
+}
+.cap-main ::selection {
+  background: var(--selected);
+  color: var(--text);
+}
+#cap-status {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+#cap-status:empty {
+  display: none;
+}
+.cap-empty {
+  padding: 28px 0;
+  color: var(--muted);
+}
+.cap-memory {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cap-memory > p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 75ch;
+  margin: 0 0 12px;
+}
+.cap-memory-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cap-memory-meta button {
+  margin-left: auto;
+}
+.experiment-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 40px;
+  margin: 28px 0;
+  align-items: start;
+}
+#experiment-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+#experiment-form > p {
+  color: var(--muted);
+  margin: 4px 0 20px;
+  line-height: 1.8;
+}
+#experiment-form > a {
+  margin-top: 16px;
+  align-self: flex-start;
+}
+.cap-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 20px;
+}
+.cap-check[hidden] {
+  display: none;
+}
+.cap-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+#experiment-result {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.cap-checks {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.cap-checks li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  padding: 10px 0;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.cap-checks strong {
+  color: var(--accent);
+  font-size: 13px;
+  padding-top: 2px;
+}
+.cap-checks [data-passed="false"] strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.cap-checks pre {
+  grid-column: 2;
+}
+.cap-details {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding: 12px 0;
+}
+.cap-details summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+  font-weight: 500;
+}
+.cap-main pre {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 14px;
+  margin: 8px 0 0;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  max-height: 440px;
+  overflow: auto;
+  scrollbar-color: var(--line) transparent;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cap-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.cap-confirm {
+  color: var(--text);
+  margin: 12px 0 0;
+}
+.cap-report-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cap-report-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cap-summary {
+  padding: 18px 0 0;
+}
+.cap-summary dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  margin: 0 0 20px;
+}
+.cap-summary dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cap-summary dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 720px) {
+  .cap-main {
+    padding: 28px 18px 48px;
+  }
+  .cap-main h1 {
+    font-size: 28px;
+  }
+  .cap-nav {
+    gap: 0;
+    justify-content: space-between;
+  }
+  .cap-nav a {
+    font-size: 14px;
+  }
+  .cap-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 16px;
+  }
+  .cap-row > p {
+    grid-row: 2;
+  }
+  .cap-row > a {
+    grid-column: 2;
+    grid-row: 1/3;
+  }
+  .experiment-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .cap-help {
+    display: none;
+  }
+  .cap-section-head {
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cap-nav a {
+    transition:
+      color 140ms ease-out,
+      border-color 140ms ease-out;
+  }
+}

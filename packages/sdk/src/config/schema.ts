@@ -119,6 +119,8 @@ export const MemorySchema = z.strictObject({
         agentId: name,
       }),
       read: z.strictObject({
+        /** Disables both automatic and model-requested reads; strategy controls automatic retrieval only. */
+        enabled: z.boolean().optional(),
         strategy: z.enum(["semantic", "none"]),
         topK: positive.max(100),
         maxTokens: positive,

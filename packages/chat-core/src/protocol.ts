@@ -1,3 +1,4 @@
+import type { ChatSettings, ChatPreferences } from "./settings.js";
 import { z } from "zod";
 
 export const assistantIdSchema = z
@@ -121,6 +122,9 @@ export const runSchema = z.object({
           kind: z.enum(["question", "structured_input", "permission"]),
           question: z.string().max(4000),
           expiresAt: z.number(),
+          id: z.uuid().optional(),
+          schema: z.json().optional(),
+          details: z.string().max(4000).optional(),
         })
         .optional(),
     })
@@ -142,6 +146,7 @@ export const runSchema = z.object({
   ),
 });
 export const assistantSchema = z.object({
+  settingsEnabled: z.boolean().optional(),
   models: z.array(chatModelSchema).optional(),
   defaultModelId: z.string().optional(),
   skills: z.array(chatSkillSchema).optional(),
@@ -171,6 +176,7 @@ export const sessionSummarySchema = z.object({
   active: z.boolean(),
 });
 export const sessionSchema = z.object({
+  settingsEnabled: z.boolean().optional(),
   models: z.array(chatModelSchema).optional(),
   defaultModelId: z.string().optional(),
   skills: z.array(chatSkillSchema).optional(),
@@ -199,7 +205,36 @@ export type ChatConfig = z.infer<typeof configSchema>;
 export type ChatRun = z.infer<typeof runSchema>;
 export type ChatSession = z.infer<typeof sessionSchema>;
 export type ChatSessionSummary = z.infer<typeof sessionSummarySchema>;
+export const resolveChatInputSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    id: z.uuid(),
+    kind: z.literal("permission"),
+    decision: z.enum(["allow_once", "deny"]),
+  }),
+  z.strictObject({
+    id: z.uuid(),
+    kind: z.literal("question"),
+    answer: z.json(),
+  }),
+  z.strictObject({
+    id: z.uuid(),
+    kind: z.literal("structured_input"),
+    answer: z.json(),
+  }),
+]);
+export type ChatInputResolution = z.infer<typeof resolveChatInputSchema>;
 export interface ChatTransport {
+  resolveInput?(
+    sessionId: string,
+    input: ChatInputResolution,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  readSettings?(id: string, signal?: AbortSignal): Promise<ChatSettings>;
+  updateSettings?(
+    id: string,
+    input: { ifVersion: number; preferences: ChatPreferences },
+    signal?: AbortSignal,
+  ): Promise<ChatSettings>;
   uploadImage?(file: Blob, signal?: AbortSignal): Promise<ChatImage>;
   readImage?(id: string, signal?: AbortSignal): Promise<Blob>;
   getConfig(signal?: AbortSignal): Promise<ChatConfig>;

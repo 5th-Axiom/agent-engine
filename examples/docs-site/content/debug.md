@@ -64,3 +64,12 @@ awaiting_input 需要宿主提供审批或补充信息；awaiting_tool_resolutio
 仓库 Playground 已在 http://127.0.0.1:4318/debug/ 配好只读入口，可以先用它熟悉界面；它是示例宿主，与业务服务是否接入 Debug 无关。
 
 正式集成需限制可访问人群与数据作用域。首版没有模型/工具真实 replay，也不会提供“一键重跑写操作”。
+
+
+## 调试正在使用的文档助手
+
+打开[会话调试](/ai/capabilities/#debug)，选择当前浏览器身份下的会话。此入口在文档宿主中直接调用 SDK 的 `inspectSession`、`listEvents` 和 `getEffectiveConfig`，复用调试数据接口，不向浏览器发送管理员 Debug Token。
+
+可查看配置版本、Run / Step / Attempt、工具操作和 Usage，以及最近 1000 条事件。事件超过窗口时快照标记截断。归档、取消归档和删除位于页面底部；有活动 Run 时需先在 IM 完成或停止。长期记忆独立管理，删除会话不会一并删除已确认保存的偏好。
+
+[配置实验](/ai/capabilities/#experiments)中的「事件与可观测性」还会实际导出 Trace、日志和 Prometheus 指标，验证游标分页与订阅。实验与真实模型运行明确区分。

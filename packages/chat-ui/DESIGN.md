@@ -101,6 +101,29 @@ typography:
     fontSize: "12px"
   image-status:
     fontSize: "13px"
+  settings-title:
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+    fontSize: "26px"
+    fontWeight: 650
+    lineHeight: 1.35
+  settings-title-narrow:
+    fontSize: "23px"
+    fontWeight: 650
+    lineHeight: 1.35
+  settings-section-title:
+    fontSize: "20px"
+    fontWeight: 650
+    lineHeight: 1.4
+  settings-body:
+    fontSize: "15px"
+    lineHeight: 1.6
+  settings-item:
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: 1.6
+  settings-description:
+    fontSize: "14px"
+    lineHeight: 1.6
 rounded:
   inset: "4px"
   control: "6px"
@@ -118,6 +141,16 @@ spacing:
   rounded-space: "20px"
   large: "24px"
 components:
+  pending-field:
+    backgroundColor: "{colors.white}"
+    textColor: "{colors.navy}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    padding: "10px"
+  settings-row:
+    textColor: "{colors.navy}"
+    typography: "{typography.settings-body}"
+    padding: "18px 0"
   button-primary:
     backgroundColor: "{colors.blue}"
     textColor: "{colors.white}"
@@ -233,6 +266,9 @@ components:
 - 图片预览与上传恢复靠近输入位置，助手 Markdown 以阅读层级和可复制代码呈现。
 - 真实活动按顺序组成可展开的处理过程，最终回答单独阅读；查看详情时保留焦点和内部滚动位置。
 
+- 独立会话配置网页沿用同一主题，以分类、开关、明确保存和可恢复状态管理后续发言的设置。
+- 问题、结构化表单和审批复用原生待处理输入，过程收起时仍可操作，轮询保留同一请求的字段节点。
+
 来源为 [Token](src/tokens/index.ts)、[共享样式](src/styles.ts)、[原子组件](src/atoms/index.ts)、[业务组件](src/components/index.ts) 和 [页面](src/pages/index.ts)。方向来自 [接入示例](../../examples/embedded/index.html) 的首个 body 注释及 [PRODUCT.md](PRODUCT.md)，没有替换现有 Playground 或 Debug 的设计。
 
 ## Colors
@@ -277,6 +313,8 @@ Markdown 代码头、输入色面与图片缩略图背板使用 surface，代码
 
 当前解析器校验正文与次级文字对 canvas / surface、onAccent 对 accent、userText 对 userBackground，以及 danger 对 canvas 的文字对比度（至少 4.5:1）。[主题契约测试](../../tests/contract/chat-core.test.ts) 覆盖两种模式、两种皮肤及五个品牌色样本；它不等于所有任意覆盖组合的完整无障碍认证。源码没有色阶 Token，sidecar 不合成未使用的色阶。
 
+会话配置沿用 canvas、text、muted 与 border；分类当前项使用 userBackground / accentText，启用开关使用 accent / onAccent，未启用使用 surface / muted。禁用开关保留原因文字，不能只靠透明度表达宿主限制。
+
 ## Typography
 
 采用系统无衬线字体栈，SDK 没有远程字体或展示字体。会话 ID 与工具名称使用本机等宽字体，便于辨认标识符。标题通过字号和字重建立层级，正文保留足够行距阅读长回复；字体不承担营销式表达。
@@ -316,6 +354,8 @@ Markdown 代码头、输入色面与图片缩略图背板使用 surface，代码
 
 公开思考正文的有效字号与行高沿用 message，以 muted 与独立边界区分最终答案。思考类的局部字号与行高被后续消息样式覆盖，不将未生效声明另立为 Token。
 
+独立配置网页的标题使用 settings-title，视口不大于（680px）时使用 settings-title-narrow；分类面板标题使用 settings-section-title。页面基础文字使用 settings-body，开关项目名使用 settings-item，分类导航、简介和操作文字使用 settings-description 的字号；保存状态为（13px），记忆说明为（13px）／行高（1.75）。窄屏搜索与模型选择文字为（16px）。这些角色记录已实现的配置页层级，不改变聊天欢迎标题或文章标题。
+
 ## Layout
 
 页面根节点是占满挂载容器高度的横向 flex 结构，左侧会话列表与右侧主区域并排。根容器宽度达到（760px）时，左栏默认常驻、宽（232px），可从主区域页头的图标收起；左栏含一个列表标题、新对话按钮、多助手时才显示的选择器，以及占据剩余高度、独立滚动的会话列表。列表组件自身的标题在侧栏组合中隐藏，避免重复标题。主区域保持纵向结构：合并操作入口的页头、主体；主体中的记录、反馈和输入区沿纵向排列，只有记录区独立滚动。宿主需为 inline 容器提供实际高度，SDK 不接管宿主页面的栅格。
@@ -340,6 +380,8 @@ Markdown 代码头、输入色面与图片缩略图背板使用 surface，代码
 
 公开思考使用独立可聚焦滚动区，继承详情（240px）高度上限；左侧留白（26px）、横向内边距（12px）与（1px）中性边线区分最终回答。外层过程下方留白（14px），标题下方（4px），用量上方（6px）；最终答案仍使用主要正文色并保持独立阅读。
 
+会话配置占满宿主给定高度，最大宽（1080px），桌面内边距（32px 28px 0）；分类列宽（180px），与内容间距（44px）。页头与底部操作不参与中间区域的纵向滚动，分类和当前内容共用中间滚动区域；底栏通过细线分隔并始终保留保存状态、恢复默认和保存操作。视口不大于（680px）时内边距为（24px 16px 0），布局改为单列、间距（24px），四个分类排为两列，标签可换行、最小高度（44px）；底栏状态独占一行，两个操作均分下一行。开关行桌面间距（24px）、窄屏（16px），文字自然换行；模型选择最大宽（480px），搜索和选择最小高度（44px）。
+
 ## Elevation & Depth
 
 SDK 没有 box-shadow。页面以背景色、细边框（1px）和空间分区表达层级；用户消息拥有轻底色，助手回复直接排在工作面上。默认悬浮挂载的 `zIndex` 为 1000，移动模态使用浏览器 top layer。这里的覆盖层是交互位置，不是投影装饰。
@@ -362,6 +404,8 @@ workbench 皮肤使用前置 control / message / panel 圆角；rounded 只替�
 
 输入区的图片、麦克风、展开、设置和发送采用同一套（20×20px）原创描边 SVG。模型／Skill 选择器与不可用语音说明外框采用固定（6px）圆角，输入设置面板采用固定（8px）圆角；输入色面继续跟随 panel 圆角。设置面板通过 canvas、border 和局部覆盖层级（z-index 2）区分，不添加投影。
 
+会话配置以整行 label 包裹原生 checkbox（role="switch"），开关固定为（42×24px）、圆角（12px），圆形滑块（16px）；整行上下内边距（18px）提供文字与操作空间。搜索框、模型选择和运行提示沿用 control 圆角；项目之间采用（1px）细分隔线，没有新增卡片、投影、字体或图像资产。
+
 ## Components
 
 ### Tokens 与主题
@@ -383,7 +427,7 @@ workbench 皮肤使用前置 control / message / panel 圆角；rounded 只替�
 - **执行详情**：`createRunDetails()` 使用原生 details / summary 折叠，显示 Token、输入/输出、用量与费用估算是否完整、模型请求数、步骤数、操作执行与校验状态。未知用量显示破折号，不把缺失值画成零；失败和待核验有明确文案。
 - **有序处理过程**：`createRunProcess()` 使用原生外层 details / summary 和有序列表。首次活动时自动展开，终态默认收起；用户已主动查看且未主动收起时保持展开，历史可以再次展开。记录只按公开投影的服务器顺序呈现实际活动，包含阶段说明、工具与已开放的公开思考。活动标题优先显示当前进行中或等待阶段；终态有思考条目时显示“思考与处理过程”，否则显示“处理过程”。已完成的排队／模型请求从主要过程隐藏，在执行详情中保留真实状态与时长。最终回答保持在外层 disclosure 之后，不随过程收起，也不被重复的完成状态挤占。
 - **过程摘要与阅读连续性**：工具有公开输入或结果摘要时才提供内层 details，初始收起，文字经 textContent 显示。思考条目有独立 details 与受限 Markdown 正文，活动中首次收到正文时展开，其后保留用户开合选择。更新同一活动时复用原 details、summary 和正文节点，保留展开状态、正文焦点及 scrollTop；具名正文使用 `tabIndex=0`、`role="region"`。摘要悬停使用 surface；标题、摘要与正文的可见焦点为 focus 色（2px）轮廓、外偏移（2px）。缺少摘要的活动仍可用文字状态阅读。
-- **过程时间、用量与等待**：外层显示服务器累计活动时间；只有运行中才按秒补充计时，最近一次观测后最多延长（3 秒），暂停或终态不继续增长。页脚在 disclosure 外显示已上报 Token 与按币种列出的费用估算，标出待结算／不完整，不用缺失值拼出零。记录不完整时说明只展示当前可用部分。等待问题同样位于外层之外，以 `role="status"` 提示等待确认或补充信息；实际审批和提交答案由宿主处理，界面明确可停止本轮运行。
+- **过程时间、用量与等待**：外层显示服务器累计活动时间；只有运行中才按秒补充计时，最近一次观测后最多延长（3 秒），暂停或终态不继续增长。页脚在 disclosure 外显示已上报 Token 与按币种列出的费用估算，标出待结算／不完整，不用缺失值拼出零。记录不完整时说明只展示当前可用部分。待处理输入同样位于外层之外，以可见标题提示等待确认或补充信息；宿主开放请求标识及解析回调时显示可提交的原生表单，状态区使用 `role="status"`。缺少这些条件才显示由接入方处理的说明，普通输入区保留停止本轮入口。
 - **输入区**：`createComposer()` 接收 onDraft / onSend / onCancel、可选图片与 onModel / onSkill 回调，以及 sendShortcut。字符上限（8000），接近上限（7200）时展示计数；此前仅宽屏显示当前快捷键提示，脚注始终可见。保留原生 textarea、选区、撤销／重做与文本粘贴；就地展开复用同一输入节点并返回焦点，再次点击或 Escape 收起。空输入按 ↑ 找回当前会话最近一轮文字，只写入草稿，不重附图片。没有文字和图片、图片未全部上传就绪、待确认或不可发送时禁用发送，已上传图片允许单独发送。活动 Run 显示停止入口，停止请求期间显示等待状态。
 - **发送与输入设置**：SDK 缺省 `mod-enter`，即 ⌘ / Ctrl + Enter 发送、Enter 换行；可选 `enter`，即 Enter 发送、Shift + Enter 换行。中文组合输入期间及结束后的（80ms）不触发快捷发送，按钮发送也需组合输入已结束。设置使用原生 details / summary 与 select，Escape 收起后焦点返回设置入口，点击外部收起。选择器、设置入口和不可用语音说明的键盘焦点使用 focus 色（2px）轮廓与（2px）外偏移；输入正文仍把（3px）轮廓画在完整输入色面上。
 - **下一轮模型与 Skill**：原生选择器读取服务器实际公开目录，模型名称按真实配置附加“思考／图片”标记，title 解释能力并说明用于下一条消息；目录缺失时隐藏对应选择器。Skill 含“自动技能”，显式选择用于下一轮，受理后回到自动。活动 Run 期间可编辑下一条和修改选择；发送确认窗口及受理结果未明时冻结已提交内容与选择，重试沿用同一请求。图片能力随所选模型检查，有图片草稿时拒绝切到纯文本模型并保留草稿。刷新恢复最近一轮模型，未发送选择与快捷键偏好不跨页面保存。
@@ -403,6 +447,18 @@ workbench 皮肤使用前置 control / message / panel 圆角；rounded 只替�
 **The Received Text Rule.** 仅平滑呈现已经收到的文字，单次活动更新在约（220ms）内按字素分帧追上，终态收尾缩短至最多（100ms）；历史、重试撤回、后台页面和减少动态效果偏好立即显示目标文本。保留未变化的节点、焦点、选区与用户阅读位置，不补造思考或回答，不重放历史打字。
 
 Markdown 增量更新复用未变化的段落、代码区与复制按钮，追加文字保留原文本节点，复制读取当前代码文字；保留正文选区、焦点及代码横向滚动。正文更新与内容尺寸观察只在用户原本跟随末尾时继续跟随；独立思考区也保留上翻位置。卸载清理逐帧更新、计时器、可见性观察器与偏好监听。约（450ms）的活动快照轮询仍存在，短缓冲不消除供应商首字延迟，也不新增 SSE、数学公式或代码语法高亮。
+
+### 会话配置网页
+
+四类为“工具”“Skill”“知识与记忆”“回答与上下文”。分类使用 tablist / tab / tabpanel 与当前项标记，方向键及 Home / End 切换并移动焦点；工具和 Skill 用具名原生搜索筛选，零结果给出调整名称的提示。开关标签同时呈现用途与权限原因，知识库与每个记忆存储的读取、写入分别排列；没有接入能力时显示空状态、禁用开关及宿主提供的接入文档。搜索焦点位于完整控件边界（2px 轮廓／2px 外偏移），其余控件沿用共享（3px）焦点。滑块只做（150ms ease-out）的位移，减少动态效果时直接切换。
+
+顶部说明助手、当前会话和配置版本；有活动 Run 时显示“本轮继续使用原配置”的提示。修改进入草稿，底栏区分未保存与已保存；“恢复助手默认”先改草稿，再由“保存配置”提交。版本冲突和普通网络失败保留修改并提供重新载入，保存响应丢失先回读核对；读取期间显示“正在读取配置”，提交期间显示“正在确认保存结果”，不能把读取画成保存。归档会话只读，未保存离开使用浏览器原生提示。
+
+记忆读取与写入分开控制，文字明确关闭读取不会删除已有记忆、聊天记录或已进入上下文的信息；需要新上下文时新建对话。默认模型受宿主目录限制，输入框的单轮选择优先；公开思考与自动整理只呈现宿主开放的开关，界面不暴露模型地址、密钥、记忆 namespace 或运行预算。
+
+**The Confirmed Settings Rule.** 配置读取与保存使用不同状态文案；明确失权（401／403）或宿主关闭配置能力后清除旧目录和草稿、禁用编辑与保存，只有成功重新读取当前会话配置后才恢复。
+
+IM 页头的“配置”使用带新标签页说明的同源链接，宿主须显式开放 `settings: true` 并提供 `settingsUrl`；首条消息前打开只创建空会话，保留输入草稿。`mountChatSettingsPage` 在独立 Shadow Root 挂载，复用主题、HTTP transport 和公开样式；宿主提供明确高度，卸载时清理请求及离开提示。
 
 ### 页面组合、挂载与生命周期
 
@@ -428,6 +484,26 @@ Widget 的原生 dialog 暴露 part="panel"，宿主可以用 [data-agent-chat]:
 
 2026-09-12 回复展示追加合并依据 [过程](src/components/process.ts)、[消息](src/components/message.ts)、[Markdown](src/components/markdown.ts)、[短缓冲](src/components/streaming.ts)、共享样式与页面组合，以及 [回复展示说明](../../docs/reply-display-alignment.md)。这是现有白色／蓝灰开发工具界面的 Operate 细化，没有新视觉世界或视觉稿。新独立终审结论为 `ship`，范围为五张供应截图及抽查代码，未发现需要实质 UI 修复的问题。截图位于文档宿主 `.impeccable/review/`：`reply-thinking-desktop.png`、`reply-thinking-mobile.png`、`reply-tool-dark.png`、`reply-completed-desktop.png`、`reply-completed-mobile.png`。本次文档合并已查看五图并核对实现；交接的确定性 Engine／HTTP／Chromium 验证通过有界逐帧与字素、代码节点／复制／焦点连续性、滚动跟随、减少动态效果、刷新与卸载检查。本次文档工作未重跑交互或真实供应商，终审不等于真实供应商行为、线上 WorkBuddy 或 iOS 真机认证；新增真实供应商证据仅以 [文档站验收记录](../../examples/docs-site/ACCEPTANCE.md) 为准。私有报告与截图继续保持 Git 忽略。
 
+2026-09-12 会话配置追加合并以已实现的设置页面、共享样式、IM 入口与文档宿主为依据，沿用既有工作台设计，没有新视觉稿、种子或图像资产。独立终审首次要求修复 F1 明确失权后仍保留旧目录／可编辑状态、F2 读取期间误用保存文案；两项已复核为 resolved，disposition 为 `ship`，结论仅覆盖这两项修复，不表示重新批准整个界面。九张供应截图位于文档宿主 `.impeccable/review/`：`settings-tools-desktop.png`、`settings-tools-mobile.png`、`settings-memory-desktop.png`、`settings-memory-mobile-dark.png`、`settings-skills-desktop.png`、`settings-empty-mobile.png`、`settings-response-desktop.png`、`settings-loading-desktop.png`、`settings-access-mobile.png`。本次文档合并查看了桌面工具、深色手机记忆与手机失权三张代表图，并核对源码；这些较早截图只证明当时的配置演示状态；当前标准文档宿主的 Skill、知识库与记忆接入事实见能力工作台补充。
+
+交接验证为 `pnpm check`（33 文件／162 项，含真实 PostgreSQL 与故障测试）、文档（25 篇／33 组）、聊天（20 组）通过；配置专项通过真实 Engine／HTTP、确定性模型与 Chromium 验证打开空会话、草稿保留、保存、版本冲突、丢失响应核对和授权恢复，并生成上述九图。一次机械扫描中的配置标题字号提示由本规范记录实际层级；其余为既有 Markdown 中性引用边线与回复高度过渡提示，没有据此修改范围外样式。本次文档工作未重跑浏览器、检测器或供应商，不宣称真实供应商、线上 WorkBuddy 全功能或手机操作系统验证；私有截图与日志继续保持 Git 忽略。
+
+实现详见 [设置页面](src/pages/settings.ts)、[IM 页面](src/pages/page.ts)、[共享样式](src/styles.ts) 与 [会话配置说明](../../docs/chat-settings.md)。验证分轮记录见 [文档站验收记录](../../examples/docs-site/ACCEPTANCE.md)。
+
+### 原生待处理输入与宿主能力扩展
+
+`createPendingInput(resolveInput?)` 经 `createRunProcess`、时间线与页面组合接入控制器；宿主声明 interaction 后才能提交安全投影中的请求。问题使用文本框；最多二十个简单对象字段按 string／enum／boolean／number／integer 映射为 textarea、select、checkbox 或 number input，复杂 schema 使用具名 JSON 输入。权限请求显示宿主安全预览与“不允许／允许这一次”，问题和表单显示“提交并继续”；服务端继续校验权限与答案。
+
+请求标识、类型、问题、预览及 schema 未变时保留原生表单节点和草稿。提交时禁用字段与动作并显示正在提交；成功显示已提交并等待继续，错误保留输入供修正，过期明确提示。预览保留换行与长串折行，缺少请求标识或回调时仅显示由接入方处理的说明。组件不添加网络端点，也不为宿主自动启用能力。
+
+待处理区沿用 process-pending 的 surface 色面、边界、media 圆角与内边距；字段纵向排列、上下外边距（14px）、标签间距（8px），输入内边距（10px）、最小高（44px），采用 canvas／text／border 与 control 圆角。字段文字固定（16px）、沿用当前行高，状态文字（13px）；textarea 最小高（90px），允许纵向调整，checkbox 为（24px）。操作区顶部留白（16px）、间距（8px）并换行。字段焦点采用 accentText（2px 轮廓／3px 外偏移），按钮沿用原子组件焦点；没有新色板、阴影或动效。
+
+文档宿主能力工作台采用四个原生锚点导航、平整能力行、记忆记录、十三项真实 SDK 实验和身份范围内的会话调试。其（17px）小标题是本轮新增且被检测器提示的字号台阶，记录在 [文档站设计规范](../../examples/docs-site/DESIGN.md) 的 capability-subheading；不新增到共享聊天字号表。主宿主使用 PostgreSQL，实验每次使用隔离 MemoryStore 和合成模型／数据，报告存回宿主；这些导航、宽度与实验布局不成为通用 Chat UI 页面契约。宿主记忆采用用户确认、加密、版本 CAS、无内容 tombstone 和到期清理；401 清空身份内容并阻止迟到响应，403 清理被拒记录，删除／取消确认／归档后恢复焦点。
+
+2026-09-12 合并依据 [待处理输入](src/components/pending-input.ts)、[过程](src/components/process.ts)、[页面](src/pages/page.ts)、[共享样式](src/styles.ts) 与文档宿主能力代码，沿用原工作台的 Operate 设计，没有新视觉稿。标准宿主已声明八个只读工具（六个 binding、实际本地 HTTP 目录与 Streamable HTTP MCP 检索）、inline integration-guide、版本／hash 固定的 loader troubleshoot、正式 KnowledgeBase manual 与跨 Session 偏好记忆；SDK 不默认安装这些能力。文档同步对应能力终审 F3，最终修复复核结论见 [验收记录](../../examples/docs-site/ACCEPTANCE.md)。
+
+文档合并查看了能力总览桌面、深色手机记忆、手机表单及桌面审批四张供应截图。交接验证为 38 文件／192 项（含独立 PostgreSQL 与崩溃测试；全量源码检查显式排除并行任务的 .local 验证副本），十二张确定性浏览器截图、六次合成对话请求且无浏览器错误；另有已授权真实供应商四个 Run 验证记忆审批写入后新 Session 回读、两项 Skill、KnowledgeBase、HTTP 与 MCP，标准启动器重启后的 PostgreSQL 记忆回读也已通过。文档工作未重跑浏览器、检测器或供应商；互动实验不代表完整供应商／崩溃验证，私有截图与记录保持 Git 忽略。既有 contextRef 与 contextBar 的可信上下文职责继续按 [页面上下文契约](../../docs/chat-context.md) 实施，不因待处理表单而自动将上下文放入模型提示词。
+
 ## Do's and Don'ts
 
 ### Do:
@@ -445,6 +521,10 @@ Widget 的原生 dialog 暴露 part="panel"，宿主可以用 [data-agent-chat]:
 
 - **Do** 保留公开思考、供应商摘要、工具和最终回答的独立层级；短缓冲更新保持代码、复制、焦点、选区及上翻阅读位置。
 
+- **Do** 保留配置分类、读写记忆的独立开关、未接入原因和始终可见的保存状态，让当前会话与后续发言的作用范围明确可读。
+
+- **Do** 让待处理表单留在过程折叠之外，保留同一请求的原生输入、明确提交状态及服务端授权边界。
+
 ### Don't:
 
 - **Don't** 把接入示例的导航、库存表或业务内容提升为 SDK 的通用组件契约。
@@ -455,6 +535,7 @@ Widget 的原生 dialog 暴露 part="panel"，宿主可以用 [data-agent-chat]:
 - **Don't** 将模型文字作为 HTML 注入、自动加载 Markdown 外链图片，或让展示组件直接处理模型密钥。
 - **Don't** 把未提供工具清单显示为零，或从原始配置自动暴露工具提示、Schema 和执行器细节。
 - **Don't** 把未发送图片写入持久化草稿，或把无权读取／到期图片伪装成可用预览。
-- **Don't** 把私有推理或原始工具载荷用作过程摘要，补造未发生的步骤、进度或费用，或把等待文案冒充宿主审批表单。
+- **Don't** 把私有推理或原始工具载荷用作过程摘要，补造未发生的步骤、进度或费用，或在缺少宿主请求标识与解析回调时显示可提交的审批动作。
 - **Don't** 用可点击占位动作暗示未接入的语音或附件能力，也不为容纳工具栏而裁切正常选择名称或缩小窄屏选择器字号。
 - **Don't** 把未获授权的推理、原生签名或遮蔽块当作公开思考，也不补造未收到的文本、重放历史打字或持续播放离屏状态动画。
+- **Don't** 将读取配置显示为保存、把明确失权后的旧目录留作可编辑内容，或用开关暗示能够扩大宿主权限、删除聊天记录和追改活动 Run。

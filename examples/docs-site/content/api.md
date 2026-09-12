@@ -23,6 +23,8 @@ const config = defineSessionConfig({
 
 Schema 字段接受 JSON Schema 或能无损转为 JSON Schema 的结构化 Zod。自定义 refinements、transforms、函数和类实例不能存入配置。CONFIG_INVALID 返回字段路径和问题类别，不回显传入值。models 和 routing.primary 必须提供，默认 tools / skills / knowledgeBases / memory.stores 为空。能力数组替换，不合并。
 
+`memory.stores[].read.enabled` 可选，省略表示允许读取；false 同时禁止自动及显式读取，写入独立控制。`read.strategy: "none"` 仅禁自动读取。`tools[].permission: "deny"` 同时从模型能力目录中移除，分发前拒绝，不执行该工具的权限 Binding 或返回旧成功回执。
+
 ## createAgentEngine
 
 输入 EngineOptions，返回 Promise<AgentEngine>。先显式迁移 Store；同一数据库只有一个管理实例，启动时恢复未完成 Run。
@@ -172,6 +174,7 @@ run 返回 `Promise<{runId, outputText, output, citations}>`。startRun 返回 `
 | addImages / retryImage / removeImage | File[] / 本地草稿图片 ID | 维护上传、错误与稳定引用；失败不会静默丢图发送 |
 | mountChatWidget | options | 悬浮窗口，返回 controller/open/close/destroy/updateTheme 等 |
 | mountChatPage | target: HTMLElement, options | 嵌入页面，返回 controller/ready/destroy/updateTheme 等 |
+| mountChatSettingsPage | target, { transport, sessionId, theme?, helpLinks?, styleNonce? } | 独立配置网页；容器需明确高度；返回 ready/updateTheme/destroy |
 | createSessionMemory | Storage, accountScope | 可选缓存会话 ID；按已验证账号隔离，不保存正文或凭据 |
 
 现成 Chat UI 支持安全 Markdown、代码复制、图片和引用；原始 HTML 不执行，回答中的任意图片 URL 不自动加载。getRunSources 由宿主把公开引用转换为 HTTP(S) 链接。
@@ -215,8 +218,20 @@ images=true 开启 /images 上传和读取接口，需要 Engine protocolKey。�
 | --- | --- | --- |
 | ModelConfig.thinking.expose | none / summary / content | content 显式展示供应商返回的公开内容；summary 仅摘要 |
 | ChatAssistantDefinition.thinkingDisplay | 可选 summary / content | 宿主默认关闭；只能收窄模型展示权限 |
+| ChatAssistantDefinition.settings | 可选 boolean | 默认关闭；开放受限的会话配置 GET/POST |
+| ChatPageOptions.settingsUrl | 可选同源网页地址 | IM 打开新标签页，附加 session 查询参数 |
+| ChatController.ensureSession | 无参数 | 创建/返回空会话 ID，不发送消息；保留草稿 |
+| ChatTransport.readSettings | sessionId, signal? | 读取 ChatSettings 安全目录、默认/当前偏好与版本 |
+| ChatTransport.updateSettings | sessionId, { ifVersion, preferences }, signal? | 保存 ChatPreferences，版本冲突不覆盖，影响后续 Run |
+| restoreChatPreferences | nextHostConfig, previousSessionConfig | 宿主迁移配置时保留用户限制；chat-server 导出 |
 | ModelStreamEvent.delta.thinkingFormat | 可选 summary / content | 未标注沿用 summary；标准协议公开正文标注 content |
 | content.thinking.delta.data.format | 可选 summary / content | 与 content.output.delta 分离，原生签名不进入事件 |
 | createMessage | MessageViewData.streaming?、destroy() | 低层组件可选择流式缓冲；卸载时清理监听器和动画 |
 
 Engine 的 thinkingDisplayRetention 为 none 时不记录展示正文；具体三处配置及普通模型限制见[展示思考内容](/docs/events/#显示模型返回的思考内容)。
+
+## Pending 回复与能力工作台
+
+`ChatTransport.resolveInput`、`ChatController.resolveInput`、`ChatInputResolution` 负责继续等待用户的 Run；服务端 `interaction: true` 是显式开关，前端不能自行提高权限。`createPendingInput` 可用于自定义时间线，标准聊天页已自动接入。完整场景见[文档站接入](/docs/docs-site/)。
+
+[能力工作台](/ai/capabilities/)中的 `/api/docs-capabilities/*` 是文档示例宿主接口，不属于通用 SDK 的稳定 HTTP 协议。它组合 SDK 的配置、调试、事件和生命周期 API，避免把示例站点路由当成业务 SDK 必选依赖。

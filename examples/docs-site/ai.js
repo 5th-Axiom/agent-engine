@@ -63,6 +63,7 @@ if (document.body.dataset.chatAvailable === "true") {
     sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
+    settingsUrl: "/ai/settings/",
     theme: chatTheme(),
     copy: {
       title: "文档助手",
