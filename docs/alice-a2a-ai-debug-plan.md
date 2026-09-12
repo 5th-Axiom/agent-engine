@@ -1,7 +1,7 @@
 # alice-a2a 测试环境 AI Debug 接入方案
 
 日期：2026-09-12
-状态：代码已实现并通过本地验收；正式部署进度见 [实施记录](implementation-plan.md)。
+状态：首条接入已部署；实际数据覆盖和未闭环验收见 [实施记录](implementation-plan.md)。下文保留初始设计，拟议工具或目录不能据此视作已全部接入。
 定位：基于 Agent Engine 的独立 AI 诊断平台，首个入口放在 alice-a2a Debug 页面。
 
 ## 1. 目标与确定的架构决策
