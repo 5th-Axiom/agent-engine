@@ -131,11 +131,26 @@ tenantId 和 accountId 来自你已有的登录状态，只用来区分前端存
 
 退出、切换账号或登录布局卸载时调用 chat.destroy({ clearSession: true })。如果主动传入自己的共享 controller，视图销毁不负责释放它，需由所有者调用 controller.dispose({ clearSession: true })。
 
+列表在当前实例中保留，选择、标题和运行状态变化只更新对应列表项；关闭再打开侧栏保留滚动位置。需要整页刷新后立即显示列表时，可额外启用摘要缓存：
+
+```ts
+import { createSessionListMemory } from "@agent-runtime/chat-ui";
+
+const historyMemory = createSessionListMemory(
+  sessionStorage,
+  tenantId + ":" + accountId + ":support",
+);
+// 在 mountChatWidget / mountChatPage 的 options 中传入 historyMemory。
+// 自己创建 ChatController 时，在其 options 中传入同一选项。
+```
+
+scope 必须来自服务端已验证的账号，并包含业务 namespace。缓存只含最多 100 条会话摘要，有效期 5 分钟；不保存正文、模型配置或凭据。缓存先显示，列表仍会后台重新读取；没有缓存时显示加载状态，成功返回空列表后才显示空态。网络暂时失败保留已有列表，401/403 和 clearSession 会清理缓存。默认不启用；浏览器禁止存储或缓存损坏时自动回退。文档站使用已验证访客派生的独立 scope，同标签页跨模式共享。
+
 ## 发生连接错误时
 
 界面会提供重新连接或重试发送；401/403 会清掉当前可见会话和历史。宿主负责恢复登录，必要时重建实例。
 
-关闭窗口、卸载组件、放弃重试都不会撤销服务端可能已接收的运行。需要停止时显式调用 cancel。当前控制器通过 HTTP 快照轮询更新，活跃时默认 450ms、空闲时 2500ms；它不是 WebSocket/SSE 客户端。
+关闭窗口、卸载组件、放弃重试都不会撤销服务端可能已接收的运行。需要停止时显式调用 cancel。当前控制器通过 HTTP 快照轮询更新，活跃时默认 250ms、空闲时 2500ms；它不是 WebSocket/SSE 客户端。
 
 ## 编辑输入和选择模型
 

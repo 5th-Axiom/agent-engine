@@ -134,9 +134,10 @@ export function renderPage(
   article: Article,
   articles: Article[],
   available: boolean,
+  cacheScope = "",
 ) {
   const page = renderArticle(article, articles);
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="description" content="${escapeHTML(article.description)}"><meta name="color-scheme" content="light dark"><title>${escapeHTML(article.title)} · Agent Engine 文档</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ai.css"><script src="/assets/theme.js"></script></head><body data-article="${article.id}" data-chat-available="${available}">
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="description" content="${escapeHTML(article.description)}"><meta name="color-scheme" content="light dark"><title>${escapeHTML(article.title)} · Agent Engine 文档</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ai.css"><script src="/assets/theme.js"></script></head><body data-article="${article.id}" data-chat-available="${available}" data-chat-cache-scope="${escapeHTML(cacheScope)}">
 <!-- THESIS: Introduce the product before its guides: one sentence, core features, then a two-column product and usage table.
 OWN-WORLD: White #ffffff, navy #172b42, blue #0758a0, ruled workbench surfaces, system reading font.
 STORY: Choose a task, run a complete integration path, then look up precise API details. Delivery forms are independent of scenario navigation.

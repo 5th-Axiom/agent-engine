@@ -2908,3 +2908,10 @@ Chat 增加可选 `reply: { id, sequence }`，以 Attempt 身份和首个公开�
 ### 2026-09-13 Anthropic 同批工具结果编码
 
 Anthropic-compatible 的连续 canonical tool 结果编码为同一 user 消息中的多个 tool_result，保留 ID、顺序和多模态嵌套；assistant/native 或普通 user 边界终止分组。修复 DeepSeek Thinking 同一响应多工具成功后继续请求的 HTTP 400，不改变 canonical 消息、原生签名、工具执行顺序、审批或恢复要求。依据与验证见[同批工具结果修复](model-tool-batch-fix.md)。
+
+
+### 列表摘要缓存补充（2026-09-13）
+
+ChatController / mountChatPage / mountChatWidget 新增可选 historyMemory（SessionListMemory）；createSessionListMemory(Storage, accountScope) 只保存经过公开摘要 Schema 投影的列表，5 分钟、最多 100 条、序列化最多 64Ki UTF-16 字符。默认关闭。scope 必须来自服务端验证的账号与业务 namespace；缓存仅用于先显示，所有会话读取/发送/授权仍走原接口。historyLoaded 表示已有快照（可含合法空缓存），首读未知不显示空态，后台失败保留列表；401/403、clearSession 清理，失效当前会话移除并中断迟到列表。
+
+当前已验证会话若不在默认最近 50 条列表中可立即补入，标题与活动态同步持久化。列表组件按 ID 复用行、只改变化内容，排序移动已有行，关闭侧栏不销毁。文档站仅在同一标签页 sessionStorage 保存摘要；服务端从已验证访客生成域分离的 HMAC 缓存分区，HTML no-store，该值不能作为身份凭据。cookie 失效/变更或服务端 Secret 变更时分区随之变化。既有 SessionMemory 仍只存当前 ID，正文的 5 会话 / 约 4MiB 缓存继续仅存在控制器内存。证据见 LIST-01 至 LIST-05，不新增分布式缓存或 M4/M5 功能。

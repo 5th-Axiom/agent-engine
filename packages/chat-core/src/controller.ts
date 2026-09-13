@@ -1,4 +1,5 @@
 import { createChatId } from "./identity.js";
+import type { SessionListMemory } from "./history-memory.js";
 import {
   ChatError,
   errorCode,
@@ -40,6 +41,8 @@ export interface ChatState {
   selectedSessionId?: string;
   loadingSession?: boolean;
   historyError?: string;
+  /** At least one list snapshot is available, including a valid empty cache. */
+  historyLoaded?: boolean;
   session?: ChatSession;
   submission?: ChatSubmission;
   draft: string;
@@ -147,11 +150,32 @@ export class ChatController {
     readonly transport: ChatTransport,
     private options: {
       memory?: SessionMemory;
+      historyMemory?: SessionListMemory;
       assistantId?: string;
       activePollMs?: number;
       idlePollMs?: number;
     } = {},
-  ) {}
+  ) {
+    try {
+      const sessions = options.historyMemory?.read();
+      if (sessions) {
+        this.state.sessions = structuredClone(sessions);
+        this.state.historyLoaded = true;
+        const selected = options.memory?.read();
+        if (sessions.some((session) => session.id === selected))
+          this.state.selectedSessionId = selected ?? undefined;
+      }
+    } catch {
+      /* Optional host storage cannot prevent mounting. */
+    }
+  }
+  private rememberHistory(sessions: ChatSessionSummary[] | null) {
+    try {
+      this.options.historyMemory?.write(sessions);
+    } catch {
+      /* Optional cache. */
+    }
+  }
   get snapshot(): ChatState {
     return structuredClone(this.state);
   }
@@ -190,6 +214,8 @@ export class ChatController {
       this.cache.clear();
       this.state.session = undefined;
       this.state.sessions = [];
+      this.state.historyLoaded = false;
+      this.rememberHistory(null);
       this.state.selectedSessionId = undefined;
       this.state.loadingSession = false;
       this.state.submission = undefined;
@@ -643,7 +669,9 @@ export class ChatController {
         const sessions = await this.transport.listSessions(controller.signal);
         if (this.disposed || controller.signal.aborted) return;
         this.state.sessions = sessions;
+        this.state.historyLoaded = true;
         this.syncCurrentSummary();
+        this.rememberHistory(this.state.sessions);
         this.state.historyError = undefined;
         this.emit();
       } catch (error) {
@@ -668,15 +696,32 @@ export class ChatController {
       return;
     // Current Run snapshots arrive independently of the slower list request.
     // A late list must not resurrect the current conversation's running badge.
-    this.state.sessions = this.state.sessions.map((summary) =>
-      summary.id === session.id
-        ? {
-            ...summary,
-            title: session.title,
-            active: !!session.activeRun || session.runs.some(isActiveRun),
-          }
-        : summary,
+    const active = !!session.activeRun || session.runs.some(isActiveRun);
+    const existing = this.state.sessions.find(
+      (summary) => summary.id === session.id,
     );
+    if (existing?.title === session.title && existing.active === active) return;
+    this.state.sessions = existing
+      ? this.state.sessions.map((summary) =>
+          summary.id === session.id
+            ? {
+                ...summary,
+                title: session.title,
+                active,
+              }
+            : summary,
+        )
+      : [
+          {
+            id: session.id,
+            assistantId: session.assistantId,
+            title: session.title,
+            createdAt: session.createdAt ?? 0,
+            active,
+          },
+          ...this.state.sessions,
+        ];
+    this.rememberHistory(this.state.sessions);
   }
   private remember(session: ChatSession) {
     this.cache.delete(session.id);
@@ -771,7 +816,12 @@ export class ChatController {
         (error.status === 404 || error.status === 410)
       ) {
         if (id) this.cache.delete(id);
+        this.historyRequest?.controller.abort();
         this.state.session = undefined;
+        this.state.sessions = this.state.sessions.filter(
+          (summary) => summary.id !== id,
+        );
+        this.rememberHistory(this.state.sessions);
       }
       this.fail(error);
       this.emit();
@@ -811,6 +861,7 @@ export class ChatController {
     this.cache.clear();
     this.listeners.clear();
     if (options.clearSession) this.options.memory?.write(null);
+    if (options.clearSession) this.rememberHistory(null);
     this.pending = undefined;
     this.state = {
       connection: "disconnected",

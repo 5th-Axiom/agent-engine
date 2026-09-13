@@ -41,6 +41,7 @@ pnpm run docs --read-only
 ## 助手如何工作
 
 - AI 模式使用 `mountChatPage`，传统模式使用 `mountChatWidget`；都通过 `createHttpChatTransport` 与 `createChatHandler` 复用现有聊天 SDK。
+- 两种模式在同一标签页共享 5 分钟的列表摘要缓存，首次挂载同步显示、后台校验；服务端根据已验证访客派生 scope，身份变化不恢复旧列表，正文不写入该缓存。`pnpm verify:session-list` 验证慢请求与重开。
 - 项目问题先查资料，普通聊天可直接回答。六个工具均为服务端只读 Binding：
 
 | 工具            | 用途                                     |

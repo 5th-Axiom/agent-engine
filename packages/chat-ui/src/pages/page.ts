@@ -510,13 +510,23 @@ export function createChatPage(
     history.update(
       state.sessions,
       state.selectedSessionId ?? state.session?.id,
-      state.sending || state.pending,
+      state.sending || state.pending || state.connection === "connecting",
       state.config?.assistants ?? [],
+      state.historyLoaded === true,
     );
-    historyStatus.hidden = !state.historyError;
-    historyStatus.textContent = state.historyError
+    const loadingHistory =
+      !state.historyLoaded &&
+      !state.historyError &&
+      state.connection !== "disconnected";
+    history.element.setAttribute("aria-busy", String(loadingHistory));
+    historyStatus.hidden = !state.historyError && !loadingHistory;
+    const historyMessage = state.historyError
       ? "会话列表暂时无法更新，正在重试…"
-      : "";
+      : loadingHistory
+        ? "正在加载对话列表…"
+        : "";
+    if (historyStatus.textContent !== historyMessage)
+      historyStatus.textContent = historyMessage;
     settingsLink.hidden =
       !options.settingsUrl ||
       !(

@@ -1,4 +1,26 @@
-import { createSessionMemory } from "/assets/agent-chat.mjs";
+import {
+  createSessionMemory,
+  createSessionListMemory,
+} from "/assets/agent-chat.mjs";
+
+export function chatHistoryMemory() {
+  const scope = document.body.dataset.chatCacheScope;
+  if (!scope) return undefined;
+  try {
+    const prefix = "agent-chat:history:docs-site:" + location.origin + ":";
+    // A new/expired visitor cannot hydrate the previous visitor's titles.
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(prefix) && key !== prefix + scope)
+        sessionStorage.removeItem(key);
+    }
+    return createSessionListMemory(
+      sessionStorage,
+      "docs-site:" + location.origin + ":" + scope,
+    );
+  } catch {
+    return undefined;
+  }
+}
 
 export function chatMemory() {
   try {

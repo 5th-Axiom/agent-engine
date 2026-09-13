@@ -3,6 +3,7 @@ import {
   createChatId,
   type ChatTransport,
   type SessionMemory,
+  type SessionListMemory,
   type ChatState,
 } from "@agent-runtime/chat-core";
 import { createButton, element, type ChatIcon } from "../atoms/index.js";
@@ -21,6 +22,8 @@ export interface ChatMountOptions extends ChatPageOptions {
   /** Share a controller deliberately. Supplied controllers are owned/disposed by the caller. */
   controller?: ChatController;
   memory?: SessionMemory;
+  /** Opt-in account-scoped summary cache, revalidated in the background. */
+  historyMemory?: SessionListMemory;
   assistantId?: string;
   theme?: ChatThemeOptions;
   styleNonce?: string;
@@ -42,6 +45,7 @@ function setup(target: HTMLElement, options: ChatMountOptions) {
     options.controller ??
     new ChatController(options.transport!, {
       memory: options.memory,
+      historyMemory: options.historyMemory,
       assistantId: options.assistantId,
     });
   const host = element("div");

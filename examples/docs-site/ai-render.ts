@@ -7,8 +7,8 @@ export function modeNavigation(mode: "ai" | "docs") {
 function head(title: string) {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="light dark"><title>${escapeHTML(title)} · Agent Engine</title><link rel="icon" href="/assets/favicon.svg"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/ai.css"><script src="/assets/theme.js"></script></head>`;
 }
-export function renderAiPage(available: boolean) {
-  return `${head("文档助手")}<body class="ai-mode" data-chat-available="${available}">
+export function renderAiPage(available: boolean, cacheScope = "") {
+  return `${head("文档助手")}<body class="ai-mode" data-chat-available="${available}" data-chat-cache-scope="${escapeHTML(cacheScope)}">
 <!-- Extends the existing blue workbench. The SDK conversation is the main workspace; mode links stay visible, sources remain inspectable. -->
 <a class="skip" href="#ai-main">跳到对话</a>
 <header class="site-header"><a class="brand" href="/" aria-label="Agent Engine 首页"><span class="brand-mark">${icon("command")}</span><strong>Agent Engine</strong></a>${modeNavigation("ai")}<button class="icon-button theme-button" aria-label="切换深色模式">${icon("sun")}</button></header>

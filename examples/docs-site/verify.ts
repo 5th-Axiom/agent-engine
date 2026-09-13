@@ -338,6 +338,31 @@ try {
   await page.locator("[data-agent-chat] textarea").fill("切换模式后保留的问题");
   await page.evaluate(() => window.scrollTo(0, 350));
   const readingY = await page.evaluate(() => window.scrollY);
+  const cacheScope = await page
+    .locator("body")
+    .getAttribute("data-chat-cache-scope");
+  assert.match(cacheScope!, /^[a-f0-9]{64}$/);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const key = Object.keys(sessionStorage).find((key) =>
+          key.startsWith("agent-chat:history:"),
+        );
+        return key
+          ? JSON.parse(sessionStorage.getItem(key)!).sessions.length
+          : 0;
+      }),
+    )
+    .toBe(1);
+  let releaseHistory!: () => void;
+  const heldHistory = new Promise<void>((resolve) => {
+    releaseHistory = resolve;
+  });
+  const historyRoute = "**/api/agent-chat/sessions";
+  await page.route(historyRoute, async (route) => {
+    if (route.request().method() === "GET") await heldHistory;
+    await route.continue();
+  });
   // Click the visible sticky link without Playwright scrolling its DOM position to the top.
   const modeBox = await page
     .getByRole("link", { name: "询问文档", exact: true })
@@ -347,6 +372,18 @@ try {
     modeBox!.y + modeBox!.height / 2,
   );
   await expect(page).toHaveURL(/\/ai\/$/);
+  await expect(page.locator("body")).toHaveAttribute(
+    "data-chat-cache-scope",
+    cacheScope!,
+  );
+  await expect(page.locator("[data-agent-chat] .ae-history-item")).toHaveCount(
+    1,
+  );
+  await expect(
+    page.locator("[data-agent-chat] .ae-history-status"),
+  ).toBeHidden();
+  releaseHistory();
+  await page.unrouteAll({ behavior: "wait" });
   await expect(page.locator("#reading-trail a")).toContainText(
     "配置模型与密钥",
   );
@@ -851,6 +888,7 @@ try {
         "read-only-mode",
         "AI-default-SDK-page",
         "mode-switch-history-and-draft",
+        "visitor-scoped-list-cache-before-delayed-network",
         "six-read-tools-engine-execution",
         "source-version-lines-and-route-boundary",
         "committed-allowlist-no-symlinks-or-dirty-files",

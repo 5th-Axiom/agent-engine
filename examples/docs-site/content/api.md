@@ -174,12 +174,13 @@ run 返回 `Promise<{runId, outputText, output, citations}>`。startRun 返回 `
 | resolveContext | IncomingMessage → {engine, assistants, defaultAssistant?} | 每个请求验证登录，engine 已按用户作用域隔离；不能从请求体取 principal |
 | createHttpChatTransport | {baseURL, headers?, credentials?, allowCrossOrigin?, timeoutMs?, fetch?} | ChatTransport；超时默认 15000ms，范围 1–120000 |
 | ChatTransport | getConfig/listSessions/readSession/createSession/sendMessage/cancelRun | uploadImage/readImage 可选，旧文本 Transport 仍可用 |
-| ChatController | transport, {memory?, assistantId?, activePollMs?, idlePollMs?} | 订阅状态、send/retrySend/cancel/selectSession/newSession/dispose |
+| ChatController | transport, {memory?, historyMemory?, assistantId?, activePollMs?, idlePollMs?} | 订阅状态、send/retrySend/cancel/selectSession/newSession/dispose |
 | addImages / retryImage / removeImage | File[] / 本地草稿图片 ID | 维护上传、错误与稳定引用；失败不会静默丢图发送 |
 | mountChatWidget | options | 悬浮窗口，返回 controller/open/close/destroy/updateTheme 等 |
 | mountChatPage | target: HTMLElement, options | 嵌入页面，返回 controller/ready/destroy/updateTheme 等 |
 | mountChatSettingsPage | target, { transport, sessionId, theme?, helpLinks?, styleNonce? } | 独立配置网页；容器需明确高度；返回 ready/updateTheme/destroy |
 | createSessionMemory | Storage, accountScope | 可选缓存会话 ID；按已验证账号隔离，不保存正文或凭据 |
+| createSessionListMemory | Storage, accountScope | 显式配置 historyMemory；5 分钟 / 最多 100 条摘要，后台校验，401/403 和 clearSession 清理 |
 
 现成 Chat UI 支持安全 Markdown、代码复制、图片和引用；原始 HTML 不执行，回答中的任意图片 URL 不自动加载。getRunSources 由宿主把公开引用转换为 HTTP(S) 链接。
 

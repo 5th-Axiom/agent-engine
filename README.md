@@ -72,6 +72,8 @@ pnpm playground
 
 发送后立即显示问题与发送状态，切换已浏览会话时先显示缓存再更新；历史列表不会阻塞当前回复。慢请求、重试和连续输出可用 `pnpm verify:chat-responsiveness` 验证，证据与限制见[聊天体验验收](docs/chat-ui-experience.md)。
 
+对话列表按会话 ID 原地更新，开关侧栏保留列表与滚动位置。文档站额外启用同一标签页的 5 分钟摘要缓存，刷新或切换模式先显示缓存、后台校验；通用 SDK 可显式配置 `historyMemory: createSessionListMemory(sessionStorage, verifiedAccountScope)`。最多 100 条，不保存正文；身份失效或 `destroy({ clearSession: true })` 清理。执行 `pnpm verify:session-list` 验证缓存、焦点、慢请求和重开行为。
+
 回复渲染、公开思考配置和 API 变更见[回复展示改进](docs/reply-display-alignment.md)。`pnpm verify:stream-cadence` 可复测小批次文字、长 Markdown 和桌面/窄屏出字节奏。元素顺序、局部收起与动效见[呈现行为](docs/reply-presentation-behaviors.md)，运行 `pnpm verify:reply-presentation` 验证完整状态序列。
 
 文档助手现已接入 Skill、正式知识库、审批写入的跨会话记忆、HTTP/MCP 与问题表单；还可通过 [历史会话工具](docs/session-history-tools.md) 搜索和读取自己的其他对话，无需先保存为长期记忆。从「能力与记忆」打开配置实验及会话调试。接入范围、API 变化和验证证据见 [文档站能力覆盖](docs/docs-capability-coverage.md)。

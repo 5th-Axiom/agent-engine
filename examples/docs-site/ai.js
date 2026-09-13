@@ -1,6 +1,7 @@
 import { mountChatPage, createHttpChatTransport } from "/assets/agent-chat.mjs";
 import {
   chatMemory,
+  chatHistoryMemory,
   chatTheme,
   preserveDraft,
   readingPosition,
@@ -63,6 +64,7 @@ if (document.body.dataset.chatAvailable === "true") {
     sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
+    historyMemory: chatHistoryMemory(),
     settingsUrl: "/ai/settings/",
     theme: chatTheme(),
     copy: {

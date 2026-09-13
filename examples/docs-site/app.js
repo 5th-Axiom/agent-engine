@@ -5,6 +5,7 @@ import {
 import {
   preserveDraft,
   chatMemory,
+  chatHistoryMemory,
   chatTheme,
   rememberReading,
   restoreReading,
@@ -101,6 +102,7 @@ if (available) {
     sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
+    historyMemory: chatHistoryMemory(),
     settingsUrl: "/ai/settings/",
     theme: {
       ...chatTheme(),

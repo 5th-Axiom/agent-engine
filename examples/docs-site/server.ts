@@ -252,13 +252,23 @@ export function visitorCookies(
       : null;
   }
   function issue(res: ServerResponse) {
-    const payload = randomUUID() + "." + (Date.now() + 30 * 86400_000);
+    const id = randomUUID();
+    const payload = id + "." + (Date.now() + 30 * 86400_000);
     res.setHeader(
       "set-cookie",
       `${name}=${payload}.${sign(payload)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`,
     );
+    return id;
   }
-  return { read, issue };
+  function cacheScope(req: IncomingMessage, res: ServerResponse) {
+    const id = read(req) ?? issue(res);
+    // Public cache partition, derived only after signature/expiry validation.
+    // This domain-separated value is never accepted for authentication.
+    return createHmac("sha256", secret)
+      .update("agent-engine-docs-history-cache-v1\0" + id)
+      .digest("hex");
+  }
+  return { read, issue, cacheScope };
 }
 
 export async function startDocsSite(options: {
@@ -527,9 +537,9 @@ export async function startDocsSite(options: {
         return;
       }
       if (url.pathname === "/ai/" || url.pathname === "/ai") {
-        if (chat && !cookies.read(req)) cookies.issue(res);
+        const scope = chat ? cookies.cacheScope(req, res) : "";
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(req.method === "HEAD" ? undefined : renderAiPage(!!chat));
+        res.end(req.method === "HEAD" ? undefined : renderAiPage(!!chat, scope));
         return;
       }
       if (url.pathname === "/api/source-index") {
@@ -563,12 +573,12 @@ export async function startDocsSite(options: {
       const id = /^\/docs\/([a-z-]+)\/?$/.exec(url.pathname)?.[1];
       const article = articles.find((a) => a.id === id);
       if (article) {
-        if (chat && !cookies.read(req)) cookies.issue(res);
+        const scope = chat ? cookies.cacheScope(req, res) : "";
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(
           req.method === "HEAD"
             ? undefined
-            : renderPage(article, articles, !!chat),
+            : renderPage(article, articles, !!chat, scope),
         );
         return;
       }
