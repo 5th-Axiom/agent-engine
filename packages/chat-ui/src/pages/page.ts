@@ -31,6 +31,8 @@ export interface ChatPageOptions extends TimelineOptions {
   sendShortcut?: "enter" | "mod-enter";
   copy?: Partial<ChatCopy>;
   suggestions?: string[];
+  /** Warm recent history while idle and on pointer/keyboard intent. Defaults to true for mounted views. */
+  prefetchHistory?: boolean;
   onClose?: () => void;
 }
 /** Composes presentational components and a controller; owns focus and transcript scrolling. */
@@ -125,10 +127,18 @@ export function createChatPage(
     feedback.hidden = false;
     feedbackText.textContent = explainChatError(code);
   }
-  const history = createSessionList((id) => {
-    safe(() => controller.selectSession(id));
-    if (!wide) setSidebar(false);
-  }, copy);
+  const history = createSessionList(
+    (id) => {
+      safe(() => controller.selectSession(id));
+      if (!wide) setSidebar(false);
+    },
+    copy,
+    options.prefetchHistory === false
+      ? undefined
+      : (id) => {
+          void controller.prefetchSession(id);
+        },
+  );
   sidebar.append(sidebarHeader, history.element);
   const historyStatus = element("p", "ae-history-status");
   historyStatus.setAttribute("role", "status");
@@ -337,9 +347,6 @@ export function createChatPage(
     ...options,
     readImage: controller.transport.readImage?.bind(controller.transport),
   });
-  const loading = element("p", "ae-session-loading");
-  loading.setAttribute("role", "status");
-  loading.hidden = true;
   const submission = element("article", "ae-submission");
   const submittedMessage = createMessage({
     sender: "self",
@@ -355,7 +362,7 @@ export function createChatPage(
     submissionStatus,
   );
   submission.hidden = true;
-  transcript.append(welcome, loading, timeline.element);
+  transcript.append(welcome, timeline.element);
   let following = true;
   let lastSession: string | undefined;
   let fingerprint = "";
@@ -474,6 +481,21 @@ export function createChatPage(
   });
   let assistants = "";
   let wasSending = false;
+  let loadingId: string | undefined;
+  let loadingTimer: ReturnType<typeof setTimeout> | undefined;
+  let slowLoading = false;
+  let connectionState: ChatState["connection"] = "connecting";
+  function showConnection() {
+    const text =
+      connectionState === "ready"
+        ? slowLoading
+          ? "正在打开对话…"
+          : "已连接"
+        : connectionState === "connecting"
+          ? "正在连接"
+          : "连接中断";
+    if (connection.textContent !== text) connection.textContent = text;
+  }
   const unsubscribe = controller.subscribe((state: ChatState) => {
     // Sending expresses a new intent to follow this turn, even after reading history.
     // Passive polling and streamed text must still preserve an explicit scroll back.
@@ -484,12 +506,22 @@ export function createChatPage(
       jump.hidden = true;
       followContent();
     }
-    connection.textContent =
-      state.connection === "ready"
-        ? "已连接"
-        : state.connection === "connecting"
-          ? "正在连接"
-          : "连接中断";
+    connectionState = state.connection;
+    const waitingForBody =
+      state.loadingSession && !state.session
+        ? state.selectedSessionId
+        : undefined;
+    if (waitingForBody !== loadingId) {
+      clearTimeout(loadingTimer);
+      loadingId = waitingForBody;
+      slowLoading = false;
+      if (waitingForBody)
+        loadingTimer = setTimeout(() => {
+          slowLoading = true;
+          showConnection();
+        }, 200);
+    }
+    showConnection();
     const serialized = JSON.stringify(state.config?.assistants ?? []);
     if (serialized !== assistants) {
       assistants = serialized;
@@ -556,12 +588,7 @@ export function createChatPage(
     lastSession = selectedSession;
     const hasRuns = !!state.session?.runs.length;
     welcome.hidden = hasRuns || !!state.submission || !!state.selectedSessionId;
-    loading.hidden = !state.loadingSession;
-    loading.textContent = state.session ? "正在更新对话…" : "正在加载对话…";
-    timeline.element.setAttribute(
-      "aria-busy",
-      String(state.loadingSession === true),
-    );
+    timeline.element.setAttribute("aria-busy", String(!!waitingForBody));
     submission.hidden = !state.submission;
     if (state.submission) {
       if (!submission.isConnected) transcript.append(submission);
@@ -644,6 +671,8 @@ export function createChatPage(
     focus: composer.focus,
     transcript,
     destroy: () => {
+      clearTimeout(loadingTimer);
+      history.destroy();
       window.removeEventListener("focus", settingsRefresh);
       timeline.destroy();
       submittedMessage.destroy();

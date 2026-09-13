@@ -7,6 +7,7 @@ import { defaultChatCopy, type ChatCopy } from "../copy.js";
 export function createSessionList(
   onSelect: (id: string) => void,
   copy: ChatCopy = defaultChatCopy,
+  onPrefetch?: (id: string) => void,
 ) {
   const root = element("section", "ae-history");
   root.setAttribute("aria-label", copy.history);
@@ -18,8 +19,11 @@ export function createSessionList(
     { button: HTMLButtonElement; title: HTMLElement; status: HTMLElement }
   >();
   const empty = element("p", "ae-status", copy.emptyHistory);
+  let intentTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearIntent = () => clearTimeout(intentTimer);
   return {
     element: root,
+    destroy: clearIntent,
     update: (
       sessions: ChatSessionSummary[],
       currentId?: string,
@@ -33,6 +37,7 @@ export function createSessionList(
       const ids = new Set(sessions.map((session) => session.id));
       for (const [id, row] of rows) {
         if (!ids.has(id)) {
+          clearIntent();
           row.button.remove();
           rows.delete(id);
         }
@@ -54,7 +59,20 @@ export function createSessionList(
             status: element("small"),
           };
           button.append(row.title, row.status);
-          button.addEventListener("click", () => onSelect(session.id));
+          button.addEventListener("click", () => {
+            clearIntent();
+            onSelect(session.id);
+          });
+          if (onPrefetch) {
+            const intent = () => {
+              clearIntent();
+              intentTimer = setTimeout(() => onPrefetch(session.id), 100);
+            };
+            button.addEventListener("pointerenter", intent);
+            button.addEventListener("focus", intent);
+            button.addEventListener("pointerleave", clearIntent);
+            button.addEventListener("blur", clearIntent);
+          }
           rows.set(session.id, row);
         }
         const { button, title, status } = row;

@@ -174,7 +174,7 @@ run 返回 `Promise<{runId, outputText, output, citations}>`。startRun 返回 `
 | resolveContext | IncomingMessage → {engine, assistants, defaultAssistant?} | 每个请求验证登录，engine 已按用户作用域隔离；不能从请求体取 principal |
 | createHttpChatTransport | {baseURL, headers?, credentials?, allowCrossOrigin?, timeoutMs?, fetch?} | ChatTransport；超时默认 15000ms，范围 1–120000 |
 | ChatTransport | getConfig/listSessions/readSession/createSession/sendMessage/cancelRun | uploadImage/readImage 可选，旧文本 Transport 仍可用 |
-| ChatController | transport, {memory?, historyMemory?, assistantId?, activePollMs?, idlePollMs?} | 订阅状态、send/retrySend/cancel/selectSession/newSession/dispose |
+| ChatController | transport, {memory?, historyMemory?, prefetchHistory?, assistantId?, activePollMs?, idlePollMs?} | 订阅状态、send/retrySend/cancel/selectSession/prefetchSession/newSession/dispose；自动预读默认关闭 |
 | addImages / retryImage / removeImage | File[] / 本地草稿图片 ID | 维护上传、错误与稳定引用；失败不会静默丢图发送 |
 | mountChatWidget | options | 悬浮窗口，返回 controller/open/close/destroy/updateTheme 等 |
 | mountChatPage | target: HTMLElement, options | 嵌入页面，返回 controller/ready/destroy/updateTheme 等 |
@@ -213,6 +213,7 @@ images=true 开启 /images 上传和读取接口，需要 Engine protocolKey。�
 | controller.setModel(id) / setSkill(id?) | 更新下一条草稿选项 | 不改当前 Run；发送结果未明时禁止修改；有图片不能切纯文本模型 |
 | composerCatalog(state) / selectedChatModel(state) | 自定义界面读取目录与选项 | 由 chat-core 导出 |
 | mountChatPage / mountChatWidget 的 sendShortcut | enter 或 mod-enter | 缺省 mod-enter；文档站使用 enter |
+| mountChatPage / mountChatWidget 的 prefetchHistory | boolean | 缺省 true；自建 controller 控制自动预读，false 同时禁用界面的悬停/聚焦预读 |
 | createComposer.destroy() | 清理输入组件资源 | 独立使用组件时在卸载调用；页面/浮窗已代办 |
 
 选择器会显示实际配置的模型；声明 thinking.enabled 不代表供应商或适配器必然支持，仍须满足 Engine 能力验证。语音识别没有实现，麦克风保持禁用。具体使用见[定制聊天界面](/docs/frontend-customize/#编辑输入和选择模型)。

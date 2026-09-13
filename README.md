@@ -74,6 +74,8 @@ pnpm playground
 
 对话列表按会话 ID 原地更新，开关侧栏保留列表与滚动位置。文档站额外启用同一标签页的 5 分钟摘要缓存，刷新或切换模式先显示缓存、后台校验；通用 SDK 可显式配置 `historyMemory: createSessionListMemory(sessionStorage, verifiedAccountScope)`。最多 100 条，不保存正文；身份失效或 `destroy({ clearSession: true })` 清理。执行 `pnpm verify:session-list` 验证缓存、焦点、慢请求和重开行为。
 
+正文命中内存缓存时直接显示，后台校验不插入加载提示。挂载界面默认空闲预读最多 4 个近期会话，鼠标停留或键盘聚焦 100ms 后预读目标；只读接口、单并发、仍受 5 会话 / 约 4MiB 内存限制，不保存正文、不调用模型。可传 `prefetchHistory: false` 关闭；首次慢读取超过 200ms 才在标题栏提示。执行 `pnpm verify:session-switching` 验证。
+
 回复渲染、公开思考配置和 API 变更见[回复展示改进](docs/reply-display-alignment.md)。`pnpm verify:stream-cadence` 可复测小批次文字、长 Markdown 和桌面/窄屏出字节奏。元素顺序、局部收起与动效见[呈现行为](docs/reply-presentation-behaviors.md)，运行 `pnpm verify:reply-presentation` 验证完整状态序列。
 
 文档助手现已接入 Skill、正式知识库、审批写入的跨会话记忆、HTTP/MCP 与问题表单；还可通过 [历史会话工具](docs/session-history-tools.md) 搜索和读取自己的其他对话，无需先保存为长期记忆。从「能力与记忆」打开配置实验及会话调试。接入范围、API 变化和验证证据见 [文档站能力覆盖](docs/docs-capability-coverage.md)。

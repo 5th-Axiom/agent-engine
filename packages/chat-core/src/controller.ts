@@ -136,7 +136,17 @@ export class ChatController {
     promise: Promise<void>;
   };
   private historyReadAt = 0;
-  private cache = new Map<string, { session: ChatSession; bytes: number }>();
+  private cache = new Map<
+    string,
+    { session: ChatSession; bytes: number; prefetched: boolean }
+  >();
+  private prefetchRequest?: {
+    id: string;
+    controller: AbortController;
+    promise: Promise<ChatSession>;
+  };
+  private prefetchTimer?: ReturnType<typeof setTimeout>;
+  private prefetchAttempted = new Set<string>();
   private timer?: ReturnType<typeof setTimeout>;
   private generation = 0;
   private pending?: Pending;
@@ -151,6 +161,8 @@ export class ChatController {
     private options: {
       memory?: SessionMemory;
       historyMemory?: SessionListMemory;
+      /** Warm up to four recent sessions when idle; no model calls or persisted bodies. */
+      prefetchHistory?: boolean;
       assistantId?: string;
       activePollMs?: number;
       idlePollMs?: number;
@@ -211,6 +223,8 @@ export class ChatController {
       ++this.generation;
       this.viewRequest?.abort();
       this.historyRequest?.controller.abort();
+      this.stopPrefetch();
+      this.prefetchAttempted.clear();
       this.cache.clear();
       this.state.session = undefined;
       this.state.sessions = [];
@@ -242,6 +256,8 @@ export class ChatController {
     const generation = ++this.generation;
     this.viewRequest?.abort();
     this.historyRequest?.controller.abort();
+    this.stopPrefetch();
+    this.prefetchAttempted.clear();
     clearTimeout(this.timer);
     this.state.connection = "connecting";
     this.emit();
@@ -411,6 +427,7 @@ export class ChatController {
       throw new ChatError("CHAT_SEND_PENDING");
     if (!this.state.config?.assistants.some((a) => a.id === assistantId))
       throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE");
+    this.stopPrefetch();
     ++this.generation;
     this.viewRequest?.abort();
     this.viewRequest = undefined;
@@ -455,6 +472,7 @@ export class ChatController {
       throw new ChatError("CHAT_SEND_PENDING");
     if (!this.state.assistantId) throw new ChatError("CHAT_NOT_READY");
     this.state.preparingSession = true;
+    this.stopPrefetch();
     this.emit();
     try {
       this.preparationId ??= createChatId();
@@ -481,6 +499,7 @@ export class ChatController {
       throw new ChatError("CHAT_SEND_PENDING");
     ++this.generation;
     this.viewRequest?.abort();
+    this.stopPrefetch(id);
     this.clearImages();
     this.sessionId = id;
     this.state.selectedSessionId = id;
@@ -489,6 +508,7 @@ export class ChatController {
     const cached = this.cache.get(id);
     this.state.session = cached?.session;
     if (cached) {
+      cached.prefetched = false;
       this.cache.delete(id);
       this.cache.set(id, cached);
       this.state.assistantId = cached.session.assistantId;
@@ -515,6 +535,7 @@ export class ChatController {
       (this.state.selectedSessionId && !this.state.session)
     )
       throw new ChatError("CHAT_NOT_READY");
+    this.stopPrefetch();
     const text = input.trim();
     if ((!text && !this.state.images?.length) || text.length > 8000)
       throw new ChatError("INVALID_INPUT");
@@ -669,6 +690,10 @@ export class ChatController {
         const sessions = await this.transport.listSessions(controller.signal);
         if (this.disposed || controller.signal.aborted) return;
         this.state.sessions = sessions;
+        const visibleIds = new Set(sessions.map((session) => session.id));
+        this.prefetchAttempted = new Set(
+          [...this.prefetchAttempted].filter((id) => visibleIds.has(id)),
+        );
         this.state.historyLoaded = true;
         this.syncCurrentSummary();
         this.rememberHistory(this.state.sessions);
@@ -686,6 +711,7 @@ export class ChatController {
       } finally {
         this.lifetime.signal.removeEventListener("abort", abort);
         if (this.historyRequest === request) this.historyRequest = undefined;
+        this.schedulePrefetch();
       }
     })();
     return request.promise;
@@ -723,21 +749,140 @@ export class ChatController {
         ];
     this.rememberHistory(this.state.sessions);
   }
-  private remember(session: ChatSession) {
+  private remember(session: ChatSession, prefetched = false) {
+    const previous = this.cache.get(session.id);
+    if (
+      prefetched &&
+      previous &&
+      (!previous.prefetched ||
+        previous.session.snapshotSequence > session.snapshotSequence)
+    )
+      return;
     this.cache.delete(session.id);
     const bytes = JSON.stringify(session).length * 2;
     // Bounded, controller-local memory only; never persist conversation contents.
     if (bytes > 4 * 1024 * 1024) return;
-    this.cache.set(session.id, { session, bytes });
+    this.cache.set(session.id, { session, bytes, prefetched });
     let total = [...this.cache.values()].reduce(
       (sum, item) => sum + item.bytes,
       0,
     );
     while (this.cache.size > 5 || total > 4 * 1024 * 1024) {
-      const [id, oldest] = this.cache.entries().next().value!;
+      // Speculation never evicts a visited session. Foreground reads evict speculative rows first.
+      const entries = [...this.cache.entries()];
+      const [id, oldest] =
+        entries.find(
+          ([id, entry]) => id !== this.sessionId && entry.prefetched,
+        ) ??
+        entries.find(([id]) => id !== this.sessionId) ??
+        entries[0]!;
       total -= oldest.bytes;
       this.cache.delete(id);
     }
+  }
+  private stopPrefetch(exceptId?: string) {
+    clearTimeout(this.prefetchTimer);
+    this.prefetchTimer = undefined;
+    if (this.prefetchRequest && this.prefetchRequest.id !== exceptId) {
+      this.prefetchRequest.controller.abort();
+      this.prefetchRequest = undefined;
+    }
+  }
+  /** Read a known sidebar session into bounded memory without selecting it or calling a model. */
+  async prefetchSession(id: string): Promise<void> {
+    if (
+      this.disposed ||
+      this.unauthorized ||
+      this.state.connection !== "ready" ||
+      chatBusy(this.state) ||
+      this.state.pending ||
+      !!this.state.session?.activeRun ||
+      this.viewRequest ||
+      id === this.sessionId ||
+      this.cache.has(id) ||
+      !this.state.sessions.some((session) => session.id === id)
+    )
+      return;
+    if (this.prefetchRequest?.id === id) {
+      await this.prefetchRequest.promise.catch(() => {});
+      return;
+    }
+    if (
+      this.cache.size >= 5 &&
+      ![...this.cache.values()].some((entry) => entry.prefetched)
+    )
+      return;
+    this.stopPrefetch();
+    this.prefetchAttempted.add(id);
+    const controller = new AbortController();
+    const request = {
+      id,
+      controller,
+      promise: Promise.resolve(undefined as unknown as ChatSession),
+    };
+    this.prefetchRequest = request;
+    request.promise = (async () => {
+      try {
+        const session = await this.transport.readSession(id, controller.signal);
+        if (this.disposed || this.unauthorized || controller.signal.aborted)
+          throw new ChatError("CHAT_REQUEST_CANCELLED");
+        if (session.id !== id) throw new ChatError("CHAT_INVALID_RESPONSE");
+        this.remember(session, true);
+        return session;
+      } catch (error) {
+        if (
+          !this.disposed &&
+          !controller.signal.aborted &&
+          error instanceof ChatError
+        ) {
+          if (error.status === 401) {
+            this.fail(error);
+            this.emit();
+          } else if ([403, 404, 410].includes(error.status ?? 0))
+            this.cache.delete(id);
+        }
+        throw error;
+      } finally {
+        if (this.prefetchRequest === request) this.prefetchRequest = undefined;
+      }
+    })();
+    // Background failures never produce a rejected, unobserved UI promise.
+    await request.promise.catch(() => {});
+  }
+  private schedulePrefetch() {
+    clearTimeout(this.prefetchTimer);
+    this.prefetchTimer = undefined;
+    if (
+      !this.options.prefetchHistory ||
+      this.disposed ||
+      this.unauthorized ||
+      this.viewRequest ||
+      this.prefetchRequest ||
+      this.state.connection !== "ready" ||
+      chatBusy(this.state) ||
+      this.state.pending ||
+      !!this.state.session?.activeRun
+    )
+      return;
+    if (
+      this.cache.size >= 5 &&
+      ![...this.cache.values()].some((entry) => entry.prefetched)
+    )
+      return;
+    const next = this.state.sessions
+      .filter((session) => session.id !== this.sessionId)
+      .slice(0, 4)
+      .find(
+        (session) =>
+          !this.cache.has(session.id) &&
+          !this.prefetchAttempted.has(session.id),
+      );
+    if (!next) return;
+    this.prefetchTimer = setTimeout(async () => {
+      this.prefetchTimer = undefined;
+      await this.prefetchSession(next.id);
+      this.schedulePrefetch();
+    }, 150);
   }
   private async refreshView(): Promise<void> {
     if (this.disposed || this.unauthorized) return;
@@ -746,12 +891,24 @@ export class ChatController {
     const number = ++this.refreshNumber;
     const id = this.sessionId;
     this.viewRequest?.abort();
+    const background = this.prefetchRequest;
+    const prefetched =
+      background &&
+      background.id === id &&
+      !background.controller.signal.aborted
+        ? background
+        : undefined;
+    this.stopPrefetch(id);
     const request = (this.viewRequest = new AbortController());
     const abort = () => request.abort();
+    const abortPrefetched = () => prefetched?.controller.abort();
+    request.signal.addEventListener("abort", abortPrefetched, { once: true });
     this.lifetime.signal.addEventListener("abort", abort, { once: true });
     try {
       const session = id
-        ? await this.transport.readSession(id, request.signal)
+        ? prefetched
+          ? await prefetched.promise
+          : await this.transport.readSession(id, request.signal)
         : undefined;
       if (
         this.disposed ||
@@ -827,9 +984,11 @@ export class ChatController {
       this.emit();
     } finally {
       this.lifetime.signal.removeEventListener("abort", abort);
+      request.signal.removeEventListener("abort", abortPrefetched);
       if (this.viewRequest === request) {
         this.viewRequest = undefined;
         this.schedule();
+        this.schedulePrefetch();
       }
     }
   }
@@ -858,6 +1017,8 @@ export class ChatController {
     this.lifetime.abort();
     this.viewRequest?.abort();
     this.historyRequest?.controller.abort();
+    this.stopPrefetch();
+    this.prefetchAttempted.clear();
     this.cache.clear();
     this.listeners.clear();
     if (options.clearSession) this.options.memory?.write(null);

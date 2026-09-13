@@ -35,7 +35,8 @@
     "verify:chat-settings": "pnpm build && tsx scripts/verify-chat-settings.ts",
     "verify:docs-capabilities": "pnpm build && tsx scripts/verify-docs-capabilities.ts",
     "verify:reply-presentation": "pnpm build && tsx scripts/verify-reply-presentation.ts",
-    "verify:session-list": "pnpm build && tsx scripts/verify-session-list.ts"
+    "verify:session-list": "pnpm build && tsx scripts/verify-session-list.ts",
+    "verify:session-switching": "pnpm build && tsx scripts/verify-session-switching.ts"
   },
   "devDependencies": {
     "@agent-runtime/debug": "workspace:*",

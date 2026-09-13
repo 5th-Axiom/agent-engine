@@ -2915,3 +2915,10 @@ Anthropic-compatible 的连续 canonical tool 结果编码为同一 user 消息�
 ChatController / mountChatPage / mountChatWidget 新增可选 historyMemory（SessionListMemory）；createSessionListMemory(Storage, accountScope) 只保存经过公开摘要 Schema 投影的列表，5 分钟、最多 100 条、序列化最多 64Ki UTF-16 字符。默认关闭。scope 必须来自服务端验证的账号与业务 namespace；缓存仅用于先显示，所有会话读取/发送/授权仍走原接口。historyLoaded 表示已有快照（可含合法空缓存），首读未知不显示空态，后台失败保留列表；401/403、clearSession 清理，失效当前会话移除并中断迟到列表。
 
 当前已验证会话若不在默认最近 50 条列表中可立即补入，标题与活动态同步持久化。列表组件按 ID 复用行、只改变化内容，排序移动已有行，关闭侧栏不销毁。文档站仅在同一标签页 sessionStorage 保存摘要；服务端从已验证访客生成域分离的 HMAC 缓存分区，HTML no-store，该值不能作为身份凭据。cookie 失效/变更或服务端 Secret 变更时分区随之变化。既有 SessionMemory 仍只存当前 ID，正文的 5 会话 / 约 4MiB 缓存继续仅存在控制器内存。证据见 LIST-01 至 LIST-05，不新增分布式缓存或 M4/M5 功能。
+
+
+### 正文预读与切换显示补充（2026-09-13）
+
+ChatController 新增可选 prefetchHistory（默认 false）和 prefetchSession(id)；mountChatPage / mountChatWidget 创建自有控制器时默认 true，并提供悬停/焦点意图。预读仅使用已验证同 namespace 的已有 readSession 投影，列表已知 ID、单并发、空闲近期最多 4 个，不生成 Run、发送消息或调用模型。返回体只进入既有有界内存缓存，预读项先于已浏览项淘汰；摘要持久化合同不变。主视图读取优先，点击正在预读的相同 ID 可复用该请求；任何中断或授权 epoch 变化均拒绝迟到结果。预读 401 清理身份状态；单会话 403/404/410 不破坏当前有效会话，选择该会话时仍重新授权读取。
+
+loadingSession 继续表示发送前需要完成重新验证，但不再等同于可见加载状态。已有正文时后台校验无正文提示、无 aria-busy；无正文且超过 200ms 才用标题栏状态反馈等待。切换不会用旧会话内容冒充新会话，定时器在切换/完成/销毁时清理；无额外入场动画。证据见 SWITCH-01 至 SWITCH-05。

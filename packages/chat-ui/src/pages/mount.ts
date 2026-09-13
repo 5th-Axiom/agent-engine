@@ -46,6 +46,7 @@ function setup(target: HTMLElement, options: ChatMountOptions) {
     new ChatController(options.transport!, {
       memory: options.memory,
       historyMemory: options.historyMemory,
+      prefetchHistory: options.prefetchHistory ?? true,
       assistantId: options.assistantId,
     });
   const host = element("div");

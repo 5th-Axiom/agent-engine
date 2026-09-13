@@ -64,7 +64,7 @@ const server = createServer(async (req, res) => {
   if (!url.startsWith("/api/agent-chat")) {
     res.setHeader("content-type", "text/html;charset=utf-8");
     res.end(
-      `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>对话响应验证</title><style>body{margin:0}#chat{height:100dvh}</style><div id="chat"></div><script type="module">import{mountChatPage,createHttpChatTransport}from"/chat.mjs";window.chat=mountChatPage(document.querySelector("#chat"),{transport:createHttpChatTransport({baseURL:"/api/agent-chat"}),sendShortcut:"enter"});</script></html>`,
+      `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>对话响应验证</title><style>body{margin:0}#chat{height:100dvh}</style><div id="chat"></div><script type="module">import{mountChatPage,createHttpChatTransport}from"/chat.mjs";window.chat=mountChatPage(document.querySelector("#chat"),{transport:createHttpChatTransport({baseURL:"/api/agent-chat"}),sendShortcut:"enter",prefetchHistory:false});</script></html>`,
     );
     return;
   }
@@ -136,7 +136,9 @@ try {
   heldRead = { id: b, gate: gate() };
   await history(b).click();
   await expect(history(b)).toHaveAttribute("aria-current", "true");
-  await expect(root.locator(".ae-session-loading")).toHaveText("正在加载对话…");
+  await expect(root.locator(".ae-heading .ae-status")).toHaveText(
+    "正在打开对话…",
+  );
   await expect(root.locator(".ae-welcome")).toBeHidden();
   await expect(self).toHaveCount(0);
   heldRead.gate.release();
@@ -155,7 +157,8 @@ try {
       throw Error("CACHE_NOT_IMMEDIATE");
     return performance.now() - start;
   });
-  await expect(root.locator(".ae-session-loading")).toHaveText("正在更新对话…");
+  await expect(root.locator(".ae-heading .ae-status")).toHaveText("已连接");
+  await expect(root.locator(".ae-session-loading")).toHaveCount(0);
   // An old response arriving after a second click must not replace the chosen view.
   await history(b).click();
   heldRead.gate.release();
