@@ -99,6 +99,12 @@ export const runSchema = z.object({
   input: z.string(),
   output: z.string(),
   draft: z.string(),
+  reply: z
+    .object({
+      id: z.string().max(200),
+      sequence: z.number().int().nonnegative(),
+    })
+    .optional(),
   state: z.enum([
     "queued",
     "running",

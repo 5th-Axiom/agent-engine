@@ -190,6 +190,9 @@ export class AgentEngine {
         },
         remove: tx.remove.bind(tx),
         list: tx.list.bind(tx),
+        ...(tx.listBySession
+          ? { listBySession: tx.listBySession.bind(tx) }
+          : {}),
         head: tx.head.bind(tx),
         events: tx.events.bind(tx),
         pruneEvents: tx.pruneEvents.bind(tx),
@@ -4517,9 +4520,11 @@ export class AgentEngine {
     const context = await this.transaction(async (tx) => {
       const session = await this.sessionRecord(tx, id);
       this.assertRetained(session);
-      const runs = (await tx.list<RunRecord>("runs")).filter(
-        (run) => run.sessionId === id,
-      );
+      const runs = (
+        await (tx.listBySession
+          ? tx.listBySession<RunRecord>("runs", id)
+          : tx.list<RunRecord>("runs"))
+      ).filter((run) => run.sessionId === id);
       const refs = runs.flatMap((run) => [
         ...run.messages.flatMap((message) => message.dataRefs ?? []),
         ...(run.compaction?.sourceRefs ?? []),
@@ -4765,44 +4770,106 @@ export class AgentEngine {
     });
     this.notify();
   }
+  private async orderedRuns(tx: StoreTransaction, id: string) {
+    const runs = (
+      await (tx.listBySession
+        ? tx.listBySession<RunRecord>("runs", id)
+        : tx.list<RunRecord>("runs"))
+    ).filter((r) => r.sessionId === id);
+    // Store.list order is deliberately unspecified (Postgres uses record
+    // keys). Conversation order comes from the immutable acceptance event.
+    const order = new Map(
+      runs
+        .filter((r) => r.acceptedSequence !== undefined)
+        .map((r) => [r.id, r.acceptedSequence!]),
+    );
+    const legacy = new Set(
+      runs.filter((r) => r.acceptedSequence === undefined).map((r) => r.id),
+    );
+    if (legacy.size) {
+      const through = await tx.head(id);
+      let after = 0;
+      while (after < through && legacy.size) {
+        const events = await tx.events(id, after, through, 1000);
+        if (!events.length) break;
+        for (const event of events) {
+          if (event.type === "run.queued" && legacy.has(event.runId)) {
+            order.set(event.runId, event.sequence);
+            legacy.delete(event.runId);
+          }
+        }
+        after = events.at(-1)!.sequence;
+      }
+    }
+    runs.sort(
+      (a, b) =>
+        (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0) ||
+        a.id.localeCompare(b.id),
+    );
+    return { runs, order };
+  }
+  /** Authorized records and incremental events for a conversation projection.
+   * Each call rechecks ownership, retention and source grants. No cross-request cache.
+   */
+  async readSessionView(id: string, query: { afterSequence?: number } = {}) {
+    const requested = query.afterSequence ?? 0;
+    if (!Number.isSafeInteger(requested) || requested < 0)
+      fail("EVENT_CURSOR_INVALID");
+    await this.authorize("session", id);
+    await this.authorizeSessionData(id);
+    return this.transaction(async (tx) => {
+      const session = await this.sessionRecord(tx, id);
+      this.assertRetained(session);
+      const { runs, order } = await this.orderedRuns(tx, id);
+      const owned = tx.listBySession
+        ? await tx.listBySession<OperationRecord>("operations", id)
+        : (await tx.list<OperationRecord>("operations")).filter(
+            (o) => o.sessionId === id,
+          );
+      const operations = new Map(
+        owned.filter((o) => o.sessionId === id).map((o) => [o.id, o]),
+      );
+      for (const ref of new Set(runs.flatMap((r) => r.operationRefs ?? []))) {
+        if (operations.has(ref)) continue;
+        const operation = await tx.get<OperationRecord>("operations", ref);
+        if (operation) operations.set(ref, operation);
+      }
+      const through = await tx.head(id);
+      // The projection is bounded even if a client misses a long stream.
+      const after = Math.max(
+        0,
+        through - 6000,
+        requested > through ? 0 : requested,
+      );
+      const earliest =
+        (await tx.events(id, 0, through, 1))[0]?.sequence ?? through + 1;
+      const events: AgentEvent[] = [];
+      let cursor = after;
+      while (cursor < through) {
+        const page = await tx.events(id, cursor, through, 1000);
+        if (!page.length) break;
+        events.push(...page);
+        cursor = page.at(-1)!.sequence;
+      }
+      return {
+        session,
+        runs: runs.map((r) => ({ ...r, acceptedSequence: order.get(r.id) })),
+        operations: [...operations.values()],
+        events,
+        eventsAfter: after,
+        eventsComplete:
+          after === requested && after >= earliest - 1 && cursor === through,
+        snapshotSequence: through,
+        observedAt: this.clock.now(),
+      };
+    });
+  }
   async inspectSession(id: string) {
     await this.readSession(id);
     await this.authorize("data", id);
     return this.transaction(async (tx) => {
       const s = await this.sessionRecord(tx, id);
-      const runs = (await tx.list<RunRecord>("runs")).filter(
-        (r) => r.sessionId === id,
-      );
-      // Store.list order is deliberately unspecified (Postgres uses record
-      // keys). Conversation order comes from the immutable acceptance event.
-      const order = new Map(
-        runs
-          .filter((r) => r.acceptedSequence !== undefined)
-          .map((r) => [r.id, r.acceptedSequence!]),
-      );
-      const legacy = new Set(
-        runs.filter((r) => r.acceptedSequence === undefined).map((r) => r.id),
-      );
-      if (legacy.size) {
-        const through = await tx.head(id);
-        let after = 0;
-        while (after < through && legacy.size) {
-          const events = await tx.events(id, after, through, 1000);
-          if (!events.length) break;
-          for (const event of events) {
-            if (event.type === "run.queued" && legacy.has(event.runId)) {
-              order.set(event.runId, event.sequence);
-              legacy.delete(event.runId);
-            }
-          }
-          after = events.at(-1)!.sequence;
-        }
-      }
-      runs.sort(
-        (a, b) =>
-          (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0) ||
-          a.id.localeCompare(b.id),
-      );
+      const { runs, order } = await this.orderedRuns(tx, id);
       const operations = (await tx.list<OperationRecord>("operations")).filter(
         (o) =>
           runs.some(

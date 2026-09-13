@@ -49,18 +49,40 @@ export function createMessage(data: MessageViewData) {
   update(data);
   return { element: root, update, destroy: content.destroy };
 }
-export function createRunDetails(copy: ChatCopy = defaultChatCopy) {
+export function createRunDetails(
+  copy: ChatCopy = defaultChatCopy,
+  embedded = false,
+) {
   const root = element("details", "ae-run-details");
   const summary = element("summary");
   const usage = element("p");
   const attempts = element("p");
   const operations = element("div");
   const phases = element("div", "ae-run-phases");
-  root.append(summary, usage, attempts, operations, phases);
+  const totals = element("p", "ae-run-usage");
+  const costs = element("p");
+  summary.hidden = embedded;
+  root.open = embedded;
+  root.append(summary, totals, usage, costs, attempts, operations, phases);
   return {
     element: root,
     update: (run: ChatRun) => {
       summary.textContent = `${copy.details} · ${run.usage.total ?? "—"} Token`;
+      totals.hidden = !embedded;
+      totals.textContent =
+        run.usage.total === undefined
+          ? "用量等待上报"
+          : `已用 ${run.usage.total.toLocaleString()} Token${run.usage.complete ? "" : "（待结算）"}`;
+      costs.textContent = run.usage.costs?.length
+        ? "费用估算 " +
+          run.usage.costs
+            .map(
+              (cost) =>
+                `${cost.amount} ${cost.currency}${cost.complete ? "" : "（不完整）"}`,
+            )
+            .join(" / ")
+        : "";
+      costs.hidden = !costs.textContent;
       usage.textContent = `输入 ${run.usage.input ?? "—"} · 输出 ${run.usage.output ?? "—"} · ${run.usage.complete ? "用量完整" : "用量尚不完整"} · ${run.usage.costComplete ? "费用估算完整" : "费用估算不完整"}`;
       attempts.textContent = `模型请求 ${run.attempts} · 执行步骤 ${run.steps}`;
       phases.replaceChildren(
@@ -111,6 +133,7 @@ export function createMessageTimeline(
       process: ReturnType<typeof createRunProcess>;
       sources: HTMLElement;
       fingerprint: string;
+      sourceKey: string;
     }
   >();
   return {
@@ -168,21 +191,15 @@ export function createMessageTimeline(
           });
           const status = element("p", "ae-turn-state");
           const details = createRunDetails(copy);
-          const process = createRunProcess(options.resolveInput);
-          agent.element.insertBefore(
-            process.element,
-            agent.element.querySelector(".ae-message-text"),
+          const process = createRunProcess(
+            options.resolveInput,
+            details.element,
           );
           const sources = element("nav", "ae-sources");
           sources.setAttribute("aria-label", "本条回答的参考资料");
           sources.hidden = true;
-          container.append(
-            user.element,
-            agent.element,
-            sources,
-            status,
-            details.element,
-          );
+          agent.element.append(process.element, sources);
+          container.append(user.element, agent.element, status);
           turn = {
             element: container,
             user,
@@ -192,7 +209,11 @@ export function createMessageTimeline(
             process,
             sources,
             fingerprint: "",
+            sourceKey: "",
           };
+          process.element.addEventListener("replysettled", () => {
+            sources.hidden = !sources.childElementCount || !process.settled;
+          });
           turns.set(run.id, turn);
           root.append(container);
         }
@@ -243,12 +264,13 @@ export function createMessageTimeline(
         const active = !["completed", "failed", "cancelled"].includes(
           run.state,
         );
+        turn.element.dataset.active = String(active);
         turn.agent.update({
           sender: "agent",
           name: copy.assistant,
-          text:
-            run.output ||
-            (active ? run.draft || (run.process ? "" : "正在准备回答…") : ""),
+          text: run.process
+            ? ""
+            : run.output || (active ? run.draft || "正在准备回答…" : ""),
           streaming: active,
         });
         turn.agent.element.hidden = !active && !run.output && !run.process;
@@ -267,7 +289,7 @@ export function createMessageTimeline(
           (run.state === "completed" ||
             (active && !run.cancelRequested && !run.errorCode));
         turn.details.update(run);
-        turn.sources.replaceChildren();
+        const links: HTMLAnchorElement[] = [];
         if (run.state === "completed" && options.getRunSources) {
           try {
             for (const source of options.getRunSources(run).slice(0, 8)) {
@@ -280,18 +302,25 @@ export function createMessageTimeline(
                 continue;
               const link = element("a", "", source.label);
               link.href = url.href;
-              // Keep the active conversation and draft in place while reading a source.
               link.target = "_blank";
               link.rel = "noopener noreferrer";
               link.setAttribute("aria-label", source.label + "（新标签页）");
-              turn.sources.append(link);
+              links.push(link);
             }
           } catch {
-            // A host reference resolver cannot interrupt rendering or sending.
-            turn.sources.replaceChildren();
+            links.length = 0;
           }
         }
-        turn.sources.hidden = !turn.sources.childElementCount;
+        const sourceKey = JSON.stringify(
+          links.map((link) => [link.href, link.textContent]),
+        );
+        if (sourceKey !== turn.sourceKey) {
+          turn.sourceKey = sourceKey;
+          turn.sources.replaceChildren(...links);
+        }
+        turn.sources.hidden =
+          !turn.sources.childElementCount ||
+          (!!run.process && !turn.process.settled);
       }
     },
   };

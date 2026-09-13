@@ -24,6 +24,7 @@
 | suggestions         | 示例问题数组                             | 帮用户开始第一条消息       |
 | theme               | 模式、皮肤、品牌色和尺寸                 | 适配你的产品视觉           |
 | position            | right 或 left                            | 控制图标位于右下角或左下角 |
+| panelMode           | floating（默认）或 side                    | 浮窗或贴侧边面板；宿主通过 `::part(panel)` 留出页头 |
 
 欢迎语和建议问题是前端展示文案，**不会代替模型的 instructions 或业务工具配置**。要让助手真正知道你的产品规则，请在后端配置说明或[接入文档检索](/docs/capabilities/)。
 

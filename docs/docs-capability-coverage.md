@@ -17,6 +17,7 @@
 | --- | --- | --- |
 | 图文、多模型、公开思考、历史与取消 | 原有 IM、输入工具栏与过程记录 | 既有图文/模型/过程契约回归；本轮没有伪造供应商思考内容 |
 | Binding 工具 | 6 个公开文档/API/源码工具 | 原有行为回归与真实模型资料查询 |
+| 跨会话聊天读取 | sessions.search / sessions.read，标准目录现在共 10 个工具 | 本人会话关键词查找、分页原文、来源撤权/删除继承及 PostgreSQL 故障恢复；见 [历史会话工具](session-history-tools.md) |
 | HTTP、Streamable HTTP MCP | 本地公共资料服务，新增目录与检索两个工具 | 真实 HTTP/MCP 初始化、工具 Schema 与执行；授权模型 Smoke |
 | inline / loader Skill | integration-guide 与 troubleshoot | 首请求前加载；loader 版本和内容哈希；配置禁用；两个 Skill 均经授权模型运行 |
 | KnowledgeBase | manual 手册检索器、来源 ID、知识库开关 | 真实文档检索；严格引用校验另由配置实验验证 |
@@ -41,6 +42,7 @@
 新增文档宿主模块：
 
 - `examples/docs-site/capabilities.ts`：Skill、知识库、审批策略、记忆适配器、加密与版本控制。
+- `session-history.ts`：当前访客的其他会话搜索/读取、Operation 来源关系与事务内只读授权；不依赖长期记忆开关。
 - `remote-capabilities.ts`：只绑定 loopback 的公开文档 HTTP/MCP 服务，默认 4321。SDK 执行器和远端契约均实际启用。
 - `experiments.ts`：13 类有界配置实验。检查结果来自真实 Run、执行次数、事件与快照。
 - `capabilities-handler.ts`、`capabilities-page.js`、`capabilities.css`：工作台 API、身份隔离、实验报告、记忆与会话管理。

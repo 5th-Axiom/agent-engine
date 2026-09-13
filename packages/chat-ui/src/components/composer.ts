@@ -12,6 +12,8 @@ import {
 } from "../atoms/index.js";
 import { defaultChatCopy, explainChatError, type ChatCopy } from "../copy.js";
 export function createComposer(options: {
+  /** Height of the conversation area, excluding feedback and other host chrome. */
+  availableHeight?: () => number;
   sendShortcut?: "enter" | "mod-enter";
   onModel?: (id: string) => void;
   onSkill?: (id?: string) => void;
@@ -45,42 +47,42 @@ export function createComposer(options: {
   skill.addEventListener("change", () =>
     options.onSkill?.(skill.value || undefined),
   );
-  const microphone = createButton({
-    label: "语音输入：未接入语音识别服务",
-    icon: "microphone",
-    iconOnly: true,
-  });
-  microphone.disabled = true;
-  const voiceHint = element("span", "ae-disabled-control");
-  voiceHint.tabIndex = 0;
-  voiceHint.setAttribute("role", "note");
-  voiceHint.setAttribute("aria-label", "语音输入不可用：未接入语音识别服务");
-  voiceHint.title = "未接入语音识别服务";
-  voiceHint.append(microphone);
   const resize = () => {
+    if (!root.isConnected || !root.getClientRects().length) return;
+    const available =
+      options.availableHeight?.() ?? root.parentElement?.clientHeight ?? 0;
+    if (!available) return;
+    root.dataset.compact = String(available < 360);
+    // Measure the actual controls, attachments and footnote before changing the
+    // native editor. A widget and a full page share this same height budget.
+    const overhead =
+      root.getBoundingClientRect().height -
+      field.input.getBoundingClientRect().height;
+    const reading = Math.min(200, available * 0.45);
+    const limit = Math.max(
+      40,
+      Math.min(expanded ? 320 : 180, available - overhead - reading),
+    );
     const top = field.input.scrollTop;
     field.input.style.height = "auto";
-    const limit = Math.max(
-      72,
-      Math.min(
-        expanded ? 480 : 180,
-        (window.visualViewport?.height ?? innerHeight) *
-          (expanded ? 0.5 : 0.25),
-      ),
-    );
     field.input.style.height = `${Math.min(limit, Math.max(expanded ? limit : 72, field.input.scrollHeight))}px`;
     field.input.scrollTop = top;
+    const pageTop = root.closest(".ae-page")?.getBoundingClientRect().top ?? 0;
+    settingsBody.style.maxHeight = `${Math.max(44, Math.min(300, settingsSummary.getBoundingClientRect().top - pageTop - 12))}px`;
   };
   const expand = createButton({
     label: "展开输入框",
     icon: "expand",
-    iconOnly: true,
     onClick: () => {
       expanded = !expanded;
       root.dataset.expanded = String(expanded);
       expand.setAttribute("aria-expanded", String(expanded));
       expand.setAttribute("aria-label", expanded ? "收起输入框" : "展开输入框");
       expand.title = expanded ? "收起输入框（Esc）" : "展开输入框";
+      expand.querySelector("span")!.textContent = expanded
+        ? "收起输入框"
+        : "展开输入框";
+      settings.open = false;
       resize();
       field.input.focus({ preventScroll: true });
     },
@@ -92,11 +94,14 @@ export function createComposer(options: {
   settingsSummary.title = "输入设置";
   // Use the same authored icon vocabulary as every other toolbar control.
   settingsSummary.append(createIcon("settings"));
-  const settingsBody = element(
+  const settingsBody = element("div", "ae-composer-settings-body");
+  const skillLabel = element(
     "label",
-    "ae-composer-settings-body",
-    "发送快捷键",
+    "ae-input-option",
+    "下一条消息使用的技能",
   );
+  skillLabel.append(skill);
+  const shortcutLabel = element("label", "ae-input-option", "发送快捷键");
   const shortcutSelect = element("select", "ae-composer-select");
   shortcutSelect.setAttribute("aria-label", "发送快捷键");
   for (const [value, label] of [
@@ -112,7 +117,8 @@ export function createComposer(options: {
     shortcut = shortcutSelect.value as typeof shortcut;
     if (latest) updateCount(latest);
   });
-  settingsBody.append(shortcutSelect);
+  shortcutLabel.append(shortcutSelect);
+  settingsBody.append(skillLabel, expand, shortcutLabel);
   settings.append(settingsSummary, settingsBody);
   const send = createButton({
     label: copy.send,
@@ -125,7 +131,7 @@ export function createComposer(options: {
     icon: "stop",
     onClick: options.onCancel,
   });
-  actions.append(voiceHint, expand, settings, cancel, send);
+  actions.append(settings, cancel, send);
   footer.append(controls, actions);
   const picker = document.createElement("input");
   picker.type = "file";
@@ -138,7 +144,7 @@ export function createComposer(options: {
     iconOnly: true,
     onClick: () => picker.click(),
   });
-  controls.append(attach, model, skill);
+  controls.append(attach, model);
   picker.addEventListener("change", () => {
     options.onImages?.([...(picker.files ?? [])]);
     picker.value = "";
@@ -179,7 +185,7 @@ export function createComposer(options: {
     resize();
   });
   field.input.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && !event.isComposing && !composing) {
       if (settings.open) {
         event.preventDefault();
         event.stopPropagation();
@@ -234,14 +240,25 @@ export function createComposer(options: {
   };
   document.addEventListener("pointerdown", outside);
   let width = 0;
+  let resizeFrame = 0;
+  const scheduleResize = () => {
+    if (!resizeFrame)
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        resize();
+      });
+  };
   const observer = new ResizeObserver((entries) => {
-    const next = entries[0]?.contentRect.width ?? 0;
-    if (next !== width) {
-      width = next;
-      resize();
+    for (const entry of entries) {
+      if (entry.target === field.element) {
+        if (entry.contentRect.width === width) continue;
+        width = entry.contentRect.width;
+      }
+      scheduleResize();
     }
   });
   observer.observe(field.element);
+  for (const part of [footer, images, count, note]) observer.observe(part);
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
   const updateCount = (state: ChatState) => {
@@ -264,7 +281,9 @@ export function createComposer(options: {
   return {
     element: root,
     input: field.input,
+    resize: scheduleResize,
     destroy: () => {
+      cancelAnimationFrame(resizeFrame);
       observer.disconnect();
       document.removeEventListener("pointerdown", outside);
       window.removeEventListener("resize", resize);
@@ -313,9 +332,13 @@ export function createComposer(options: {
           }),
         );
       }
-      skill.hidden = !catalog.skills?.length;
+      skillLabel.hidden = !catalog.skills?.length;
       skill.disabled = state.pending || state.sending || !options.onSkill;
       skill.value = state.skillId ?? "";
+      settingsSummary.dataset.selected = String(!!state.skillId);
+      settingsSummary.title = state.skillId
+        ? `输入设置 · ${catalog.skills?.find((item) => item.id === state.skillId)?.label ?? state.skillId}`
+        : "输入设置";
       expand.disabled = !state.config;
       attach.hidden = !state.config?.images || !options.onImages;
       const supportsImages =
@@ -391,6 +414,7 @@ export function createComposer(options: {
       cancel.hidden = !state.session?.runs.some(
         (r) => !["completed", "failed", "cancelled"].includes(r.state),
       );
+      send.hidden = !cancel.hidden;
       cancel.disabled =
         state.cancelling ||
         state.session?.runs.some(

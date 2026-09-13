@@ -34,6 +34,8 @@
 | [上下文与宿主约定](adr/0002-context-and-host-contracts.md)                | 上下文、审批和宿主协作边界                 |
 | [保留与维护决策](adr/0003-retention-and-maintenance.md)                   | 数据保留、到期清理与维护规则               |
 | [前端聊天 SDK 决策](adr/0005-embeddable-chat-sdk.md)                      | 分层、登录隔离与浏览器数据边界             |
+| [聊天空间与操作反馈](chat-ui-experience.md)                             | 容器高度、菜单、过程、侧窗与动效的行为验收 |
+| [历史会话工具](session-history-tools.md)                                | 文档助手搜索和读取其他聊天、权限与分页     |
 | [本地测试页决策](adr/0004-local-playground.md)                            | 页面范围、Debug 挂载与运行排序             |
 
 [参考 Runtime 说明](workbuddy-agent-runtime-usage.md)记录的是参考项目行为；[原始实施任务](implementation-task.md)记录的是建设要求。两者用于追溯背景，当前项目怎么使用请以上面的使用文档和公开接口为准。

@@ -66,129 +66,148 @@ it("standard OpenAI-compatible provider is selected automatically and parses SSE
   await e.close();
   await s.close();
 });
-it("Anthropic Thinking native signature survives a tool round trip and is absent from public events", async () => {
-  let count = 0;
-  const nativeSignature = "synthetic-native-signature";
-  const s = await server((body) => {
-    const start = frame({
-      type: "message_start",
-      message: { usage: { input_tokens: 10, output_tokens: 0 } },
-    });
-    if (count++ === 0)
+it.each([1, 2])(
+  "Anthropic Thinking signature survives %i tool results in one user message and stays private",
+  async (toolCount) => {
+    let count = 0;
+    const nativeSignature = "synthetic-native-signature";
+    const s = await server((body) => {
+      const start = frame({
+        type: "message_start",
+        message: { usage: { input_tokens: 10, output_tokens: 0 } },
+      });
+      if (count++ === 0)
+        return (
+          start +
+          frame({
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "thinking", thinking: "" },
+          }) +
+          frame({
+            type: "content_block_delta",
+            index: 0,
+            delta: {
+              type: "thinking_delta",
+              thinking: "private synthetic reasoning",
+            },
+          }) +
+          frame({
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "signature_delta", signature: nativeSignature },
+          }) +
+          frame({ type: "content_block_stop", index: 0 }) +
+          Array.from(
+            { length: toolCount },
+            (_, i) =>
+              frame({
+                type: "content_block_start",
+                index: i + 1,
+                content_block: {
+                  type: "tool_use",
+                  id: "c" + i,
+                  name: body.tools[0].name,
+                  input: {},
+                },
+              }) + frame({ type: "content_block_stop", index: i + 1 }),
+          ).join("") +
+          frame({
+            type: "message_delta",
+            delta: { stop_reason: "tool_use" },
+            usage: { output_tokens: 5 },
+          }) +
+          frame({ type: "message_stop" })
+        );
       return (
         start +
         frame({
           type: "content_block_start",
           index: 0,
-          content_block: { type: "thinking", thinking: "" },
+          content_block: { type: "text", text: "" },
         }) +
         frame({
           type: "content_block_delta",
           index: 0,
-          delta: {
-            type: "thinking_delta",
-            thinking: "private synthetic reasoning",
-          },
-        }) +
-        frame({
-          type: "content_block_delta",
-          index: 0,
-          delta: { type: "signature_delta", signature: nativeSignature },
+          delta: { type: "text_delta", text: "done" },
         }) +
         frame({ type: "content_block_stop", index: 0 }) +
         frame({
-          type: "content_block_start",
-          index: 1,
-          content_block: {
-            type: "tool_use",
-            id: "c",
-            name: body.tools[0].name,
-            input: {},
-          },
-        }) +
-        frame({ type: "content_block_stop", index: 1 }) +
-        frame({
           type: "message_delta",
-          delta: { stop_reason: "tool_use" },
-          usage: { output_tokens: 5 },
+          delta: { stop_reason: "end_turn" },
+          usage: { output_tokens: 2 },
         }) +
         frame({ type: "message_stop" })
       );
-    return (
-      start +
-      frame({
-        type: "content_block_start",
-        index: 0,
-        content_block: { type: "text", text: "" },
-      }) +
-      frame({
-        type: "content_block_delta",
-        index: 0,
-        delta: { type: "text_delta", text: "done" },
-      }) +
-      frame({ type: "content_block_stop", index: 0 }) +
-      frame({
-        type: "message_delta",
-        delta: { stop_reason: "end_turn" },
-        usage: { output_tokens: 2 },
-      }) +
-      frame({ type: "message_stop" })
-    );
-  });
-  const store = new MemoryStore();
-  const e = await createAgentEngine({
-    store,
-    principal: { tenantId: "t", subjectId: "u" },
-    secrets: { resolve: async () => "synthetic-protection-key" },
-    protocolKey: { secretRef: "protocol" },
-    policy: { allowedOrigins: [s.origin], allowPrivateOrigins: [s.origin] },
-    bindings: {
-      read: {
-        version: "1",
-        sideEffect: "read",
-        execute: async () => ({ ok: true }),
-      },
-    },
-  });
-  const session = await e.createSession({
-    config: {
-      models: {
-        p: {
-          provider: "anthropic-compatible",
-          model: "test",
-          baseURL: s.origin,
-          apiKey: { secretRef: "test" },
-          thinking: { enabled: true, budgetTokens: 1024, expose: "none" },
-          limits: { contextWindowTokens: 32000, maxOutputTokens: 2000 },
+    });
+    const store = new MemoryStore();
+    const e = await createAgentEngine({
+      store,
+      principal: { tenantId: "t", subjectId: "u" },
+      secrets: { resolve: async () => "synthetic-protection-key" },
+      protocolKey: { secretRef: "protocol" },
+      policy: { allowedOrigins: [s.origin], allowPrivateOrigins: [s.origin] },
+      bindings: {
+        read: {
+          version: "1",
+          sideEffect: "read",
+          execute: async () => ({ ok: true }),
         },
       },
-      routing: { primary: "p" },
-      tools: [
-        {
-          name: "read",
-          description: "Read data",
-          inputSchema: { type: "object" },
-          outputSchema: { type: "object" },
-          execution: {
-            type: "binding",
-            bindingKey: "read",
-            sideEffect: "read",
+    });
+    const session = await e.createSession({
+      config: {
+        models: {
+          p: {
+            provider: "anthropic-compatible",
+            model: "test",
+            baseURL: s.origin,
+            apiKey: { secretRef: "test" },
+            thinking: { enabled: true, budgetTokens: 1024, expose: "none" },
+            limits: { contextWindowTokens: 32000, maxOutputTokens: 2000 },
           },
         },
-      ],
-    },
-  });
-  expect((await session.run({ input: "go" })).outputText).toBe("done");
-  expect(JSON.stringify(s.requests[1])).toContain(nativeSignature);
-  expect(JSON.stringify((await session.listEvents()).events)).not.toContain(
-    nativeSignature,
-  );
-  expect(
-    JSON.stringify(await store.transaction((tx) => tx.list("runs"))),
-  ).not.toContain(nativeSignature);
-  await e.close();
-  await s.close();
-});
+        routing: { primary: "p" },
+        tools: [
+          {
+            name: "read",
+            description: "Read data",
+            inputSchema: { type: "object" },
+            outputSchema: { type: "object" },
+            execution: {
+              type: "binding",
+              bindingKey: "read",
+              sideEffect: "read",
+            },
+          },
+        ],
+      },
+    });
+    expect((await session.run({ input: "go" })).outputText).toBe("done");
+    expect(JSON.stringify(s.requests[1])).toContain(nativeSignature);
+    const continuation = s.requests[1].messages;
+    const assistantIndex = continuation.findIndex(
+      (m: any) => m.role === "assistant",
+    );
+    expect(continuation.slice(assistantIndex + 1)).toHaveLength(1);
+    expect(continuation[assistantIndex + 1]).toEqual({
+      role: "user",
+      content: Array.from({ length: toolCount }, (_, i) => ({
+        type: "tool_result",
+        tool_use_id: "c" + i,
+        content: '{"ok":true}',
+      })),
+    });
+    expect(JSON.stringify((await session.listEvents()).events)).not.toContain(
+      nativeSignature,
+    );
+    expect(
+      JSON.stringify(await store.transaction((tx) => tx.list("runs"))),
+    ).not.toContain(nativeSignature);
+    await e.close();
+    await s.close();
+  },
+);
 
 it.each([
   ["refusal", "openai-compatible", "MODEL_REFUSED"],

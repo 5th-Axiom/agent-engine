@@ -15,6 +15,7 @@ import {
 } from "@agent-runtime/testing";
 import { createHttpChatTransport } from "@agent-runtime/chat-core";
 import { createDocsCapabilities } from "../../examples/docs-site/capabilities.js";
+import { createDocsSessionHistory } from "../../examples/docs-site/session-history.js";
 import { startDocsRemoteCapabilities } from "../../examples/docs-site/remote-capabilities.js";
 import {
   docsAssistant,
@@ -41,10 +42,11 @@ async function fixture(model: ModelAdapter) {
     memoryKey: key,
   });
   const remote = await startDocsRemoteCapabilities(articles);
+  const history = createDocsSessionHistory(store);
   closes.push(remote.close);
   const engine = await createAgentEngine({
-    store,
-    authorize: async () => true,
+    store: history.store,
+    authorize: history.authorize,
     principal: { tenantId: "docs-site", subjectId: "host" },
     secrets: { resolve: async () => "synthetic-only" },
     adapters: { models: { scripted: model } },
@@ -52,6 +54,7 @@ async function fixture(model: ModelAdapter) {
       "docs.search.v1": docsBinding(articles),
       ...knowledge.bindings,
       ...capabilities.bindings,
+      ...history.bindings,
     },
     remoteContracts: remote.contracts,
     policy: {
@@ -60,15 +63,18 @@ async function fixture(model: ModelAdapter) {
     },
   });
   closes.push(() => engine.close());
-  const assistant = docsAssistant(
-    {
-      provider: "scripted",
-      model: "test",
-      baseURL: "https://model.example.com",
-      apiKey: { secretRef: "test" },
-      limits: { contextWindowTokens: 64000, maxOutputTokens: 1500 },
-    },
-    knowledge,
+  history.attachEngine(engine);
+  const assistant = history.assistant(
+    docsAssistant(
+      {
+        provider: "scripted",
+        model: "test",
+        baseURL: "https://model.example.com",
+        apiKey: { secretRef: "test" },
+        limits: { contextWindowTokens: 64000, maxOutputTokens: 1500 },
+      },
+      knowledge,
+    ),
   );
   const config = parseConfig(assistant.config);
   config.tools.push(...remote.tools);
@@ -104,8 +110,10 @@ async function finished(
     .poll(async () => (await client.readSession(id)).runs.at(-1)?.state, {
       timeout: 10000,
     })
-    .toBe("completed");
-  return (await client.readSession(id)).runs.at(-1)!;
+    .toMatch(/^(completed|failed|cancelled)$/);
+  const run = (await client.readSession(id)).runs.at(-1)!;
+  expect(run.state, run.errorCode).toBe("completed");
+  return run;
 }
 it("docs memory requires confirmation, persists across sessions, stays encrypted and isolated, and obeys read switches", async () => {
   const model = scriptedModel([
@@ -237,7 +245,10 @@ it("docs Skills, formal knowledge and real HTTP/MCP run through Engine contracts
   const settings = await a.client.readSettings!(s.id);
   expect(settings.skills).toHaveLength(2);
   expect(settings.knowledgeBases).toHaveLength(1);
-  expect(settings.tools).toHaveLength(8);
+  expect(settings.tools).toHaveLength(10);
+  expect(settings.tools.map((tool) => tool.name)).toEqual(
+    expect.arrayContaining(["sessions.search", "sessions.read"]),
+  );
   await a.client.sendMessage(s.id, {
     requestId: randomUUID(),
     input: "核对接入",
@@ -319,6 +330,41 @@ it("docs question and structured-input resolution validates schemas and idempote
       a.client.resolveInput!(s.id, { id: p.id!, kind, answer: "changed" }),
     ).rejects.toMatchObject({ code: "INPUT_ALREADY_RESOLVED" });
   }
+});
+
+it("the HTTP settings catalog exposes both history tools and disabling them removes them from the model", async () => {
+  const model = scriptedModel([finalText("已使用当前配置")]);
+  const f = await fixture(model),
+    a = await f.transport();
+  const s = await a.client.createSession({
+    assistantId: "docs",
+    requestId: randomUUID(),
+  });
+  const settings = await a.client.readSettings!(s.id);
+  const history = ["sessions.search", "sessions.read"];
+  expect(
+    settings.tools.filter((t) => history.includes(t.name)).map((t) => t.label),
+  ).toEqual(["搜索历史会话", "读取会话内容"]);
+  expect(settings.preferences.enabledTools).toEqual(
+    expect.arrayContaining(history),
+  );
+  settings.preferences.enabledTools = settings.preferences.enabledTools.filter(
+    (name) => !history.includes(name),
+  );
+  await a.client.updateSettings!(s.id, {
+    ifVersion: settings.configVersion,
+    preferences: settings.preferences,
+  });
+  await a.client.sendMessage(s.id, { requestId: randomUUID(), input: "继续" });
+  await finished(a.client, s.id);
+  expect(model.requests[0]!.tools.some((t) => history.includes(t.name))).toBe(
+    false,
+  );
+  expect(
+    (await a.client.readSettings!(s.id)).preferences.enabledTools.some((name) =>
+      history.includes(name),
+    ),
+  ).toBe(false);
 });
 
 it("workbench APIs authenticate ownership, enforce origin and CAS, and keep experiment requests idempotent", async () => {

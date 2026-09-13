@@ -4,6 +4,7 @@ import {
   AgentEngineError,
   type ModelStreamEvent,
   type SessionConfigInput,
+  type RunRecord,
 } from "@agent-runtime/sdk";
 import {
   MemoryStore,
@@ -11,7 +12,11 @@ import {
   finalText,
   toolCall,
 } from "@agent-runtime/testing";
-import { ProcessJournal } from "../../packages/chat-server/src/process.js";
+import {
+  ProcessJournal,
+  type Fact,
+} from "../../packages/chat-server/src/process.js";
+import { projectReply } from "../../packages/chat-server/src/reply.js";
 import { readChatSession } from "../../packages/chat-server/src/projection.js";
 import { sessionSchema } from "@agent-runtime/chat-core";
 import type { ChatAssistantDefinition } from "@agent-runtime/chat-server";
@@ -407,4 +412,127 @@ it("does not upgrade summary-only model policy to content and removes thinking f
   );
   expect(JSON.stringify(result)).not.toContain("DISCARDED_THINKING");
   expect(JSON.stringify(result)).toContain("重试后的可展示内容");
+});
+
+it("reads a growing conversation in a fixed transaction budget with bounded incremental events", async () => {
+  const f = await fixture([
+    finalText("one"),
+    finalText("two"),
+    finalText("three"),
+  ]);
+  const transaction = f.store.transaction.bind(f.store);
+  let reads = 0;
+  f.store.transaction = (fn) => {
+    reads++;
+    return transaction(fn);
+  };
+  const journal = new ProcessJournal();
+  await f.session.run({ input: "first" });
+  reads = 0;
+  await readChatSession(f.context, "process", f.session.id, undefined, journal);
+  const firstReads = reads;
+  await f.session.run({ input: "second" });
+  await f.session.run({ input: "third" });
+  reads = 0;
+  const view = await readChatSession(
+    f.context,
+    "process",
+    f.session.id,
+    undefined,
+    journal,
+  );
+  expect(view.runs.map((r) => r.output)).toEqual(["one", "two", "three"]);
+  expect(reads).toBe(firstReads);
+  // Each authorized read includes retention checks before and after host authorization.
+  expect(reads).toBeLessThanOrEqual(8);
+  await transaction(async (tx) => {
+    for (let i = 0; i < 6100; i++)
+      await tx.append(f.session.id, {
+        type: "session.created",
+        data: { version: 1 },
+      });
+  });
+  const bounded = await f.engine.readSessionView(f.session.id);
+  expect(bounded.events).toHaveLength(6000);
+  expect(bounded.eventsComplete).toBe(false);
+  expect(bounded.eventsAfter).toBe(bounded.snapshotSequence - 6000);
+  const incremental = await f.engine.readSessionView(f.session.id, {
+    afterSequence: bounded.snapshotSequence - 2,
+  });
+  expect(incremental.events).toHaveLength(2);
+  expect(incremental.eventsComplete).toBe(true);
+  f.revoke();
+  await expect(
+    readChatSession(f.context, "process", f.session.id, undefined, journal),
+  ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
+});
+
+it("keeps reply identity and visible text across draft, tool commit and final commit transactions", async () => {
+  const intro = "先查阅接入文档。";
+  const answer = "使用保存的会话标识继续对话。";
+  const f = await fixture([
+    [
+      { type: "delta", kind: "text", blockId: "intro", text: intro },
+      ...toolCall("docs.search", { query: "会话" }),
+    ],
+    [
+      { type: "delta", kind: "text", blockId: "answer", text: answer },
+      ...finalText(answer),
+    ],
+  ]);
+  const versions: { run: RunRecord; sequence: number }[] = [];
+  const transaction = f.store.transaction.bind(f.store);
+  f.store.transaction = async (fn) => {
+    const saved: typeof versions = [];
+    const result = await transaction((tx) =>
+      fn({
+        ...tx,
+        put: async (table, key, value) => {
+          await tx.put(table, key, value);
+          if (table === "runs") {
+            const run = structuredClone(value) as RunRecord;
+            saved.push({ run, sequence: await tx.head(run.sessionId) });
+          }
+        },
+      }),
+    );
+    versions.push(...saved);
+    return result;
+  };
+  await f.session.run({ input: "怎么续聊" });
+  const facts = (await transaction((tx) => tx.events(f.session.id, 0))).filter(
+    (e) => "runId" in e,
+  ) as Fact[];
+  const views = versions.map(({ run, sequence }) => ({
+    run,
+    ...projectReply(
+      run,
+      facts.filter((e) => e.sequence <= sequence),
+    ),
+  }));
+  const draft = views.find((v) => v.draft === intro)!;
+  expect(draft.reply).toBeDefined();
+  const finalView = await readChatSession(f.context, "process", f.session.id);
+  const committedIntro = finalView.runs[0]!.process!.entries.find(
+    (e) => e.kind === "message",
+  )!;
+  expect(committedIntro).toMatchObject({
+    id: draft.reply!.id,
+    sequence: draft.reply!.sequence,
+    output: intro,
+  });
+  const finalDraft = views.find(
+    (v) => v.draft === answer && Object.keys(v.run.drafts ?? {}).length > 0,
+  )!;
+  const commitGap = views.find(
+    (v) =>
+      v.run.decision?.stopReason === "final" &&
+      !Object.keys(v.run.drafts ?? {}).length &&
+      !v.run.result,
+  )!;
+  expect(commitGap).toBeDefined();
+  expect(commitGap.draft).toBe(answer);
+  expect(commitGap.reply).toEqual(finalDraft.reply);
+  expect(finalView.runs[0]!.reply).toEqual(finalDraft.reply);
+  expect(finalView.runs[0]!.output).toBe(answer);
 });

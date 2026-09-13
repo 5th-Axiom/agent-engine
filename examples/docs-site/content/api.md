@@ -47,6 +47,8 @@ Schema 字段接受 JSON Schema 或能无损转为 JSON Schema 的结构化 Zod�
 
 主要错误：CONFIG_INVALID、CONFIG_POLICY_VIOLATION、ACCESS_DENIED、ENGINE_BUSY、STORE_UNAVAILABLE。引擎启动错误不应将内部异常或凭据转发到浏览器。
 
+自定义 Store 的 `StoreTransaction` 可选实现 `listBySession<T>(table, sessionId)`，返回该表中 sessionId 完全匹配的记录，以优化会话回读；未实现时 Engine 使用原有 list 后过滤。该方法不代替任何身份、来源或保留检查。PostgresStore 已内置参数化查询和幂等索引迁移。
+
 ## authorize
 
 `authorize(request: AuthorizationRequest): Promise<boolean>`。每次请求带可信 principal、action、resource；sideEffect 与 data 按调用点可选。当前 sessionId 字段不保证填充，不应依赖它识别能力或数据范围。需要特定业务权限时通过 resource / data 与你的权限服务判断。
@@ -87,6 +89,8 @@ const inventory = defineBoundTool({
 BindingContext 包含 principal、runId、context、signal、operationId、idempotencyKey。context 是宿主输入，默认不进模型上下文；idempotencyKey 不能由模型自行决定。执行输出继续经过 outputSchema 校验。
 
 ## Engine 方法
+
+本站文档助手另装配了只读工具 `sessions.search({query?, after?, limit?})` 和 `sessions.read({sessionId, cursor?})`，通过可信主体作用域的 SDK API 读取其他聊天。这是宿主工具名称，不是 AgentEngine 的新方法，也不受 Memory 偏好开关控制；分页与访问范围见[会话内容读取](/docs/memory/)。
 
 | 方法 | 输入 | 返回与行为 |
 | --- | --- | --- |
@@ -186,6 +190,7 @@ images=true 开启 /images 上传和读取接口，需要 Engine protocolKey。�
 | 符号 | 输入 / 字段 | 行为 |
 | --- | --- | --- |
 | ChatRun.process | entries、complete、observedAt、activeMs、可选 pending / thinkingDisplay | 有序公开过程；字段可选，兼容旧服务 |
+| ChatRun.reply | 可选 `{ id, sequence }` | 当前草稿／最终正文的稳定展示身份及首个文本事件顺序；与已提交阶段正文衔接，旧服务可省略 |
 | ChatProcessEntry / processEntrySchema | id、sequence、kind、label、state、startedAt / endedAt、可选 input / output | 输入摘要最多 2000 字符、输出最多 8000；不包含原始私有事件 |
 | ChatAssistantDefinition.describeProcess | {name, input?, output?} → {input?, output?} 或 undefined | 服务端显式挑选可公开查询/结果；抛错时省略，不改变执行 |
 | createRunProcess | chat-ui/components 导出；update(ChatRun)、destroy() | 可独立组合的过程组件；整个聊天页自动接入 |

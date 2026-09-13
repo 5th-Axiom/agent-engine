@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import {
   createAgentEngine,
   AgentEngineError,
@@ -204,7 +204,7 @@ try {
       await widget
         .locator(".ae-turn")
         .last()
-        .locator(".ae-message-agent > .ae-message-text")
+        .locator(".ae-process-row[data-answer=true] > .ae-message-text")
         .waitFor({ state: "visible" });
     } else {
       await widget
@@ -361,7 +361,7 @@ try {
     .getByText("DEMO-1 的合成库存是 24 件。", { exact: true })
     .waitFor();
   await waitDone();
-  await widget.locator(".ae-run-details").last().locator("summary").click();
+  await widget.locator(".ae-run-details > summary").last().click();
   await widget.getByText("demo.inventory", { exact: true }).last().waitFor();
   assert(
     (await widget.locator(".ae-run-details").last().innerText()).includes(
@@ -531,6 +531,87 @@ try {
     return connected;
   });
   assert(globalReady);
+  // Pointer motion is interruptible; keyboard/reduced-motion work is immediate.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(async () => {
+    const api = (window as any).AgentChat;
+    const changes: boolean[] = [];
+    const motion = api.mountChatWidget({
+      panelMode: "side",
+      theme: { tokens: { motionMs: 300 } },
+      transport: api.createHttpChatTransport({ baseURL: "/api/agent-chat" }),
+      onOpenChange: changes.push.bind(changes),
+    });
+    await motion.ready;
+    (window as any).motionFixture = { motion, changes };
+  });
+  const motionRoot = page.locator("[data-agent-chat]");
+  const motionDialog = motionRoot.locator("dialog");
+  await motionRoot.locator(".ae-launcher").click();
+  const continuity = await page.evaluate(async () => {
+    const { motion, changes } = (window as any).motionFixture;
+    const dialog = motion.element.shadowRoot.querySelector("dialog");
+    await new Promise(requestAnimationFrame);
+    const initial = new DOMMatrixReadOnly(getComputedStyle(dialog).transform);
+    const beforeClose = Number(getComputedStyle(dialog).opacity);
+    motion.close();
+    const afterClose = Number(getComputedStyle(dialog).opacity);
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    const beforeOpen = Number(getComputedStyle(dialog).opacity);
+    motion.open();
+    const afterOpen = Number(getComputedStyle(dialog).opacity);
+    return {
+      x: initial.m41,
+      y: initial.m42,
+      beforeClose,
+      afterClose,
+      beforeOpen,
+      afterOpen,
+      changes,
+    };
+  });
+  assert.ok(
+    continuity.x > 0 && continuity.y === 0,
+    "side panel enters from its own edge",
+  );
+  assert.ok(Math.abs(continuity.beforeClose - continuity.afterClose) < 0.02);
+  assert.ok(Math.abs(continuity.beforeOpen - continuity.afterOpen) < 0.02);
+  assert.deepEqual(continuity.changes, [true, false, true]);
+  await expect(motionDialog).toHaveAttribute("data-phase", "open");
+  await motionRoot.locator("textarea").press("Escape");
+  await expect(motionDialog).toHaveAttribute("data-phase", "closed");
+  await expect(motionRoot.locator(".ae-launcher")).toBeFocused();
+  await motionRoot.locator(".ae-launcher").press("Enter");
+  assert.equal(await motionDialog.getAttribute("data-phase"), "open");
+  assert.equal(
+    await motionDialog.evaluate((el) => el.getAnimations().length),
+    0,
+  );
+  await page.setViewportSize({ width: 390, height: 600 });
+  await expect
+    .poll(() => motionDialog.evaluate((el) => el.matches(":modal")))
+    .toBe(true);
+  await motionRoot.locator("textarea").press("Escape");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await motionRoot.locator(".ae-launcher").click();
+  assert.equal(await motionDialog.getAttribute("data-phase"), "open");
+  assert.equal(
+    await motionDialog.evaluate((el) => el.getAnimations().length),
+    0,
+  );
+  await motionRoot.locator("textarea").press("Escape");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await motionRoot.locator(".ae-launcher").click();
+  const teardown = await page.evaluate(() => {
+    const { motion, changes } = (window as any).motionFixture;
+    motion.close();
+    motion.destroy();
+    motion.destroy();
+    return { attached: motion.element.isConnected, last: changes.slice(-2) };
+  });
+  assert.deepEqual(teardown, { attached: false, last: [true, false] });
+  await expect(page.locator("dialog:modal")).toHaveCount(0);
   const references = await page.evaluate(async () => {
     const api = (window as any).AgentChat;
     const timeline = api.createMessageTimeline(undefined, {
@@ -600,6 +681,7 @@ try {
         "focus-return",
         "bfcache-preserves-mounts",
         "destroy",
+        "interruptible-side-motion-keyboard-reduced-motion-and-modal-cleanup",
         "classic-script",
       ],
     }),

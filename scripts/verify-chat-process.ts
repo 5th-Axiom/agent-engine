@@ -222,7 +222,7 @@ try {
   await page.evaluate(() =>
     (window as any).chat.updateTheme({ mode: "light", accent: "#ffcc00" }),
   );
-  const processHeading = root.locator(".ae-process-header");
+  const processHeading = summary;
   await page.keyboard.press("Tab");
   await processHeading.focus();
   const ratios = await page.evaluate(() => {
@@ -233,7 +233,7 @@ try {
           '.ae-process-row[data-state="running"] .ae-process-state',
         )!,
       ).color,
-      getComputedStyle(shadow.querySelector(".ae-process-header")!)
+      getComputedStyle(shadow.querySelector(".ae-process-detail-header")!)
         .outlineColor,
     ].map((color) => {
       const rgb = color
@@ -303,11 +303,11 @@ try {
   await expect(search.locator("details")).toHaveAttribute("open", "");
   assert.equal(
     await root.locator('.ae-process-row[data-kind="thinking"]').count(),
-    2,
+    0,
   );
   assert.equal(
     await root.locator('.ae-process-row[data-kind="message"]').count(),
-    1,
+    2,
   );
   assert.equal(
     await root
@@ -328,6 +328,8 @@ try {
     "open",
     "",
   );
+  await expect(root.locator(".ae-turn > .ae-run-details")).toHaveCount(0);
+  await expect(root.locator(".ae-run-details > p").first()).not.toBeVisible();
   const code = root.getByRole("button", { name: "复制代码", exact: true });
   await code.focus();
   await page.evaluate(() => (window as any).chat.controller.refresh());
@@ -365,7 +367,13 @@ try {
       animations: "disabled",
     });
   }
+  await root.locator(".ae-run-details > summary").click();
+  await expect(root.locator(".ae-run-details > p").nth(1)).toBeVisible();
   await root.locator(".ae-process-header").click();
+  assert.equal(
+    (await root.locator(".ae-process").innerText()).match(/Token/g)?.length,
+    1,
+  );
   await search.locator("summary").click();
   await expect(search.locator(".ae-process-output")).toContainText(
     "保存 session.id",
@@ -393,6 +401,13 @@ try {
   await expect(root.locator(".ae-process-pending")).toContainText(
     "你准备把助手接入",
   );
+  assert.equal(
+    await root
+      .locator(".ae-process-pending")
+      .evaluate((el) => !!el.closest("details")),
+    false,
+  );
+  await expect(root.locator(".ae-process-pending")).toBeVisible();
   await page.screenshot({
     path: artifacts + "/process-waiting-mobile.png",
     fullPage: true,

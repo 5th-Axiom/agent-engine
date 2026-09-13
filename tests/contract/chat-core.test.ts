@@ -7,6 +7,7 @@ import {
   type ChatTransport,
   type ChatSession,
   type ChatConfig,
+  type ChatSessionSummary,
   selectedChatModel,
 } from "@agent-runtime/chat-core";
 import { resolveChatTheme, contrast } from "@agent-runtime/chat-ui";
@@ -109,6 +110,284 @@ it("ignores delayed session reads after switching to another conversation", asyn
   older.resolve(session(ids.a));
   await pending;
   expect(c.snapshot.session?.id).toBe(ids.b);
+});
+it("shows a frozen submission before acceptance and reconciles only its acknowledged run", async () => {
+  const accepted = deferred<{ runId: string }>();
+  const firstRead = deferred<ChatSession>();
+  const c = controller(
+    transport({
+      sendMessage: () => accepted.promise,
+      readSession: () => firstRead.promise,
+    }),
+  );
+  await c.start();
+  c.setDraft("合成即时消息");
+  const sending = c.send();
+  expect(c.snapshot.submission).toMatchObject({
+    input: "合成即时消息",
+    status: "sending",
+  });
+  accepted.resolve({ runId: ids.run });
+  await vi.waitFor(() =>
+    expect(c.snapshot.submission?.status).toBe("accepted"),
+  );
+  expect(c.snapshot.draft).toBe("");
+  expect(c.snapshot.submission?.input).toBe("合成即时消息");
+  firstRead.resolve(session());
+  await sending;
+  expect(c.snapshot.submission?.runId).toBe(ids.run);
+  c.discardPending();
+  expect(c.snapshot.submission?.runId).toBe(ids.run);
+  c.newSession();
+  expect(c.snapshot.submission).toBeUndefined();
+});
+it("selects cached conversation content immediately while revalidating, without waiting for history", async () => {
+  let slow = false;
+  const read = deferred<ChatSession>();
+  const history = deferred<ChatSessionSummary[]>();
+  const c = controller(
+    transport({
+      listSessions: () => (slow ? history.promise : Promise.resolve([])),
+      readSession: (id) => (slow ? read.promise : Promise.resolve(session(id))),
+    }),
+  );
+  await c.start();
+  await c.selectSession(ids.a);
+  await c.selectSession(ids.b);
+  slow = true;
+  const selecting = c.selectSession(ids.a);
+  expect(c.snapshot.selectedSessionId).toBe(ids.a);
+  expect(c.snapshot.session?.id).toBe(ids.a);
+  expect(c.snapshot.loadingSession).toBe(true);
+  read.resolve({ ...session(ids.a), title: "Updated", snapshotSequence: 2 });
+  await selecting;
+  expect(c.snapshot.session?.title).toBe("Updated");
+  expect(c.snapshot.loadingSession).toBe(false);
+  history.resolve([]);
+});
+it("renders current snapshot updates while the conversation list request is still pending", async () => {
+  let slow = false;
+  const history = deferred<ChatSessionSummary[]>();
+  let sequence = 1;
+  const c = controller(
+    transport({
+      listSessions: () => (slow ? history.promise : Promise.resolve([])),
+      readSession: async (id) => ({
+        ...session(id),
+        snapshotSequence: sequence,
+      }),
+    }),
+  );
+  await c.start();
+  await c.selectSession(ids.a);
+  slow = true;
+  sequence = 2;
+  const refreshing = c.refresh();
+  await vi.waitFor(() => expect(c.snapshot.session?.snapshotSequence).toBe(2));
+  history.resolve([]);
+  await refreshing;
+});
+it.each(["completed", "failed", "cancelled"] as const)(
+  "updates the sidebar immediately on %s and rejects a stale running badge",
+  async (state) => {
+    const oldSummary: ChatSessionSummary = {
+      id: ids.a,
+      assistantId: "demo",
+      title: "新对话",
+      createdAt: 0,
+      active: true,
+    };
+    const late = deferred<ChatSessionSummary[]>();
+    let ending = false;
+    const c = controller(
+      transport({
+        listSessions: () =>
+          ending ? late.promise : Promise.resolve([oldSummary]),
+        readSession: async () => ({
+          ...session(),
+          title: ending ? "实际问题" : "新对话",
+          snapshotSequence: ending ? 2 : 1,
+          activeRun: ending ? undefined : ids.run,
+          runs: [
+            {
+              id: ids.run,
+              sequence: 1,
+              input: "实际问题",
+              output: "",
+              draft: "",
+              state: ending ? state : "running",
+              cancelRequested: false,
+              steps: 1,
+              attempts: 1,
+              operations: [],
+              usage: { complete: false, costComplete: false },
+            },
+          ],
+        }),
+      }),
+    );
+    await c.start();
+    await c.selectSession(ids.a);
+    expect(c.snapshot.sessions[0]?.active).toBe(true);
+    ending = true;
+    const refresh = c.refresh();
+    await vi.waitFor(() =>
+      expect(c.snapshot.session?.runs[0]?.state).toBe(state),
+    );
+    expect(c.snapshot.sessions[0]).toMatchObject({
+      active: false,
+      title: "实际问题",
+    });
+    late.resolve([oldSummary]);
+    await refresh;
+    expect(c.snapshot.sessions[0]).toMatchObject({
+      active: false,
+      title: "实际问题",
+    });
+  },
+);
+it("replaces the accepted echo exactly once when its Run arrives and permits switching during a delayed snapshot", async () => {
+  let delayed = false;
+  const read = deferred<ChatSession>();
+  const c = controller(
+    transport({
+      readSession: (id) =>
+        delayed ? read.promise : Promise.resolve(session(id)),
+    }),
+  );
+  await c.start();
+  delayed = true;
+  const sending = c.send("即时显示");
+  await vi.waitFor(() => expect(c.snapshot.submission?.runId).toBe(ids.run));
+  expect(c.snapshot.sending).toBe(false);
+  c.newSession();
+  read.resolve({
+    ...session(),
+    runs: [
+      {
+        id: ids.run,
+        sequence: 1,
+        input: "即时显示",
+        output: "",
+        draft: "",
+        state: "running",
+        cancelRequested: false,
+        steps: 1,
+        attempts: 1,
+        operations: [],
+        usage: { complete: false, costComplete: false },
+      },
+    ],
+  });
+  await sending;
+  expect(c.snapshot.session).toBeUndefined();
+  delayed = false;
+  await c.send("下一条");
+  expect(c.snapshot.submission?.status).toBe("accepted");
+  delayed = true;
+  await c.refresh();
+  expect(c.snapshot.submission).toBeUndefined();
+  expect(c.snapshot.awaitingRunId).toBeUndefined();
+  expect(c.snapshot.session?.runs).toHaveLength(1);
+});
+it("blocks sending cached data until revalidation and removes it on expiry or authorization loss", async () => {
+  let failure: ChatError | undefined;
+  const gate = deferred<ChatSession>();
+  let held = false;
+  const c = controller(
+    transport({
+      readSession: async (id) => {
+        if (held) return gate.promise;
+        if (failure) throw failure;
+        return session(id);
+      },
+    }),
+  );
+  await c.start();
+  await c.selectSession(ids.a);
+  c.newSession();
+  held = true;
+  const selecting = c.selectSession(ids.a);
+  expect(c.snapshot.session?.id).toBe(ids.a);
+  await expect(c.send("wait for validation")).rejects.toThrow(
+    "CHAT_SEND_PENDING",
+  );
+  gate.resolve(session(ids.a));
+  await selecting;
+  held = false;
+  failure = new ChatError("CHAT_SESSION_NOT_FOUND", 404);
+  await c.refresh();
+  expect(c.snapshot.session).toBeUndefined();
+  c.newSession();
+  const expired = c.selectSession(ids.a);
+  expect(c.snapshot.session).toBeUndefined();
+  await expired;
+  failure = undefined;
+  await c.selectSession(ids.b);
+  failure = new ChatError("ACCESS_DENIED", 403);
+  await c.refresh();
+  expect(c.snapshot.selectedSessionId).toBeUndefined();
+  failure = undefined;
+  await c.refresh();
+  expect(c.snapshot.connection).toBe("disconnected");
+  await c.reconnect();
+  const unauthorizedCache = c.selectSession(ids.b);
+  expect(c.snapshot.session).toBeUndefined();
+  await unauthorizedCache;
+});
+it("keeps active polling moving and coalesces a stalled sidebar request", async () => {
+  vi.useFakeTimers();
+  let held = false,
+    reads = 0,
+    lists = 0;
+  const history = deferred<ChatSessionSummary[]>();
+  const c = controller(
+    transport({
+      readSession: async (id) => ({
+        ...session(id),
+        snapshotSequence: ++reads,
+      }),
+      listSessions: async () => {
+        lists++;
+        return held ? history.promise : [];
+      },
+    }),
+  );
+  await c.start();
+  held = true;
+  await c.send("pending Run");
+  const listsBefore = lists,
+    readsBefore = reads;
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(reads - readsBefore).toBeGreaterThanOrEqual(5);
+  expect(lists).toBe(listsBefore);
+  history.resolve([]);
+  await Promise.resolve();
+});
+it("does not let a polling timer abort a slow conversation selection", async () => {
+  vi.useFakeTimers();
+  const read = deferred<ChatSession>();
+  let reads = 0,
+    signal: AbortSignal | undefined;
+  const c = new ChatController(
+    transport({
+      readSession: (_id, currentSignal) => {
+        reads++;
+        signal = currentSignal;
+        return read.promise;
+      },
+    }),
+    { idlePollMs: 100 },
+  );
+  controllers.push(c);
+  await c.start();
+  const selecting = c.selectSession(ids.a);
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(reads).toBe(1);
+  expect(signal?.aborted).toBe(false);
+  read.resolve(session(ids.a));
+  await selecting;
+  expect(c.snapshot.loadingSession).toBe(false);
 });
 it("dispose aborts active work and prevents late subscriber updates", async () => {
   const later = deferred<{ id: string }>();

@@ -415,11 +415,13 @@ try {
     "aria-current",
     "true",
   );
+  await sdk.getByLabel("更多操作", { exact: true }).click();
   await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
   await expect(sdk.locator(".ae-detail-panel")).toContainText(old.id);
   await page.screenshot({
     path: new URL("ai-session-details.png", captures).pathname,
   });
+  await sdk.getByLabel("更多操作", { exact: true }).click();
   await sdk
     .getByRole("button", { name: "已接入工具（6）", exact: true })
     .click();
@@ -441,9 +443,7 @@ try {
     .focus();
   await page.keyboard.press("Escape");
   await expect(sdk.locator(".ae-detail-panel")).not.toBeVisible();
-  await expect(
-    sdk.getByRole("button", { name: "已接入工具（6）", exact: true }),
-  ).toBeFocused();
+  await expect(sdk.getByLabel("更多操作", { exact: true })).toBeFocused();
   await sdk.getByRole("button", { name: "新对话", exact: true }).click();
   await sdk.locator("textarea").fill("第二个合成问题");
   await sdk.getByRole("button", { name: "发送", exact: true }).click();
@@ -451,6 +451,7 @@ try {
     timeout: 15000,
   });
   await expect(sdk.locator(".ae-history-item")).toHaveCount(2);
+  await sdk.getByLabel("更多操作", { exact: true }).click();
   await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
   await sdk.locator(`[data-session-id="${old.id}"]`).click();
   await expect(sdk.locator(".ae-detail-panel")).toContainText(old.id);
@@ -478,6 +479,7 @@ try {
   ])
     assert.equal((await fetch(host.url + path)).status, 404);
   await page.locator("[data-agent-chat] textarea").fill("返回文档时也保留草稿");
+  await sdk.getByLabel("更多操作", { exact: true }).click();
   await sdk.getByRole("button", { name: "当前会话", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(sdk.locator("textarea")).toHaveValue("返回文档时也保留草稿");
@@ -487,14 +489,26 @@ try {
     .click();
   await expect(page).toHaveURL(/\/docs\/models\/$/);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(readingY);
+  const closedReadingBox = await page.locator("main").boundingBox();
   await page.getByRole("button", { name: "打开文档助手", exact: true }).click();
   await expect(page.locator("[data-agent-chat] .ae-sidebar")).not.toBeVisible();
-  const readingBox = await page.locator("main").boundingBox();
-  const dockBox = await page.locator("[data-agent-chat] dialog").boundingBox();
-  assert.ok(
-    readingBox!.x + readingBox!.width <= dockBox!.x,
-    "docked assistant must not cover the article",
+  assert.deepEqual(
+    await page.locator("main").boundingBox(),
+    closedReadingBox,
+    "opening an overlay must not reflow the article or move its reading position",
   );
+  await expect(page.locator(".sidebar")).toBeVisible();
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  await expect
+    .poll(async () => {
+      const reading = (await page.locator("main").boundingBox())!;
+      const panel = (await page
+        .locator("[data-agent-chat] dialog")
+        .boundingBox())!;
+      return reading.x + reading.width <= panel.x;
+    })
+    .toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page
     .locator("[data-agent-chat]")
     .getByRole("button", { name: "对话列表", exact: true })
@@ -504,6 +518,10 @@ try {
     path: new URL("widget-sidebar.png", captures).pathname,
   });
   await page.keyboard.press("Escape");
+  await page
+    .locator("[data-agent-chat]")
+    .getByLabel("更多操作", { exact: true })
+    .click();
   await page
     .locator("[data-agent-chat]")
     .getByRole("button", { name: "已接入工具（6）", exact: true })
@@ -738,6 +756,7 @@ try {
   await expect(
     mobileChat.getByRole("button", { name: "对话列表", exact: true }),
   ).toBeFocused();
+  await mobileChat.getByLabel("更多操作", { exact: true }).click();
   await mobileChat
     .getByRole("button", { name: "已接入工具（6）", exact: true })
     .click();
@@ -760,7 +779,7 @@ try {
   await page.keyboard.press("Escape");
   await expect(mobileChat.locator("dialog")).toBeVisible();
   await expect(
-    mobileChat.getByRole("button", { name: "已接入工具（6）", exact: true }),
+    mobileChat.getByLabel("更多操作", { exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(

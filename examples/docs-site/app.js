@@ -75,7 +75,7 @@ function updateTheme(theme) {
   );
   chat?.updateTheme({
     ...chatTheme(),
-    tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 1000 },
+    tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 800 },
   });
 }
 $(".theme-button").addEventListener("click", () =>
@@ -97,13 +97,14 @@ function openChat(question) {
 if (available) {
   const getRunSources = await loadReferenceResolver();
   chat = mountChatWidget({
+    panelMode: "side",
     sendShortcut: "enter",
     transport: createHttpChatTransport({ baseURL: "/api/agent-chat" }),
     memory: chatMemory(),
     settingsUrl: "/ai/settings/",
     theme: {
       ...chatTheme(),
-      tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 1000 },
+      tokens: { panelWidth: 440, panelHeight: 720, breakpoint: 800 },
     },
     getRunSources,
     copy: {

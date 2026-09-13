@@ -9,6 +9,7 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 const paths = {
+  more: "M5 12h.01 M12 12h.01 M19 12h.01",
   microphone:
     "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5Z M6 10v2a6 6 0 0 0 12 0v-2 M12 18v4 M8 22h8",
   expand: "M8 3H3v5 M16 3h5v5 M3 16v5h5 M21 16v5h-5",

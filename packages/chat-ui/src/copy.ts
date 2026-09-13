@@ -57,6 +57,7 @@ export const errorMessages: Record<string, string> = {
     "当前模型不支持此输入，请选择支持图片的模型或移除图片。",
   MODEL_AUTH_FAILED: "模型认证失败，请联系管理员检查服务端配置。",
   MODEL_RATE_LIMITED: "模型请求过于频繁，请稍后再试。",
+  MODEL_PROVIDER_ERROR: "模型服务未能完成本轮回答，请稍后重试。",
   MODEL_OUTPUT_LIMIT: "回答达到了输出上限，可以要求简短回答。",
   MODEL_TIMEOUT: "模型响应超时，请稍后再试。",
   CHAT_UNAUTHENTICATED: "登录已失效，请重新登录后连接。",

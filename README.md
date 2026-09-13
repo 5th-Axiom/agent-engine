@@ -68,8 +68,12 @@ pnpm playground
 
 聊天界面支持有序处理过程：模型活动、Skill、工具、检索/记忆、重试和等待均按真实事件展示，支持安全摘要、耗时、用量与刷新恢复。[架构评估与 API 改动](docs/chat-process-architecture.md)说明实现及边界；运行 `pnpm verify:chat-process` 验证完整 HTTP/浏览器路径。
 
-聊天输入区现支持长文本展开、快捷键设置、模型和 Skill 选择；服务端从已声明配置生成可用目录，选择按 Run 冻结。语音未接入时麦克风置灰。接入与兼容性说明见[输入编辑与模型选择](docs/composer-alignment.md)。
+聊天输入区现支持长文本展开、快捷键设置、模型和 Skill 选择；服务端从已声明配置生成可用目录，选择按 Run 冻结。Skill、展开编辑和快捷键位于输入设置，未接入语音时隐藏入口。接入与兼容性说明见[输入编辑与模型选择](docs/composer-alignment.md)。
 
-回复渲染、公开思考配置和 API 变更见[回复展示改进](docs/reply-display-alignment.md)。
+发送后立即显示问题与发送状态，切换已浏览会话时先显示缓存再更新；历史列表不会阻塞当前回复。慢请求、重试和连续输出可用 `pnpm verify:chat-responsiveness` 验证，证据与限制见[聊天体验验收](docs/chat-ui-experience.md)。
 
-文档助手现已接入 Skill、正式知识库、审批写入的跨会话记忆、HTTP/MCP 与问题表单；从「能力与记忆」打开配置实验及会话调试。接入范围、API 变化和验证证据见 [文档站能力覆盖](docs/docs-capability-coverage.md)。
+回复渲染、公开思考配置和 API 变更见[回复展示改进](docs/reply-display-alignment.md)。`pnpm verify:stream-cadence` 可复测小批次文字、长 Markdown 和桌面/窄屏出字节奏。元素顺序、局部收起与动效见[呈现行为](docs/reply-presentation-behaviors.md)，运行 `pnpm verify:reply-presentation` 验证完整状态序列。
+
+文档助手现已接入 Skill、正式知识库、审批写入的跨会话记忆、HTTP/MCP 与问题表单；还可通过 [历史会话工具](docs/session-history-tools.md) 搜索和读取自己的其他对话，无需先保存为长期记忆。从「能力与记忆」打开配置实验及会话调试。接入范围、API 变化和验证证据见 [文档站能力覆盖](docs/docs-capability-coverage.md)。
+
+Anthropic-compatible 的同批工具结果已按一条消息回传，协议和真实 Thinking 续聊验证见[兼容修复](docs/model-tool-batch-fix.md)。显式运行 `pnpm exec tsx scripts/smoke-anthropic-tools.ts <本地模型配置名>` 可做合成真实模型检查。

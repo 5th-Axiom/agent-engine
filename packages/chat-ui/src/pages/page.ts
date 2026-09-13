@@ -13,6 +13,7 @@ import {
 } from "../atoms/index.js";
 import {
   createComposer,
+  createMessage,
   createMessageTimeline,
   createSessionList,
   createSessionDetails,
@@ -129,6 +130,10 @@ export function createChatPage(
     if (!wide) setSidebar(false);
   }, copy);
   sidebar.append(sidebarHeader, history.element);
+  const historyStatus = element("p", "ae-history-status");
+  historyStatus.setAttribute("role", "status");
+  historyStatus.hidden = true;
+  sidebar.append(historyStatus);
   const historyToggle = createButton({
     label: copy.history,
     icon: "sidebar",
@@ -175,7 +180,6 @@ export function createChatPage(
   detailBackdrop.tabIndex = -1;
   const details = createSessionDetails(copy);
   let panel: SessionPanel | undefined;
-  let detailTrigger: HTMLButtonElement | undefined;
   function setPanel(next: SessionPanel | undefined, focus = true) {
     panel = next;
     detailPanel.hidden = detailBackdrop.hidden = !next;
@@ -183,13 +187,15 @@ export function createChatPage(
     infoButton.setAttribute("aria-expanded", String(next === "session"));
     toolsButton.setAttribute("aria-expanded", String(next === "tools"));
     if (next) {
-      detailTrigger = next === "session" ? infoButton : toolsButton;
       detailTitle.textContent =
         next === "session" ? copy.sessionDetails : copy.tools;
       detailPanel.setAttribute("aria-label", detailTitle.textContent);
       details.update(controller.snapshot, next);
       if (focus) detailClose.focus({ preventScroll: true });
-    } else if (focus) detailTrigger?.focus({ preventScroll: true });
+    } else if (focus) {
+      moreSummary.focus({ preventScroll: true });
+    }
+    if (next) more.open = false;
   }
   const infoButton = createButton({
     label: copy.sessionDetails,
@@ -279,10 +285,34 @@ export function createChatPage(
       }
     });
   });
-  toolbar.append(quickNew, infoButton, toolsButton, settingsLink);
+  const more = element("details", "ae-more");
+  const moreSummary = element(
+    "summary",
+    "ae-button ae-icon-button ae-button-quiet",
+  );
+  moreSummary.setAttribute("aria-label", "更多操作");
+  moreSummary.title = "更多操作";
+  moreSummary.append(createIcon("more"));
+  const moreBody = element("div", "ae-more-body");
+  moreBody.append(infoButton, toolsButton, settingsLink);
+  more.append(moreSummary, moreBody);
+  toolbar.append(quickNew, more);
+  const dismissMore = (event: PointerEvent) => {
+    if (!event.composedPath().includes(more)) more.open = false;
+  };
+  document.addEventListener("pointerdown", dismissMore);
+  more.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !event.isComposing && more.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      more.open = false;
+      moreSummary.focus({ preventScroll: true });
+    }
+  });
   // Keep frequent actions in the header; details still open in the main body.
   header.insertBefore(toolbar, header.children[2] ?? null);
   const transcript = element("div", "ae-transcript");
+  const readingArea = element("div", "ae-reading-area");
   transcript.tabIndex = 0;
   transcript.setAttribute("aria-label", "对话记录");
   const welcome = element("div", "ae-welcome");
@@ -307,7 +337,25 @@ export function createChatPage(
     ...options,
     readImage: controller.transport.readImage?.bind(controller.transport),
   });
-  transcript.append(welcome, timeline.element);
+  const loading = element("p", "ae-session-loading");
+  loading.setAttribute("role", "status");
+  loading.hidden = true;
+  const submission = element("article", "ae-submission");
+  const submittedMessage = createMessage({
+    sender: "self",
+    name: copy.self,
+    text: "",
+  });
+  const submittedImages = element("p", "ae-submission-images");
+  const submissionStatus = element("p", "ae-submission-status");
+  submissionStatus.setAttribute("role", "status");
+  submission.append(
+    submittedMessage.element,
+    submittedImages,
+    submissionStatus,
+  );
+  submission.hidden = true;
+  transcript.append(welcome, loading, timeline.element);
   let following = true;
   let lastSession: string | undefined;
   let fingerprint = "";
@@ -335,13 +383,23 @@ export function createChatPage(
     },
     { passive: true },
   );
+  transcript.addEventListener("disclosurechange", () => {
+    following = false;
+    jump.hidden =
+      transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight <
+      32;
+  });
   const followContent = () => {
     if (following) transcript.scrollTop = transcript.scrollHeight;
   };
-  transcript.addEventListener("contentresize", followContent);
+  // Observe actual size changes after layout; per-character synchronous
+  // content events otherwise force layout once for every streaming region.
   const contentSize = new ResizeObserver(followContent);
   contentSize.observe(timeline.element);
+  contentSize.observe(submission);
   const composer = createComposer({
+    availableHeight: () =>
+      conversation.clientHeight - (feedback.hidden ? 0 : feedback.offsetHeight),
     copy,
     sendShortcut: options.sendShortcut,
     onModel: (id) => safe(() => controller.setModel(id)),
@@ -373,8 +431,16 @@ export function createChatPage(
   debug.hidden = true;
   debug.target = "_blank";
   debug.rel = "noopener noreferrer";
-  toolbar.append(debug);
-  conversation.append(transcript, jump, feedback, composer.element);
+  moreBody.append(debug);
+  readingArea.append(transcript, jump);
+  conversation.append(readingArea, feedback, composer.element);
+  const conversationSize = new ResizeObserver(() => {
+    composer.resize();
+    followContent();
+  });
+  conversationSize.observe(conversation);
+  conversationSize.observe(feedback);
+  conversationSize.observe(transcript);
   mainBody.append(conversation, detailBackdrop, detailPanel);
   main.append(header);
   if (options.contextBar) main.append(options.contextBar);
@@ -443,10 +509,14 @@ export function createChatPage(
       state.pending || state.sending || !state.config;
     history.update(
       state.sessions,
-      state.session?.id,
+      state.selectedSessionId ?? state.session?.id,
       state.sending || state.pending,
       state.config?.assistants ?? [],
     );
+    historyStatus.hidden = !state.historyError;
+    historyStatus.textContent = state.historyError
+      ? "会话列表暂时无法更新，正在重试…"
+      : "";
     settingsLink.hidden =
       !options.settingsUrl ||
       !(
@@ -471,10 +541,36 @@ export function createChatPage(
       copy.tools + (tools ? `（${tools.length}）` : ""),
     );
     if (panel) details.update(state, panel);
-    const sessionChanged = lastSession !== state.session?.id;
-    lastSession = state.session?.id;
+    const selectedSession = state.selectedSessionId ?? state.session?.id;
+    const sessionChanged = lastSession !== selectedSession;
+    lastSession = selectedSession;
     const hasRuns = !!state.session?.runs.length;
-    welcome.hidden = hasRuns;
+    welcome.hidden = hasRuns || !!state.submission || !!state.selectedSessionId;
+    loading.hidden = !state.loadingSession;
+    loading.textContent = state.session ? "正在更新对话…" : "正在加载对话…";
+    timeline.element.setAttribute(
+      "aria-busy",
+      String(state.loadingSession === true),
+    );
+    submission.hidden = !state.submission;
+    if (state.submission) {
+      if (!submission.isConnected) transcript.append(submission);
+      submittedMessage.update({
+        sender: "self",
+        name: copy.self,
+        text: state.submission.input,
+      });
+      const images = state.submission.attachments?.length ?? 0;
+      submittedImages.hidden = !images;
+      submittedImages.textContent = images ? `${images} 张图片` : "";
+      submission.dataset.status = state.submission.status;
+      submissionStatus.textContent =
+        state.submission.status === "sending"
+          ? "正在发送…"
+          : state.submission.status === "accepted"
+            ? "已发送，正在准备回复…"
+            : "发送尚未确认，可重试此消息。";
+    } else submission.remove();
     const next = JSON.stringify(state.session?.runs ?? []);
     if (next !== fingerprint || sessionChanged) {
       const top = transcript.scrollTop;
@@ -540,11 +636,13 @@ export function createChatPage(
     destroy: () => {
       window.removeEventListener("focus", settingsRefresh);
       timeline.destroy();
+      submittedMessage.destroy();
       composer.destroy();
       unsubscribe();
       resize.disconnect();
       contentSize.disconnect();
-      transcript.removeEventListener("contentresize", followContent);
+      conversationSize.disconnect();
+      document.removeEventListener("pointerdown", dismissMore);
       root.remove();
     },
   };

@@ -44,6 +44,9 @@ export class PostgresStore implements EngineStore {
         "CREATE TABLE IF NOT EXISTS ae_records(kind text NOT NULL, key text NOT NULL, value jsonb NOT NULL, PRIMARY KEY(kind,key))",
       );
       await c.query(
+        "CREATE INDEX IF NOT EXISTS ae_records_session ON ae_records(kind, (value->>'sessionId'))",
+      );
+      await c.query(
         "CREATE TABLE IF NOT EXISTS ae_streams(session_id text PRIMARY KEY, sequence bigint NOT NULL DEFAULT 0)",
       );
       await c.query(
@@ -161,6 +164,14 @@ class PgTransaction implements StoreTransaction {
       await this.c.query<{ value: T }>(
         "SELECT value FROM ae_records WHERE kind=$1 ORDER BY key",
         [table],
+      )
+    ).rows.map((r) => r.value);
+  }
+  async listBySession<T>(table: string, sessionId: string): Promise<T[]> {
+    return (
+      await this.c.query<{ value: T }>(
+        "SELECT value FROM ae_records WHERE kind=$1 AND value->>'sessionId'=$2 ORDER BY key",
+        [table, sessionId],
       )
     ).rows.map((r) => r.value);
   }

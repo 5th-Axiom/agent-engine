@@ -445,6 +445,8 @@ const session = await engine.createSession({
 
 模型可以提出“值得记住的内容”，但 Engine 必须校验类型、命名空间、敏感信息和保留策略后才能写入。Session 对话历史和长期 Memory 是两份数据：历史记录“发生了什么”，Memory 保存“以后仍值得使用的事实或偏好”。
 
+2026-09-13 文档宿主增加两个只读 Binding `sessions.search` / `sessions.read`，按可信访客查找和分页读取其他文档会话。原历史不自动写入 Memory，来源关系随 Operation 持久化；读取派生会话、再次模型派发及提交时重新检查来源权限与保留状态。事务内授权通过仅允许读取的宿主 Store 适配器使用当前快照，不重入串行存储事务。公共 SDK 不默认开放其他会话给模型；契约、来源失效传播与故障验证见 [历史会话工具](session-history-tools.md)。
+
 ### 1.9 场景：配置多个模型、Thinking 和 Fallback
 
 ```ts
@@ -2883,3 +2885,26 @@ const result = await session.run({ input: "开始任务" });
 Chat 新增宿主显式 `interaction` 与 `describePending`；只有开启后公开 pending ID/受限 Schema/安全预览。`resolveChatInputSchema` 严格区分三种回复，`POST sessions/:id/input` 经已有身份与 Origin 检查调用 Session.resolveInput；Controller/Transport 与原生 pending 组件形成闭环，旧宿主默认仍只展示等待。批量写审批预览按 Run 当前工具游标定位，不用第一条调用推测。
 
 文档工作台通过 SDK 公开检查与生命周期 API读取当前身份的会话；13 类实验使用独立 MemoryStore 和确定性模型，报告保存到宿主 Store。该运行验证不声称可验证供应商兼容、进程崩溃或真实 replay；这些仍由既有隔离自动验收与授权 provider smoke 提供证据。API 和配置边界详见 docs/docs-capability-coverage.md。
+
+### 2026-09-12 会话读取与即时显示
+
+实际 UI 请求暴露全表 Run 回读成本：单个会话授权与检查反复加载其他会话记录。新增可选 `StoreTransaction.listBySession<T>(table, sessionId)`，PostgreSQL 通过 `(kind, value->>'sessionId')` 索引参数化过滤；未实现此方法的 Store 继续走 list + 归属过滤。只是查询范围优化，不省略 session/data/source 授权、保留校验、事件顺序或原有事务/管理锁。索引由原有 migrate 在无 Engine owner 时幂等创建；没有存量记录转换或分布式执行语义变化。
+
+Chat Controller 将历史列表与当前会话读取分离，活动读取结束后默认等待 250ms；本地 submission 只用于发送反馈，必须获得 runId 确认并看到对应权威 Run 才能替换。切换缓存仅存当前控制器内、最多 5 个 / 约 4MiB，重新验证前不能发送，401/403 清空并停止轮询直至重新连接。迟到响应按请求版本拒绝。完整行为和慢网络、PostgreSQL、真实模型证据见 docs/chat-ui-experience.md 的 RESP-01 至 RESP-05。
+
+
+### 2026-09-13 流式展示的批量读取
+
+前端使用字素级小数进度，按实测到达间隔调整速度，首字即时、有界 900ms 追赶、终态 100ms 收尾；不重播历史或预测模型输出。Markdown 全量词法分析保留后置引用定义语义，只为变化块构建 DOM，滚动使用实际尺寸观察。
+
+真实请求进一步暴露一份聊天投影反复调用 readSession / inspectSession / readRun / listEvents 的串行事务成本。新增 SDK `readSessionView(id, {afterSequence?})`：每次沿用 session/data/source 授权和保留校验，在一个状态事务中取得会话、按受理序号排序的 Run、所属/引用 Operation 和事件终点及增量。chat-server 用这一份数据生成既有安全投影；不缓存跨请求的权限，不跳过 PostgreSQL 管理锁和串行提交。旧 Store 使用已有 list 回退，现有 inspectSession 与新读取共享旧记录顺序恢复逻辑。
+
+事件展示最多覆盖最新 6000 个序号，分页读取上限 1000；实际起点 eventsAfter 与完整性 eventsComplete 显式返回。未来游标恢复可用窗口并标记不完整，不改变 listEvents 的严格游标错误、可靠订阅或保留规则。ProcessJournal 仍限制 32 个会话、1200 个事实、512000 字符和公开正文；浏览器不接收 SDK 原始记录。示例见 docs/sdk-usage.md，测量与回归见 DOCS-61。
+
+### 2026-09-13 回复内容单元的展示身份
+
+Chat 增加可选 `reply: { id, sequence }`，以 Attempt 身份和首个公开文本事件绑定当前草稿／最终正文。草稿提交为阶段 message 时保持相同身份及顺序；final decision 已提交但 Run.result 尚未写入的间隙仍展示该已提交文本。失败草稿撤回、授权、保留和终态语义不变。只改公开投影与展示，不创建额外模型事实，也不改变执行／存储协议。UI 根据有序内容做运行中局部折叠与完成正文锚点规划，思考、工具、等待、来源、用量有独立状态规则；详见[回复元素行为](reply-presentation-behaviors.md)。
+
+### 2026-09-13 Anthropic 同批工具结果编码
+
+Anthropic-compatible 的连续 canonical tool 结果编码为同一 user 消息中的多个 tool_result，保留 ID、顺序和多模态嵌套；assistant/native 或普通 user 边界终止分组。修复 DeepSeek Thinking 同一响应多工具成功后继续请求的 HTTP 400，不改变 canonical 消息、原生签名、工具执行顺序、审批或恢复要求。依据与验证见[同批工具结果修复](model-tool-batch-fix.md)。

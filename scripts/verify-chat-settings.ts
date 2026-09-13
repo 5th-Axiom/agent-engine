@@ -175,6 +175,7 @@ try {
   await page.goto(origin);
   const chat = page.locator("[data-agent-chat]");
   await chat.locator("textarea").fill("保留这条尚未发送的草稿");
+  await chat.getByLabel("更多操作", { exact: true }).click();
   const popupPromise = page.waitForEvent("popup");
   await chat.getByRole("link", { name: "会话配置（新标签页）" }).click();
   const settings = await popupPromise;

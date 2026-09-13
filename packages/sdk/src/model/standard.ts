@@ -380,25 +380,30 @@ export function anthropicCompatible(): ModelAdapter {
     },
     async *stream(req, ctx) {
       const messages: unknown[] = [];
+      let toolResults: Record<string, unknown>[] | undefined;
       for (const m of req.messages.filter((m) => m.role !== "system")) {
+        if (m.role === "tool" && !m.native) {
+          // One assistant turn may request several tools. All corresponding
+          // results belong to the following user message, in execution order.
+          if (!toolResults) {
+            toolResults = [];
+            messages.push({ role: "user", content: toolResults });
+          }
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: m.callId,
+            content: m.images?.length
+              ? [
+                  { type: "text", text: m.content },
+                  ...m.images.map(anthropicImage),
+                ]
+              : m.content,
+          });
+          continue;
+        }
+        toolResults = undefined;
         let mapped: unknown;
         if (m.native) mapped = m.native;
-        else if (m.role === "tool")
-          mapped = {
-            role: "user",
-            content: [
-              {
-                type: "tool_result",
-                tool_use_id: m.callId,
-                content: m.images?.length
-                  ? [
-                      { type: "text", text: m.content },
-                      ...m.images.map(anthropicImage),
-                    ]
-                  : m.content,
-              },
-            ],
-          };
         else
           mapped = {
             role: m.role,

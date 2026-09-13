@@ -31,7 +31,7 @@ pnpm run docs --read-only
 
 文章目录在 examples/docs-site/content.ts，接入教程在 content/ 下，受类型检查的主要示例代码在 snippets/ 下。接口约定和本地示例配置直接读取 docs/ 中对应的手册。修改后重启文档站，页面与助手检索一起更新。
 
-站内搜索在浏览器本地完成，不调用模型。助手保留六个 Binding 只读工具：docs.search 搜索文档，docs.read 分页读原文，api.lookup 定位公开 API 声明，examples.find 查示例，code.search 搜代码，code.read 读源码。另外接入了 docs.httpCatalog 和 docs.mcpSearch，分别通过真实本地 HTTP 与 Streamable HTTP MCP 服务读取公开资料，共 8 个工具。工具由模型按问题选择，不会每轮全部调用。
+站内搜索在浏览器本地完成，不调用模型。助手提供六个公开资料 Binding：docs.search 搜索文档，docs.read 分页读原文，api.lookup 定位公开 API 声明，examples.find 查示例，code.search 搜代码，code.read 读源码；docs.httpCatalog 和 docs.mcpSearch 通过真实本地 HTTP 与 Streamable HTTP MCP 服务读取公开资料。此外，sessions.search 与 sessions.read 可搜索并分页读取自己的其他聊天，详情见[跨会话读取](/docs/memory/)。标准目录共 10 个工具，由模型按问题选择，不会每轮全部调用。
 
 源码限六个 SDK 包的 src、本站 snippets 及契约／集成／恢复测试，使用启动时 Git HEAD 的已提交版本，不读取未提交改动、密钥或外部参考仓库。修改源码后需提交并重启站点；源码页会显示提交版本和行号。文档正文修改只需重启。
 

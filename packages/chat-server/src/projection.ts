@@ -1,5 +1,7 @@
+import { projectReply } from "./reply.js";
 import {
   AgentEngineError,
+  summarize,
   type AgentEngine,
   type SessionRecord,
   type ToolDefinition,
@@ -148,31 +150,32 @@ export async function readChatSession(
   const { engine } = context;
   const session = await engine.readSession(id);
   const assistant = assistantFor(session, context, namespace);
-  const inspection = await engine.inspectSession(id);
-  if (inspection.runs.some((r) => r.acceptedSequence === undefined))
+  const view = await engine.readSessionView(id, {
+    afterSequence: journal.cursor(id, assistant.thinkingDisplay ?? "none"),
+  });
+  if (view.runs.some((r) => r.acceptedSequence === undefined))
     throw new ChatError("RUN_ORDER_UNAVAILABLE", 409);
   const runs: ChatRun[] = [];
-  const visible = inspection.runs.slice(-50);
+  const visible = view.runs.slice(-50);
   const process = visible.length
-    ? await journal.read(
-        engine,
+    ? journal.ingest(
         id,
         visible[0]!.acceptedSequence!,
-        inspection.snapshotSequence,
+        view,
         assistant.thinkingDisplay,
       )
     : undefined;
   let activeTools: ChatTool[] | undefined;
   let activeConfigVersion: number | undefined;
-  for (const summary of visible) {
-    const r = await engine.readRun(id, summary.id);
-    if (r.id === session.activeRun) {
+  for (const r of visible) {
+    const usage = summarize(r.usage);
+    if (r.id === view.session.activeRun) {
       activeTools = publicTools(r.config.tools, assistant.toolDisplay);
       activeConfigVersion = r.configVersion;
     }
     runs.push({
       id: r.id,
-      sequence: summary.acceptedSequence!,
+      sequence: r.acceptedSequence!,
       state: r.state,
       modelId: r.config.routing.primary,
       ...(r.requestedSkill ? { skillId: r.requestedSkill } : {}),
@@ -182,7 +185,7 @@ export async function readChatSession(
             process: projectProcess(
               r,
               process.facts,
-              inspection.observedAt,
+              view.observedAt,
               assistant,
             ),
           }
@@ -190,37 +193,27 @@ export async function readChatSession(
       ...(r.attachments?.length ? { attachments: r.attachments } : {}),
       input: typeof r.input === "string" ? r.input : "",
       output: r.result?.outputText ?? "",
-      draft: ["completed", "cancelled", "failed"].includes(r.state)
-        ? ""
-        : Object.values(r.drafts ?? {})
-            .flatMap((d) =>
-              Object.values(d.blocks)
-                .filter((b) => b.kind === "text")
-                .map((b) => b.text),
-            )
-            .join(""),
+      ...projectReply(r, process?.facts ?? []),
       errorCode: r.error?.code,
-      steps: summary.steps.length,
-      attempts: summary.usage.attemptCount,
+      steps: r.steps.length,
+      attempts: usage.attemptCount,
       usage: {
-        input: summary.usage.knownTotals.input,
-        output: summary.usage.knownTotals.output,
-        total: summary.usage.knownTotals.total,
-        complete: summary.usage.complete,
-        costComplete: summary.usage.costComplete,
-        costs: Object.entries(summary.usage.costByCurrency).map(
-          ([currency, cost]) => ({
-            currency,
-            amount: cost.estimated,
-            complete: cost.complete,
-          }),
-        ),
+        input: usage.knownTotals.input,
+        output: usage.knownTotals.output,
+        total: usage.knownTotals.total,
+        complete: usage.complete,
+        costComplete: usage.costComplete,
+        costs: Object.entries(usage.costByCurrency).map(([currency, cost]) => ({
+          currency,
+          amount: cost.estimated,
+          complete: cost.complete,
+        })),
       },
-      operations: inspection.operations
+      operations: view.operations
         .filter((o) => o.runId === r.id)
         .map((o) => ({
           id: o.id,
-          name: o.name,
+          name: o.tool.name,
           state: o.executionStatus,
           validation: o.validationStatus,
         })),
@@ -235,10 +228,10 @@ export async function readChatSession(
         ?.images === true,
     assistantId: assistant.id,
     title: title(session),
-    activeRun: session.activeRun,
+    activeRun: view.session.activeRun,
     runs,
-    totalRuns: inspection.runs.length,
-    snapshotSequence: inspection.snapshotSequence,
+    totalRuns: view.runs.length,
+    snapshotSequence: view.snapshotSequence,
     createdAt: session.createdAt,
     configVersion: session.version,
     tools: publicTools(session.config.tools, assistant.toolDisplay),

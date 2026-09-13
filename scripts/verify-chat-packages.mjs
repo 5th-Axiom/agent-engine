@@ -41,7 +41,7 @@ const entry = join(consumer, "check.ts");
 await writeFile(
   entry,
   `
-import {mountChatWidget, mountChatPage, mountChatSettingsPage, createHttpChatTransport} from '@agent-runtime/chat-ui';
+import {mountChatWidget, mountChatPage, mountChatSettingsPage, createHttpChatTransport, type ChatWidgetOptions} from '@agent-runtime/chat-ui';
 import {resolveChatTheme} from '@agent-runtime/chat-ui/tokens';
 import {createButton} from '@agent-runtime/chat-ui/atoms';
 import {createMessage, createPendingInput} from '@agent-runtime/chat-ui/components';
@@ -49,9 +49,13 @@ import {createChatPage, mountChatSettingsPage as settingsPage} from '@agent-runt
 import {installChatStyles} from '@agent-runtime/chat-ui/styles';
 import {ChatController, chatSettingsSchema, chatPreferencesSchema, resolveChatInputSchema, type ChatInputResolution, type ChatPreferences} from '@agent-runtime/chat-core';
 import {createChatHandler, restoreChatPreferences} from '@agent-runtime/chat-server';
-import {createAgentEngine} from '@agent-runtime/sdk';
+import {createAgentEngine, AgentEngine} from '@agent-runtime/sdk';
+const readView: AgentEngine['readSessionView'] = AgentEngine.prototype.readSessionView;
+if(typeof readView !== 'function') throw Error('SESSION_VIEW_MISSING');
 const transport=createHttpChatTransport({baseURL:'https://admin.example.com/api/agent-chat'});
 const controller=new ChatController(transport);
+const drawer: ChatWidgetOptions = {transport, panelMode:'side', position:'left'};
+if(drawer.panelMode !== 'side') throw Error('DRAWER_OPTIONS_MISSING');
 resolveChatTheme({mode:'dark',skin:'rounded',accent:'#a63212'});
 const preferences: ChatPreferences = {modelId:'primary', enabledTools:[], enabledSkills:[], enabledKnowledgeBases:[], memory:[], showThinking:false, compactContext:false};
 chatPreferencesSchema.parse(preferences);

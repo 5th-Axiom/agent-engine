@@ -112,19 +112,36 @@ try {
   await expect(
     root.getByRole("button", { name: "添加图片", exact: true }),
   ).toBeVisible();
-  await root
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "synthetic.png",
-      mimeType: "image/png",
-      buffer: png,
-    });
+  await root.locator('input[type="file"]').setInputFiles({
+    name: "synthetic.png",
+    mimeType: "image/png",
+    buffer: png,
+  });
   await expect(
     root.getByRole("button", { name: "重试上传", exact: true }),
   ).toBeVisible();
   await expect(
     root.getByRole("button", { name: "发送", exact: true }),
   ).toBeDisabled();
+  // Failed attachments and retry controls participate in the same height budget.
+  await page.setViewportSize({ width: 440, height: 652 });
+  await root.locator("textarea").fill("合成长草稿\n".repeat(24));
+  await root.getByLabel("输入设置", { exact: true }).click();
+  await root.getByRole("button", { name: "展开输入框", exact: true }).click();
+  await expect
+    .poll(async () => {
+      const panel = (await root.locator(".ae-page").boundingBox())!;
+      const composer = (await root.locator(".ae-composer").boundingBox())!;
+      const reading = (await root.locator(".ae-transcript").boundingBox())!;
+      return (
+        composer.y + composer.height <= panel.y + panel.height + 1 &&
+        reading.height >= 200
+      );
+    })
+    .toBe(true);
+  await root.locator("textarea").press("Escape");
+  await root.locator("textarea").fill("");
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await root.getByRole("button", { name: "重试上传", exact: true }).click();
   await expect(
     root.getByRole("button", { name: "发送", exact: true }),
@@ -226,13 +243,11 @@ try {
   ).toBeEnabled();
   await root.getByRole("button", { name: "发送", exact: true }).click();
   await expect(root.locator(".ae-message-agent")).toContainText("红色色块");
-  await root
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "followup.png",
-      mimeType: "image/png",
-      buffer: png,
-    });
+  await root.locator('input[type="file"]').setInputFiles({
+    name: "followup.png",
+    mimeType: "image/png",
+    buffer: png,
+  });
   await expect(
     root.getByRole("button", { name: "发送", exact: true }),
   ).toBeEnabled();

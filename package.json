@@ -18,6 +18,7 @@
     "docs": "pnpm build && tsx examples/docs-site/start.ts",
     "verify:docs": "pnpm build && tsx examples/docs-site/verify.ts",
     "smoke:docs": "tsx examples/docs-site/smoke.ts",
+    "smoke:docs-history": "tsx examples/docs-site/smoke-session-history.ts",
     "verify:playground": "pnpm build && tsx scripts/verify-playground.ts",
     "verify:chat-ui": "pnpm build && tsx scripts/verify-chat-ui.ts",
     "pack:chat": "pnpm build && node scripts/pack-chat.mjs",
@@ -29,8 +30,11 @@
     "verify:chat-process": "pnpm build && tsx scripts/verify-chat-process.ts",
     "verify:composer": "pnpm build && tsx scripts/verify-composer.ts",
     "verify:reply-display": "pnpm build && tsx scripts/verify-reply-display.ts",
+    "verify:stream-cadence": "pnpm build && tsx scripts/verify-stream-cadence.ts",
+    "verify:chat-responsiveness": "pnpm build && tsx scripts/verify-chat-responsiveness.ts",
     "verify:chat-settings": "pnpm build && tsx scripts/verify-chat-settings.ts",
-    "verify:docs-capabilities": "pnpm build && tsx scripts/verify-docs-capabilities.ts"
+    "verify:docs-capabilities": "pnpm build && tsx scripts/verify-docs-capabilities.ts",
+    "verify:reply-presentation": "pnpm build && tsx scripts/verify-reply-presentation.ts"
   },
   "devDependencies": {
     "@agent-runtime/debug": "workspace:*",

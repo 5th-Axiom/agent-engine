@@ -105,3 +105,18 @@ Engine 的预算硬上限在会话未填写预算时仍生效；有效配置将�
 本轮新增 defineBoundTool（同源工具定义/绑定与 Zod 类型推导）、SessionConfigInput 等作者类型，以及 uploadImage/readImage/deleteImage 和 RunInput.attachments。RunInput.skill 可在首次模型请求前显式选择已声明的 Skill。图片需 protocolKey、实际模型 capabilities.images=true 与 limits.maxImageInputTokens；现成 Chat UI 支持上传和安全 Markdown。普通快照只有附件引用，模型发送前读取已冻结内容并重新授权。完整约定见 [ADR 0006](adr/0006-scenario-usage-and-images.md)。
 
 传统文档按环境、对话、图片、工具、Skill、知识、记忆、进度、Debug、登录与界面场景组织；精确符号参考在 examples/docs-site/content/api.md。pnpm example:export 导出可独立安装的后端、前端与全栈目录。所有包仍为本地开发版，CLI/公共 npm/压缩包/安装包形态待确定。
+
+
+## 批量读取聊天展示数据
+
+宿主可调用 `engine.readSessionView(sessionId, { afterSequence })`，取得同一事务中的 `session / runs / operations / events / snapshotSequence / observedAt`，减少每轮分别读取 Run、检查和事件造成的排队。每次调用仍复核主体、会话保留和来源权限；结果是服务端记录，浏览器继续使用 chat-server 的安全投影。
+
+`runs` 按持久受理序号排序；事件只返回最新 6000 条范围内、位于 `afterSequence` 之后的增量。`eventsAfter` 是实际起点，`eventsComplete` 表示从请求起点到快照终点是否完整。请求起点早于窗口、事件已清理或游标超过当前终点时，返回可用窗口并明确不完整；负数或非整数游标拒绝。它用于有界展示，可靠事件消费者仍使用 `listEvents` 的严格游标语义。
+
+```ts
+const view = await engine.readSessionView(sessionId, { afterSequence: 0 });
+// 下次展示刷新使用这个已授权快照的终点。
+const next = await engine.readSessionView(sessionId, {
+  afterSequence: view.snapshotSequence,
+});
+```

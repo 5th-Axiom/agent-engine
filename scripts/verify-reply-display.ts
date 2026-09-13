@@ -213,7 +213,9 @@ try {
     nextThought,
   );
   answerGate.release();
-  const answer = root.locator(".ae-message-agent > .ae-message-text");
+  const answer = root.locator(
+    '.ae-process-row[data-answer="true"] > .ae-message-text',
+  );
   const copy = answer.getByRole("button", { name: "复制代码", exact: true });
   await expect(copy).toBeVisible();
   await expect(answer.locator("pre")).toHaveText(

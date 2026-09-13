@@ -19,6 +19,14 @@ export interface DraftImage {
   attachment?: ChatImage;
   error?: string;
 }
+/** Local feedback only; an accepted submission is replaced by its authoritative Run. */
+export interface ChatSubmission {
+  requestId: string;
+  input: string;
+  attachments?: ChatImage[];
+  status: "sending" | "accepted" | "unconfirmed";
+  runId?: string;
+}
 export interface ChatState {
   contextRef?: string;
   preparingSession?: boolean;
@@ -29,7 +37,11 @@ export interface ChatState {
   config?: ChatConfig;
   assistantId?: string;
   sessions: ChatSessionSummary[];
+  selectedSessionId?: string;
+  loadingSession?: boolean;
+  historyError?: string;
   session?: ChatSession;
+  submission?: ChatSubmission;
   draft: string;
   sending: boolean;
   cancelling: boolean;
@@ -80,6 +92,7 @@ interface Pending {
 export const chatBusy = (state: ChatState) =>
   state.sending ||
   state.preparingSession === true ||
+  state.loadingSession === true ||
   !!state.awaitingRunId ||
   !!state.session?.runs.some(isActiveRun);
 
@@ -115,12 +128,19 @@ export class ChatController {
   private listeners = new Set<(state: ChatState) => void>();
   private lifetime = new AbortController();
   private viewRequest?: AbortController;
+  private historyRequest?: {
+    controller: AbortController;
+    promise: Promise<void>;
+  };
+  private historyReadAt = 0;
+  private cache = new Map<string, { session: ChatSession; bytes: number }>();
   private timer?: ReturnType<typeof setTimeout>;
   private generation = 0;
   private pending?: Pending;
   private sessionId?: string;
   private preparationId?: string;
   private disposed = false;
+  private unauthorized = false;
   private started = false;
   private refreshNumber = 0;
   constructor(
@@ -162,12 +182,26 @@ export class ChatController {
       (error.status === 401 || error.status === 403)
     ) {
       this.clearImages();
+      this.unauthorized = true;
+      clearTimeout(this.timer);
+      ++this.generation;
+      this.viewRequest?.abort();
+      this.historyRequest?.controller.abort();
+      this.cache.clear();
       this.state.session = undefined;
       this.state.sessions = [];
+      this.state.selectedSessionId = undefined;
+      this.state.loadingSession = false;
+      this.state.submission = undefined;
+      this.state.awaitingRunId = undefined;
+      this.state.sending = false;
+      this.state.cancelling = false;
+      this.state.historyError = undefined;
       this.state.modelId = undefined;
       this.state.skillId = undefined;
       this.sessionId = undefined;
       this.options.memory?.write(null);
+      this.emit();
     }
   }
   async start(): Promise<void> {
@@ -181,6 +215,7 @@ export class ChatController {
     if (this.state.sending) throw new ChatError("CHAT_SEND_PENDING");
     const generation = ++this.generation;
     this.viewRequest?.abort();
+    this.historyRequest?.controller.abort();
     clearTimeout(this.timer);
     this.state.connection = "connecting";
     this.emit();
@@ -195,13 +230,19 @@ export class ChatController {
       if (!config.assistants.some((a) => a.id === selected))
         throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE");
       this.state.config = config;
+      this.unauthorized = false;
       this.state.assistantId = selected;
       this.sessionId ??= this.options.memory?.read() ?? undefined;
+      this.state.selectedSessionId = this.sessionId;
+      this.state.loadingSession = !!this.sessionId;
       this.state.error = undefined;
       this.state.connection = "ready";
       await this.refresh();
     } catch (error) {
-      if (!this.disposed && generation === this.generation) this.fail(error);
+      if (!this.disposed && generation === this.generation) {
+        this.fail(error);
+        this.emit();
+      }
     } finally {
       if (!this.disposed && generation === this.generation) {
         this.emit();
@@ -346,6 +387,7 @@ export class ChatController {
       throw new ChatError("CHAT_ASSISTANT_UNAVAILABLE");
     ++this.generation;
     this.viewRequest?.abort();
+    this.viewRequest = undefined;
     this.sessionId = undefined;
     this.preparationId = undefined;
     this.options.memory?.write(null);
@@ -353,6 +395,9 @@ export class ChatController {
     this.state = {
       ...this.state,
       session: undefined,
+      selectedSessionId: undefined,
+      loadingSession: false,
+      submission: undefined,
       assistantId,
       modelId: undefined,
       skillId: undefined,
@@ -374,7 +419,7 @@ export class ChatController {
       input,
       this.lifetime.signal,
     );
-    await this.refresh();
+    await this.refreshView();
   }
   /** Materialize an empty session for configuration without sending a message. */
   async ensureSession(): Promise<string> {
@@ -393,8 +438,10 @@ export class ChatController {
       );
       this.assertLive();
       this.sessionId = created.id;
+      this.state.selectedSessionId = created.id;
       this.options.memory?.write(created.id);
-      await this.refresh();
+      void this.refreshHistory();
+      await this.refreshView();
       return created.id;
     } finally {
       this.state.preparingSession = false;
@@ -403,27 +450,45 @@ export class ChatController {
   }
   async selectSession(id: string) {
     this.assertLive();
+    if (this.unauthorized) throw new ChatError("CHAT_NOT_READY");
     if (this.state.sending || this.state.preparingSession || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
     ++this.generation;
     this.viewRequest?.abort();
     this.clearImages();
     this.sessionId = id;
+    this.state.selectedSessionId = id;
+    this.state.loadingSession = true;
     this.options.memory?.write(id);
-    this.state.session = undefined;
-    this.state.modelId = undefined;
+    const cached = this.cache.get(id);
+    this.state.session = cached?.session;
+    if (cached) {
+      this.cache.delete(id);
+      this.cache.set(id, cached);
+      this.state.assistantId = cached.session.assistantId;
+    }
+    this.state.modelId =
+      cached?.session.runs.at(-1)?.modelId ?? cached?.session.defaultModelId;
     this.state.skillId = undefined;
     this.state.draft = "";
     this.state.error = undefined;
     this.state.awaitingRunId = undefined;
+    this.state.submission = undefined;
+    this.state.cancelling = false;
     this.emit();
-    await this.refresh();
+    void this.refreshHistory();
+    await this.refreshView();
     this.schedule();
   }
   async send(input = this.state.draft) {
     this.assertLive();
     if (chatBusy(this.state) || this.pending)
       throw new ChatError("CHAT_SEND_PENDING");
+    if (
+      this.state.connection !== "ready" ||
+      (this.state.selectedSessionId && !this.state.session)
+    )
+      throw new ChatError("CHAT_NOT_READY");
     const text = input.trim();
     if ((!text && !this.state.images?.length) || text.length > 8000)
       throw new ChatError("INVALID_INPUT");
@@ -458,6 +523,7 @@ export class ChatController {
   discardPending() {
     this.assertLive();
     if (this.state.sending) return;
+    if (this.pending) this.state.submission = undefined;
     this.pending = undefined;
     this.state.pending = false;
     this.state.error = undefined;
@@ -468,6 +534,12 @@ export class ChatController {
     const generation = this.generation;
     this.state.sending = true;
     this.state.pending = true;
+    this.state.submission = {
+      requestId: pending.requestId,
+      input: pending.input,
+      attachments: pending.attachments,
+      status: "sending",
+    };
     this.state.error = undefined;
     this.emit();
     try {
@@ -479,6 +551,7 @@ export class ChatController {
         if (this.disposed) return;
         pending.sessionId = created.id;
         this.sessionId = created.id;
+        this.state.selectedSessionId = created.id;
         this.options.memory?.write(created.id);
       }
       const sent = await this.transport.sendMessage(
@@ -497,18 +570,30 @@ export class ChatController {
       );
       if (this.disposed || generation !== this.generation) return;
       this.state.awaitingRunId = sent.runId;
+      this.state.submission = {
+        ...this.state.submission!,
+        status: "accepted",
+        runId: sent.runId,
+      };
       this.state.draft = "";
       this.state.skillId = undefined;
       this.clearImages();
       this.pending = undefined;
       this.state.pending = false;
+      this.state.sending = false;
       this.state.connection = "ready";
       this.state.error = undefined;
-      await this.refresh();
+      // Acknowledgment must paint before either snapshot or sidebar requests finish.
+      this.emit();
+      void this.refreshHistory();
+      await this.refreshView();
     } catch (error) {
-      if (!this.disposed) this.fail(error);
+      if (!this.disposed && generation === this.generation) {
+        if (this.state.submission) this.state.submission.status = "unconfirmed";
+        this.fail(error);
+      }
     } finally {
-      if (!this.disposed) {
+      if (!this.disposed && generation === this.generation) {
         this.state.sending = false;
         this.emit();
         this.schedule();
@@ -529,7 +614,7 @@ export class ChatController {
         this.lifetime.signal,
       );
       if (!this.disposed && generation === this.generation)
-        await this.refresh();
+        await this.refreshView();
     } catch (error) {
       if (!this.disposed && generation === this.generation) this.fail(error);
     } finally {
@@ -541,6 +626,77 @@ export class ChatController {
   }
   async refresh(): Promise<void> {
     this.assertLive();
+    await Promise.all([this.refreshView(), this.refreshHistory()]);
+  }
+  private async refreshHistory(): Promise<void> {
+    if (this.disposed || this.unauthorized) return;
+    if (this.historyRequest && !this.historyRequest.controller.signal.aborted)
+      return this.historyRequest.promise;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    this.lifetime.signal.addEventListener("abort", abort, { once: true });
+    const request = { controller, promise: Promise.resolve() };
+    this.historyRequest = request;
+    this.historyReadAt = Date.now();
+    request.promise = (async () => {
+      try {
+        const sessions = await this.transport.listSessions(controller.signal);
+        if (this.disposed || controller.signal.aborted) return;
+        this.state.sessions = sessions;
+        this.syncCurrentSummary();
+        this.state.historyError = undefined;
+        this.emit();
+      } catch (error) {
+        if (this.disposed || controller.signal.aborted) return;
+        if (
+          error instanceof ChatError &&
+          [401, 403].includes(error.status ?? 0)
+        )
+          this.fail(error);
+        else this.state.historyError = errorCode(error);
+        this.emit();
+      } finally {
+        this.lifetime.signal.removeEventListener("abort", abort);
+        if (this.historyRequest === request) this.historyRequest = undefined;
+      }
+    })();
+    return request.promise;
+  }
+  private syncCurrentSummary() {
+    const session = this.state.session;
+    if (!session || this.state.loadingSession || this.state.awaitingRunId)
+      return;
+    // Current Run snapshots arrive independently of the slower list request.
+    // A late list must not resurrect the current conversation's running badge.
+    this.state.sessions = this.state.sessions.map((summary) =>
+      summary.id === session.id
+        ? {
+            ...summary,
+            title: session.title,
+            active: !!session.activeRun || session.runs.some(isActiveRun),
+          }
+        : summary,
+    );
+  }
+  private remember(session: ChatSession) {
+    this.cache.delete(session.id);
+    const bytes = JSON.stringify(session).length * 2;
+    // Bounded, controller-local memory only; never persist conversation contents.
+    if (bytes > 4 * 1024 * 1024) return;
+    this.cache.set(session.id, { session, bytes });
+    let total = [...this.cache.values()].reduce(
+      (sum, item) => sum + item.bytes,
+      0,
+    );
+    while (this.cache.size > 5 || total > 4 * 1024 * 1024) {
+      const [id, oldest] = this.cache.entries().next().value!;
+      total -= oldest.bytes;
+      this.cache.delete(id);
+    }
+  }
+  private async refreshView(): Promise<void> {
+    if (this.disposed || this.unauthorized) return;
+    clearTimeout(this.timer);
     const generation = this.generation;
     const number = ++this.refreshNumber;
     const id = this.sessionId;
@@ -549,10 +705,9 @@ export class ChatController {
     const abort = () => request.abort();
     this.lifetime.signal.addEventListener("abort", abort, { once: true });
     try {
-      const [sessions, session] = await Promise.all([
-        this.transport.listSessions(request.signal),
-        id ? this.transport.readSession(id, request.signal) : undefined,
-      ]);
+      const session = id
+        ? await this.transport.readSession(id, request.signal)
+        : undefined;
       if (
         this.disposed ||
         request.signal.aborted ||
@@ -560,14 +715,16 @@ export class ChatController {
         number !== this.refreshNumber
       )
         return;
-      this.state.sessions = sessions;
+      this.state.loadingSession = false;
       if (session) {
         if (session.id !== id) throw new ChatError("CHAT_INVALID_RESPONSE");
         if (
           this.state.session?.id === id &&
           session.snapshotSequence < this.state.session.snapshotSequence
-        )
+        ) {
+          this.emit();
           return;
+        }
         const previous = this.state.session;
         if (
           previous &&
@@ -585,14 +742,20 @@ export class ChatController {
         )
           this.state.skillId = undefined;
         this.state.session = session;
+        this.remember(session);
         this.state.assistantId = session.assistantId;
         this.state.modelId ??=
           session.runs.at(-1)?.modelId ?? session.defaultModelId;
-        if (session.runs.some((r) => r.id === this.state.awaitingRunId))
+        if (session.runs.some((r) => r.id === this.state.awaitingRunId)) {
           this.state.awaitingRunId = undefined;
+          this.state.submission = undefined;
+        }
+        this.syncCurrentSummary();
       }
-      this.state.connection = "ready";
-      if (!this.pending) this.state.error = undefined;
+      if (!this.pending) {
+        this.state.connection = "ready";
+        this.state.error = undefined;
+      }
       this.emit();
     } catch (error) {
       if (
@@ -602,21 +765,35 @@ export class ChatController {
         number !== this.refreshNumber
       )
         return;
+      this.state.loadingSession = false;
+      if (
+        error instanceof ChatError &&
+        (error.status === 404 || error.status === 410)
+      ) {
+        if (id) this.cache.delete(id);
+        this.state.session = undefined;
+      }
       this.fail(error);
       this.emit();
     } finally {
       this.lifetime.signal.removeEventListener("abort", abort);
+      if (this.viewRequest === request) {
+        this.viewRequest = undefined;
+        this.schedule();
+      }
     }
   }
   private schedule() {
     clearTimeout(this.timer);
-    if (this.disposed) return;
+    if (this.disposed || this.unauthorized || this.viewRequest) return;
     const delay = chatBusy(this.state)
-      ? (this.options.activePollMs ?? 450)
+      ? (this.options.activePollMs ?? 250)
       : (this.options.idlePollMs ?? 2500);
     this.timer = setTimeout(
       async () => {
-        await this.refresh();
+        const started = Date.now();
+        if (started - this.historyReadAt >= 5000) void this.refreshHistory();
+        await this.refreshView();
         this.schedule();
       },
       Math.max(50, delay),
@@ -630,6 +807,8 @@ export class ChatController {
     clearTimeout(this.timer);
     this.lifetime.abort();
     this.viewRequest?.abort();
+    this.historyRequest?.controller.abort();
+    this.cache.clear();
     this.listeners.clear();
     if (options.clearSession) this.options.memory?.write(null);
     this.pending = undefined;

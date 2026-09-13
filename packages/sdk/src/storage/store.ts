@@ -4,6 +4,8 @@ export interface StoreTransaction {
   put<T>(table: string, key: string, value: T): Promise<void>;
   remove(table: string, key: string): Promise<void>;
   list<T>(table: string): Promise<T[]>;
+  /** Optional indexed read of records whose sessionId equals the supplied ID. Not an authorization check. */
+  listBySession?<T>(table: string, sessionId: string): Promise<T[]>;
   append(sessionId: string, event: NewEvent): Promise<AgentEvent>;
   events(
     sessionId: string,

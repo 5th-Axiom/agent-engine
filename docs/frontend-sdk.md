@@ -256,6 +256,10 @@ Token 完整类型见 [`ChatTokens`](../packages/chat-ui/src/tokens/index.ts)。
 
 SDK 输出统一的 `--ae-chat-*` CSS 变量，例如 `--ae-chat-panel-width`。优先使用公开主题 API，这样可以一起更新尺寸、响应式判断和校验；不要依赖 Shadow DOM 内部类名去打补丁。默认入口在右下角，`position: 'left'` 可改到左下角。
 
+`panelMode: 'side'` 将面板贴到视口侧边，默认仍为 `'floating'`。宿主可以用 `[data-agent-chat]::part(panel)` 留出自己的页头；正文是否有足够空间并排展示由宿主负责。文档站保持原正文和导航布局，右侧空间不足时采用覆盖面板，手机使用全屏原生模态框。打开/关闭不会重排文章。
+
+指针开关使用 `motionMs` 控制的位移与透明度过渡，可反向中断；键盘操作、减少动态效果偏好及 `motionMs: 0` 即时生效。`isOpen` / `onOpenChange` 表示逻辑开关状态，关闭动画结束后释放模态状态并返回入口焦点；`destroy()` 会立即清理，包括关闭动画尚未结束时。
+
 ## 7. 放进一个页面，或单独使用组件
 
 页面容器必须有明确高度：
@@ -263,6 +267,8 @@ SDK 输出统一的 `--ae-chat-*` CSS 变量，例如 `--ae-chat-panel-width`。
 ```html
 <div id="chat-area" style="height: 680px; min-height: 320px"></div>
 ```
+
+输入区按实际聊天容器分配高度；收起时最多 180px，展开时最多 320px，同时为阅读区预留最多 200px。更短的容器会缩减编辑高度、让长文在原生输入框内部滚动；图片和错误反馈也计入预算。图片、当前模型和发送/停止始终位于输入区，Skill、展开和发送快捷键收在“输入设置”。单独组合 `createComposer` 时可提供 `availableHeight: () => number` 和调用 `resize()`，宿主尺寸变化后重新计算预算。
 
 ```ts
 import { mountChatPage, createHttpChatTransport } from "@agent-runtime/chat-ui";
@@ -288,7 +294,7 @@ const page = mountChatPage(target, {
 
 聊天容器宽度达到 760px 时默认展示 232px 的左侧对话列表，当前会话有选中标记；较窄时通过标题左侧的按钮展开。需要在桌面浮窗中常驻左栏，可设置 `theme.tokens.panelWidth: 880`。新对话按钮位于左栏顶部，左栏收起时使用页头的加号入口；发送第一条消息后会话才写入列表。手机上选中会话会收起左栏并返回聊天。
 
-顶部的“当前会话”展示 ID、创建时间、状态、轮数和配置版本；“工具”展示该会话配置中的工具及读写、审批状态。两种挂载方式都自带这两个入口，面板可滚动；关闭或在面板内按 Esc 会返回入口，保留草稿。
+顶部“更多操作”中的“当前会话”展示 ID、创建时间、状态、轮数和配置版本；“工具”展示该会话配置中的工具及读写、审批状态。两种挂载方式都自带这两个入口，面板可滚动；关闭或在面板内按 Esc 会返回可见的“更多操作”入口，保留草稿。
 
 `ChatTool` 是公开工具数据，包含 `name`、可选 `label` / `description`、`sideEffect` 和 `permission`。`ChatAssistant.tools` 用于创建前的预览；已有会话使用 `ChatSession.tools`，不冒用最新助手的工具列表。`ChatSession.activeTools` / `activeConfigVersion` 描述正在运行的配置快照，与当前配置不同时另列“本轮回答的工具”。最终能否调用仍由服务端授权决定。
 
@@ -353,15 +359,17 @@ const memory = createSessionMemory(sessionStorage, `${tenantId}:${accountId}`);
 // 将 memory 传给 mountChatWidget({ transport, memory })。
 ```
 
-这里只存会话 ID，不存聊天正文或密钥。历史正文保存在服务端。默认最近 50 个会话、当前会话最近 50 次运行；界面显示总运行数提示。长历史分页尚未提供。
+这里只持久保存会话 ID，不存聊天正文或密钥。控制器在本次挂载内缓存最多 5 个已读取会话、合计约 4MiB 序列化正文，用于切换时立即显示；同时重新请求授权快照。缓存不写浏览器存储，销毁或收到 401/403 时清除，过期/不存在的会话也会移除。服务端默认最近 50 个会话、当前会话最近 50 次运行；长历史分页尚未提供。
+
+自定义界面可以读取 `ChatState.selectedSessionId` 立即选中左侧条目，通过 `loadingSession` 显示加载/更新提示。`submission` 包含冻结的 `input`、附件引用和 `sending / accepted / unconfirmed` 状态；这是本地发送反馈，只有服务端确认后才有 `runId`，对应 Run 到达后自动移除。失败重试沿用原请求编号；不要把本地反馈写成假的 Run 或完成结果。
 
 如果主动传入自己的 `controller`，它由你负责调用 `controller.dispose({ clearSession: true })`；视图 `destroy()` 不销毁共享控制器。关闭/卸载都不等于取消 Run，确需停止时先显式请求取消。
 
 ## 9. 当前范围与验证方式
 
-- 文本答案以服务端快照持续更新；控制器默认活跃时每 450ms、空闲时每 2500ms 拉取，不是 WebSocket/SSE 客户端。
+- 文本答案以服务端快照持续更新；当前会话每次读取结束后，默认活跃时等待 250ms、空闲时等待 2500ms 再读。会话列表独立刷新，后台间隔至少 5 秒且合并未结束的请求；列表缓慢不阻塞当前回复。不是 WebSocket/SSE 客户端。
 - 展示工具状态和 Token 用量；用量不完整、费用估算不完整会分别注明，不把缺失值当零。
-- 可展示审批/等待状态，但首版 IM 没有审批或人工处置表单；需要宿主通过后端 SDK 完成人工流程。
+- 宿主显式开启 interaction 后，可在 IM 回复问题、表单和审批；工具结果未知的人工处置仍走后端 SDK。
 - 默认中文，`copy` 可覆盖主要按钮和欢迎文案；不是完整多语言系统。
 - Debug 是单独鉴权的开发页面。通用桥默认不提供 Debug 链接；仅本地示例配置了该入口。
 - `styleNonce` 支持需要 nonce 的样式后备路径；宿主自己的 CSP、定位层级和真实设备需要联调。
@@ -370,13 +378,16 @@ const memory = createSessionMemory(sessionStorage, `${tenantId}:${accountId}`);
 pnpm check
 pnpm verify:chat-ui --functional-only
 pnpm verify:chat-packages
+pnpm verify:chat-responsiveness
 ```
 
-第一条还会执行真实 PostgreSQL 集成/恢复测试，需按上手指南准备专用测试库；第二条用确定性模型在 Chromium 验证聊天，不需要模型 Key。去掉 `--functional-only` 会输出本地截图。第三条会打包，再在独立临时项目安装并验证导出、声明和浏览器构建，需要下载依赖；仅生成安装包用 `pnpm pack:chat`。真实模型验证结果和安装包验证记录见[前端 SDK 验收记录](frontend-sdk-acceptance.md)。
+第一条还会执行真实 PostgreSQL 集成/恢复测试，需按上手指南准备专用测试库；第二条用确定性模型在 Chromium 验证聊天，不需要模型 Key。去掉 `--functional-only` 会输出本地截图。第三条会打包，再在独立临时项目安装并验证导出、声明和浏览器构建，需要下载依赖；仅生成安装包用 `pnpm pack:chat`。第四条独立挂起创建、发送、快照和历史列表请求，验证即时显示、会话切换、重试、连续文字更新与手机布局。真实模型验证结果和安装包验证记录见[前端 SDK 验收记录](frontend-sdk-acceptance.md)。
 
 ## 10. 在回答旁展示处理过程
 
-整页和悬浮入口都会读取 `ChatRun.process`，接入方无需订阅原始引擎事件。执行时默认展开；完成后收起为可展开摘要，正在查看的详情保持展开。过程显示真实发生的模型阶段、工具、Skill、知识/记忆、重试和等待，最终回答继续支持 Markdown。没有模型思考信号就不显示“思考”；私有思考内容不会传到浏览器。
+整页和悬浮入口都会读取 `ChatRun.process`，接入方无需订阅原始引擎事件。正文、思考与工具按内容顺序展示，后继正文出现后局部收起过程；完成后保留主要正文与最后结论，其余按正文边界折叠，正在查看的详情保持展开。过程显示真实发生的模型阶段、工具、Skill、知识/记忆、重试和等待，最终回答继续支持 Markdown。没有模型思考信号就不显示“思考”；私有思考内容不会传到浏览器。
+
+每轮使用同一个过程入口，内部包含用量、费用完整性及执行记录；完成后放在回答和来源之后，消除重复的 Token 摘要。待回复的问题和审批仍在折叠内容之外。低层 `createRunDetails()` 保留独立使用方式，已有协议和数据完整性语义不变。
 
 默认仅显示步骤名称、状态与时间。需要显示业务查询和结果摘要时，在服务器的 `ChatAssistantDefinition` 上增加 `describeProcess`：
 
@@ -403,14 +414,14 @@ describeProcess({ name, input, output }) {
 
 输入区支持自动增高、就地展开（Esc 收起）、原生撤销/重做、空输入按 ↑ 找回上一条文字，以及中文输入法保护。挂载时可传 `sendShortcut: "enter"`，采用 Enter 发送、Shift+Enter 换行；缺省仍为 `"mod-enter"`，用户也可在输入设置中切换。文档站已显式使用 Enter 发送。
 
-在服务端 `assistant.config.models` 配置多个模型；可用 `assistant.modelDisplay[id].label` 提供公开名称。前端自动呈现目录及思考/图片标识，`chat.controller.setModel(id)` 选择下一轮模型。配置了 Skill 就会出现技能选择器，`chat.controller.setSkill(id)` 显式选择、无参数恢复自动，受理后复位。服务端只接受目录 ID，不接受浏览器传入地址、Key 或技能指令。
+在服务端 `assistant.config.models` 配置多个模型；可用 `assistant.modelDisplay[id].label` 提供公开名称。前端自动呈现目录及思考/图片标识，`chat.controller.setModel(id)` 选择下一轮模型。配置了 Skill 就会在“输入设置”中出现技能选择器，`chat.controller.setSkill(id)` 显式选择、无参数恢复自动，受理后复位。服务端只接受目录 ID，不接受浏览器传入地址、Key 或技能指令。
 
-模型和 Skill 随请求冻结，结果不明时重试不会换模型。刷新恢复最近一轮模型，轮询不覆盖正在编辑的下一条选择；新会话使用默认模型。旧会话仅提供已保存配置和宿主当前可用 ID 的交集，新增模型需要宿主显式更新该 Session。语音尚未接入，麦克风置灰并解释原因。API、配置示例、能力边界和验证见[输入编辑与模型选择](composer-alignment.md)。
+模型和 Skill 随请求冻结，结果不明时重试不会换模型。刷新恢复最近一轮模型，轮询不覆盖正在编辑的下一条选择；新会话使用默认模型。旧会话仅提供已保存配置和宿主当前可用 ID 的交集，新增模型需要宿主显式更新该 Session。语音尚未接入，隐藏入口。API、配置示例、能力边界和验证见[输入编辑与模型选择](composer-alignment.md)。
 
 
 ### 展示公开思考与流式正文
 
-模型 `thinking.expose: "content"`、Engine 策略 `thinkingDisplayRetention: "session"` 和宿主 `thinkingDisplay: "content"` 共同开启公开思考正文；默认仍只展示状态。`summary` 仅展示供应商摘要。完整配置、协议限制与 API 兼容见[回复展示改进](reply-display-alignment.md)。思考与回答分别呈现，不展示原生签名和遮蔽块；未返回正文时明确提示。
+模型 `thinking.expose: "content"`、Engine 策略 `thinkingDisplayRetention: "session"` 和宿主 `thinkingDisplay: "content"` 共同开启公开思考正文；默认仍只展示状态。`summary` 仅展示供应商摘要。完整配置、协议限制与 API 兼容见[回复展示改进](reply-display-alignment.md)。思考与回答分别呈现，不展示原生签名和遮蔽块；未返回正文时仅显示当前阶段，不创建空思考框。
 
 整页和浮窗自动处理短时文字缓冲、稳定 Markdown 节点、历史立即呈现及减少动态效果。直接使用 `createMessage` 时，可传 `streaming: true`，卸载调用 `destroy()`。已完成的基础模型阶段收在执行详情，当前阶段、工具和可展示思考留在过程区。
 
@@ -427,3 +438,7 @@ IM 自动展示并提交原生控件，跨轮询保留尚未提交的表单值�
 新增 HTTP `POST /sessions/:id/input`，请求为 `ChatInputResolution`：permission 包含 `id/kind/decision`，question 与 structured_input 包含 `id/kind/answer`。`describePending` 可公开 question/details 预览；原始工具输入不自动投影。未开启 interaction 的旧宿主与未实现 resolveInput 的自定义 transport 仍只展示等待说明。
 
 完整文档宿主和配置验证见 [能力接入总结](docs-capability-coverage.md)。
+
+### 回复身份与呈现时机
+
+`ChatRun.reply?: { id: string; sequence: number }` 是当前草稿／最终正文的公开展示身份与首个文本事件顺序。草稿提交为阶段正文时与 `process.entries` 的 message ID 保持一致；它不是跨会话读取凭据。旧服务省略该字段仍可渲染。历史立即显示，正文增长不逐字动画容器高度。来源与执行明细等最后文字收尾后出现；详见[时机、位置与折叠规则](reply-presentation-behaviors.md)，运行 `pnpm verify:reply-presentation` 可验证桌面与窄屏状态序列。

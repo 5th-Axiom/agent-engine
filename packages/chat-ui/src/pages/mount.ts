@@ -29,6 +29,8 @@ export interface ChatMountOptions extends ChatPageOptions {
 export interface ChatWidgetOptions extends ChatMountOptions {
   target?: HTMLElement;
   position?: "left" | "right";
+  /** A floating panel or a viewport-edge drawer. Hosts can offset it with ::part(panel). */
+  panelMode?: "floating" | "side";
   launcherIcon?: ChatIcon;
   onOpenChange?: (open: boolean) => void;
 }
@@ -91,6 +93,17 @@ export function mountChatWidget(options: ChatWidgetOptions) {
   let isOpen = false;
   let destroyed = false;
   let tokens: ChatTokens;
+  let animation: Animation | undefined;
+  let pointerAt = -Infinity;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const pointerInput = () => {
+    pointerAt = performance.now();
+  };
+  const keyboardInput = () => {
+    pointerAt = -Infinity;
+  };
+  document.addEventListener("pointerdown", pointerInput, true);
+  document.addEventListener("keydown", keyboardInput, true);
   const host = view.host;
   host.dataset.presentation = "widget";
   host.style.position = "fixed";
@@ -108,6 +121,8 @@ export function mountChatWidget(options: ChatWidgetOptions) {
   launcher.setAttribute("aria-expanded", "false");
   launcher.setAttribute("aria-haspopup", "dialog");
   const dialog = element("dialog", "ae-dialog");
+  dialog.dataset.panelMode = options.panelMode ?? "floating";
+  dialog.dataset.phase = "closed";
   // Hosts may position the panel without reaching into SDK implementation classes.
   dialog.setAttribute("part", "panel");
   dialog.setAttribute("aria-label", copy.title);
@@ -133,12 +148,15 @@ export function mountChatWidget(options: ChatWidgetOptions) {
     const nextMobile = mobile();
     dialog.dataset.mobile = String(nextMobile);
     if (isOpen && wasMobile !== nextMobile) {
+      animation?.cancel();
+      animation = undefined;
+      dialog.dataset.phase = "open";
       dialog.close();
       if (nextMobile) dialog.showModal();
       else dialog.show();
     }
     if (options.position === "left" && !nextMobile) {
-      dialog.style.left = "24px";
+      dialog.style.left = options.panelMode === "side" ? "0" : "24px";
       dialog.style.right = "auto";
     } else {
       dialog.style.left = "";
@@ -161,28 +179,84 @@ export function mountChatWidget(options: ChatWidgetOptions) {
       /* Host callback errors do not break cleanup/focus. */
     }
   }
+  function settle() {
+    animation?.cancel();
+    animation = undefined;
+    dialog.dataset.phase = isOpen ? "open" : "closed";
+    if (!isOpen) {
+      dialog.close();
+      launcher.hidden = false;
+      launcher.focus({ preventScroll: true });
+    }
+  }
+  function reveal(opening: boolean, initial = false) {
+    const distance =
+      options.panelMode === "side" && !mobile()
+        ? `translateX(${options.position === "left" ? "-" : ""}24px)`
+        : "translateY(12px)";
+    const style = getComputedStyle(dialog);
+    const from = initial
+      ? { transform: distance, opacity: "0" }
+      : { transform: style.transform, opacity: style.opacity };
+    animation?.cancel();
+    animation = undefined;
+    dialog.dataset.phase = opening ? "opening" : "closing";
+    if (
+      reduced.matches ||
+      performance.now() - pointerAt > 1000 ||
+      !tokens.motionMs
+    ) {
+      settle();
+      return;
+    }
+    const next = dialog.animate(
+      [
+        from,
+        opening
+          ? { transform: "none", opacity: "1" }
+          : { transform: distance, opacity: "0" },
+      ],
+      {
+        duration: tokens.motionMs,
+        easing: "cubic-bezier(.32,.72,0,1)",
+        fill: "both",
+      },
+    );
+    animation = next;
+    void next.finished.then(
+      () => {
+        if (animation === next && !destroyed) settle();
+      },
+      () => {},
+    );
+  }
   function open() {
     if (destroyed || isOpen) return;
     isOpen = true;
     updateViewport();
-    if (mobile()) dialog.showModal();
-    else dialog.show();
+    const initial = !dialog.open;
+    if (initial) {
+      if (mobile()) dialog.showModal();
+      else dialog.show();
+    }
+    dialog.inert = false;
     launcher.hidden = true;
     launcher.setAttribute("aria-expanded", "true");
     page.focus();
+    reveal(true, initial);
     notify();
   }
   function close() {
     if (destroyed || !isOpen) return;
     isOpen = false;
-    dialog.close();
-    launcher.hidden = false;
+    dialog.inert = true;
     launcher.setAttribute("aria-expanded", "false");
-    launcher.focus({ preventScroll: true });
+    reveal(false);
     notify();
   }
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
+    keyboardInput();
     close();
   });
   dialog.addEventListener("keydown", (event) => {
@@ -192,7 +266,14 @@ export function mountChatWidget(options: ChatWidgetOptions) {
       close();
     }
   });
-  const resize = () => updateViewport();
+  const resize = () => {
+    if (!isOpen && animation) settle();
+    updateViewport();
+  };
+  const motionChange = () => {
+    if (reduced.matches && animation) settle();
+  };
+  reduced.addEventListener("change", motionChange);
   window.addEventListener("resize", resize);
   visualViewport?.addEventListener("resize", resize);
   visualViewport?.addEventListener("scroll", resize);
@@ -212,10 +293,13 @@ export function mountChatWidget(options: ChatWidgetOptions) {
       if (destroyed) return;
       destroyed = true;
       const wasOpen = isOpen;
-      if (isOpen) {
-        isOpen = false;
-        dialog.close();
-      }
+      isOpen = false;
+      animation?.cancel();
+      animation = undefined;
+      if (dialog.open) dialog.close();
+      document.removeEventListener("pointerdown", pointerInput, true);
+      document.removeEventListener("keydown", keyboardInput, true);
+      reduced.removeEventListener("change", motionChange);
       window.removeEventListener("resize", resize);
       visualViewport?.removeEventListener("resize", resize);
       visualViewport?.removeEventListener("scroll", resize);

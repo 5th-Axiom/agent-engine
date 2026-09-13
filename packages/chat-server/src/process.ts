@@ -1,5 +1,4 @@
 import {
-  AgentEngineError,
   type AgentEngine,
   type AgentEvent,
   type RunRecord,
@@ -11,7 +10,7 @@ import {
 } from "@agent-runtime/chat-core";
 import type { ChatAssistantDefinition } from "./types.js";
 
-type Fact = {
+export type Fact = {
   type: string;
   sequence: number;
   timestamp: string;
@@ -77,81 +76,50 @@ export class ProcessJournal {
     string,
     { through: number; facts: Fact[]; complete: boolean; thinking: string }
   >();
-  async read(
-    engine: AgentEngine,
+  cursor(sessionId: string, thinking: string) {
+    const cached = this.sessions.get(sessionId);
+    return cached?.thinking === thinking ? cached.through : 0;
+  }
+  ingest(
     sessionId: string,
     first: number,
-    through: number,
+    view: Awaited<ReturnType<AgentEngine["readSessionView"]>>,
     thinking: "none" | "summary" | "content" = "none",
   ) {
-    // readSession performs ownership, retention and source authorization even on a cache hit.
-    await engine.readSession(sessionId);
+    // The caller supplies a fresh authorized SDK snapshot, even on a cache hit.
     let cached = structuredClone(this.sessions.get(sessionId));
-    if (!cached || cached.through > through || cached.thinking !== thinking)
+    if (
+      !cached ||
+      cached.through !== view.eventsAfter ||
+      cached.thinking !== thinking
+    )
       cached = {
         thinking,
-        through: Math.max(first - 1, through - 6000, 0),
+        through: view.eventsAfter,
         facts: [],
-        complete: through - 6000 <= first - 1,
+        complete: view.eventsAfter <= first - 1,
       };
-    if (through - cached.through > 6000) {
-      cached = {
-        through: through - 6000,
-        facts: [],
-        complete: false,
-        thinking,
-      };
-    }
-    try {
-      while (cached.through < through) {
-        const page = await engine.listEvents(sessionId, {
-          afterSequence: cached.through,
-          throughSequence: through,
-          limit: 1000,
-        });
-        for (const event of page.events) {
-          const next = fact(event, thinking);
-          if (!next) continue;
-          const previous = cached.facts.at(-1);
-          if (
-            ["content.output.delta", "content.thinking.delta"].includes(
-              next.type,
-            ) &&
-            previous?.type === next.type &&
-            previous.attemptId === next.attemptId &&
-            previous.blockId === next.blockId &&
-            previous.data.format === next.data.format
-          ) {
-            previous.data.text = text(
-              String(previous.data.text ?? "") + String(next.data.text ?? ""),
-              8000,
-            );
-          } else cached.facts.push(next);
-        }
-        if (page.nextSequence === cached.through) {
-          cached.complete = false;
-          break;
-        }
-        cached.through = page.nextSequence;
-      }
-    } catch (error) {
-      this.sessions.delete(sessionId);
+    cached.complete &&= view.eventsComplete;
+    for (const event of view.events) {
+      const next = fact(event, thinking);
+      if (!next) continue;
+      const previous = cached.facts.at(-1);
       if (
-        !(error instanceof AgentEngineError) ||
-        error.code !== "EVENT_CURSOR_EXPIRED"
-      )
-        throw error;
-      const snapshot = await engine.snapshot(sessionId);
-      cached = {
-        thinking,
-        through: snapshot.snapshotSequence,
-        complete: false,
-        facts: snapshot.draftEvents.flatMap((event) => {
-          const value = fact(event, thinking);
-          return value ? [value] : [];
-        }),
-      };
+        ["content.output.delta", "content.thinking.delta"].includes(
+          next.type,
+        ) &&
+        previous?.type === next.type &&
+        previous.attemptId === next.attemptId &&
+        previous.blockId === next.blockId &&
+        previous.data.format === next.data.format
+      ) {
+        previous.data.text = text(
+          String(previous.data.text ?? "") + String(next.data.text ?? ""),
+          8000,
+        );
+      } else cached.facts.push(next);
     }
+    cached.through = view.snapshotSequence;
     if (cached.facts.length > 1200) {
       cached.facts = cached.facts.slice(-1200);
       cached.complete = false;
@@ -318,6 +286,12 @@ export function projectProcess(
           "阶段说明",
           "completed",
         );
+        item.sequence =
+          runFacts.find(
+            (e) =>
+              e.type === "content.output.delta" &&
+              e.attemptId === event.attemptId,
+          )?.sequence ?? item.sequence;
         item.output = message.slice(0, 8000);
       }
     }

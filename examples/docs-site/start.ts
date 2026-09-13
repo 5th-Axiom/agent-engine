@@ -19,6 +19,10 @@ import {
   type DocsCapabilities,
 } from "./capabilities.js";
 import { startDocsRemoteCapabilities } from "./remote-capabilities.js";
+import {
+  createDocsSessionHistory,
+  sessionHistoryTools,
+} from "./session-history.js";
 import { docsAssistant, docsBinding, startDocsSite } from "./server.js";
 import {
   createKnowledge,
@@ -89,6 +93,7 @@ try {
       throw new Error("DOCS_DATABASE_MUST_BE_SEPARATE");
     store = PostgresStore.fromConnectionString(databaseUrl);
     await store.migrate();
+    const history = createDocsSessionHistory(store);
     capabilities = createDocsCapabilities({
       articles,
       store,
@@ -107,7 +112,7 @@ try {
       .update("agent-engine-docs-cookie-key-v1")
       .digest();
     engine = await createAgentEngine({
-      store,
+      store: history.store,
       principal: { tenantId: "docs-site", subjectId: "docs-host" },
       protocolKey: local.protocolKey,
       secrets: {
@@ -122,7 +127,8 @@ try {
           return profile.secrets.resolve(ref);
         },
       },
-      authorize: async ({ principal, sideEffect, action, resource }) => {
+      authorize: async (request) => {
+        const { principal, sideEffect, action, resource } = request;
         if (
           principal.tenantId !== "docs-site" ||
           (sideEffect === "write" &&
@@ -140,6 +146,7 @@ try {
             "docs.search",
             "docs.search.v1",
             ...knowledgeTools.flatMap((t) => [t.name, t.name + ".v1"]),
+            ...sessionHistoryTools.flatMap((t) => [t.name, t.name + ".v1"]),
             ...Object.keys(capabilities!.bindings),
             "engine.skill.select",
             "engine.skill.exit",
@@ -153,12 +160,13 @@ try {
             "docs.httpCatalog",
             "docs.mcpSearch",
           ].includes(resource);
-        return true;
+        return history.authorize(request);
       },
       bindings: {
         "docs.search.v1": docsBinding(articles),
         ...knowledge.bindings,
         ...capabilities.bindings,
+        ...history.bindings,
       },
       remoteContracts: remote.contracts,
       limits: { maxConcurrentModelRequests: 2, maxAcceptedRuns: 8 },
@@ -186,6 +194,7 @@ try {
         thinkingDisplayRetention: "session",
       },
     });
+    history.attachEngine(engine);
     // Store transactions require the fencing lock acquired by Engine startup.
     await capabilities.sweepExpired();
     memoryCleanup = setInterval(() => {
@@ -202,12 +211,14 @@ try {
       output >= local.model.limits.contextWindowTokens
     )
       throw new Error("OUTPUT_LIMIT_INVALID");
-    assistant = docsAssistant(
-      {
-        ...local.model,
-        limits: { ...local.model.limits, maxOutputTokens: output },
-      },
-      knowledge,
+    assistant = history.assistant(
+      docsAssistant(
+        {
+          ...local.model,
+          limits: { ...local.model.limits, maxOutputTokens: output },
+        },
+        knowledge,
+      ),
     );
     const assistantConfig = parseConfig(assistant.config);
     assistantConfig.tools.push(...remote.tools);

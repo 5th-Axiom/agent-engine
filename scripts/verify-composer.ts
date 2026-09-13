@@ -115,17 +115,14 @@ try {
     name: "选择模型",
     exact: true,
   });
-  const skillSelect = root.getByRole("combobox", {
-    name: "选择技能",
-    exact: true,
-  });
+  const skillSelect = root.getByLabel("选择技能", { exact: true });
   await expect(modelSelect).toHaveValue("text");
   await expect(
     root.getByRole("button", {
       name: "语音输入：未接入语音识别服务",
       exact: true,
     }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     root.getByRole("button", { name: "添加图片", exact: true }),
   ).toBeDisabled();
@@ -133,7 +130,9 @@ try {
   await expect(
     root.getByRole("button", { name: "添加图片", exact: true }),
   ).toBeEnabled();
+  await root.getByLabel("输入设置", { exact: true }).click();
   await skillSelect.selectOption("guide");
+  await root.getByLabel("输入设置", { exact: true }).click();
   const longDraft = Array.from(
     { length: 24 },
     (_, i) => `第 ${i + 1} 行：说明如何配置模型和接入 Skill。`,
@@ -145,6 +144,7 @@ try {
     (window as any).sameEditor = el;
     (el as HTMLTextAreaElement).setSelectionRange(8, 15);
   });
+  await root.getByLabel("输入设置", { exact: true }).click();
   await root.getByRole("button", { name: "展开输入框", exact: true }).click();
   assert.ok((await field.boundingBox())!.height > collapsedHeight);
   assert.deepEqual(
@@ -156,9 +156,44 @@ try {
     [true, 8, 15],
   );
   await field.press("Escape");
-  await expect(
-    root.getByRole("button", { name: "展开输入框", exact: true }),
-  ).toHaveAttribute("aria-expanded", "false");
+  await expect(root.locator(".ae-composer")).toHaveAttribute(
+    "data-expanded",
+    "false",
+  );
+  // A small embedded area must not inherit a large browser's editing budget.
+  for (const [width, height] of [
+    [440, 652],
+    [918, 590],
+    [390, 400],
+    [320, 320],
+  ]) {
+    await page.evaluate(
+      ([width, height]) => {
+        const host = document.querySelector<HTMLElement>("#chat")!;
+        host.style.width = `${width}px`;
+        host.style.height = `${height}px`;
+      },
+      [width!, height!],
+    );
+    await root.getByLabel("输入设置", { exact: true }).click();
+    await root.getByRole("button", { name: "展开输入框", exact: true }).click();
+    await expect
+      .poll(async () => {
+        const panel = (await root.locator(".ae-page").boundingBox())!;
+        const reading = (await root.locator(".ae-transcript").boundingBox())!;
+        const composer = (await root.locator(".ae-composer").boundingBox())!;
+        return (
+          composer.y + composer.height <= panel.y + panel.height + 1 &&
+          reading.height >= (height! >= 560 ? 200 : 70)
+        );
+      })
+      .toBe(true);
+    assert.ok((await root.locator(".ae-header").boundingBox())!.height <= 72);
+    await field.press("Escape");
+  }
+  await page.evaluate(() =>
+    document.querySelector<HTMLElement>("#chat")!.removeAttribute("style"),
+  );
   // Native insertion and undo continue to use the same textarea's edit history.
   await field.fill("");
   await field.pressSequentially("native undo");
