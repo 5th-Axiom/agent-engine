@@ -20,6 +20,7 @@ const paths = {
   send: "m4 4 17 8-17 8 3-8-3-8Z M7 12h14",
   stop: "M7 7h10v10H7z",
   plus: "M12 5v14 M5 12h14",
+  copy: "M9 9h11v12H9z M5 15H3V3h11v2",
   history: "M4 10a8 8 0 1 1 1 8 M4 4v6h6 M12 7v5l3 2",
   sidebar: "M4 4h16v16H4z M10 4v16 M6.5 8h1 M6.5 12h1",
   info: "M12 11v6 M12 7v.1 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",

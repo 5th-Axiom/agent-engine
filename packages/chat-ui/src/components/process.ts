@@ -9,6 +9,8 @@ import { createPendingInput } from "./pending-input.js";
 import { createStreamingMarkdown } from "./streaming.js";
 import { createDisclosure } from "./disclosure.js";
 import { planReply, type ReplyUnit } from "./reply-layout.js";
+import { createMessageCopy } from "./message-copy.js";
+import { defaultChatCopy, type ChatCopy } from "../copy.js";
 
 const stateLabels = {
   running: "进行中",
@@ -42,6 +44,7 @@ type Row = {
   entry: ChatProcessEntry;
   disclosure?: ReturnType<typeof createDisclosure>;
   stream?: ReturnType<typeof createStreamingMarkdown>;
+  copy?: ReturnType<typeof createMessageCopy>;
   body?: HTMLElement;
   label?: HTMLElement;
   status?: HTMLElement;
@@ -85,6 +88,7 @@ function place(parent: HTMLElement, nodes: HTMLElement[]) {
 export function createRunProcess(
   resolveInput?: (input: ChatInputResolution) => Promise<void>,
   audit?: HTMLElement,
+  copy: ChatCopy = defaultChatCopy,
 ) {
   const root = element("section", "ae-process");
   root.setAttribute("aria-label", "本轮处理过程");
@@ -242,6 +246,7 @@ export function createRunProcess(
       document.removeEventListener("visibilitychange", visibility);
       for (const row of rows.values()) {
         row.stream?.destroy();
+        row.copy?.destroy();
         row.disclosure?.destroy();
       }
       for (const group of groups.values()) group.destroy();
@@ -300,6 +305,7 @@ export function createRunProcess(
       for (const [id, row] of rows)
         if (!keep.has(id)) {
           row.stream?.destroy();
+          row.copy?.destroy();
           row.disclosure?.destroy();
           row.element.remove();
           rows.delete(id);
@@ -313,7 +319,8 @@ export function createRunProcess(
           if (entry.kind === "message") {
             row.body = element("div", "ae-message-text ae-process-message");
             row.stream = createStreamingMarkdown(row.body);
-            row.element.append(row.body);
+            row.copy = createMessageCopy(copy);
+            row.element.append(row.body, row.copy.element);
           } else {
             const line = element("span", "ae-process-line");
             row.label = element("span", "ae-process-label");
@@ -333,6 +340,7 @@ export function createRunProcess(
         row.element.dataset.state = entry.state;
         row.element.dataset.answer = String(entry.id === replyId && !!text);
         if (entry.kind === "message") {
+          row.copy!.update(entry.output ?? "");
           row.stream!.update(
             entry.output ?? "",
             active && entry.state === "running",

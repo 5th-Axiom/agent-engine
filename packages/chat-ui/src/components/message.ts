@@ -1,5 +1,6 @@
 import { createStreamingMarkdown } from "./streaming.js";
 import { createRunProcess } from "./process.js";
+import { createMessageCopy } from "./message-copy.js";
 import type { ChatRun, ChatInputResolution } from "@agent-runtime/chat-core";
 import { element } from "../atoms/index.js";
 import {
@@ -13,6 +14,8 @@ export interface MessageViewData {
   name: string;
   text: string;
   streaming?: boolean;
+  /** Hide copying for transient placeholders, rather than actual message text. */
+  copyable?: boolean;
 }
 export interface ChatSourceLink {
   label: string;
@@ -24,17 +27,22 @@ export interface TimelineOptions {
   /** Resolve public reference links for a completed reply. No model HTML is rendered. */
   getRunSources?: (run: ChatRun) => readonly ChatSourceLink[];
 }
-export function createMessage(data: MessageViewData) {
+export function createMessage(
+  data: MessageViewData,
+  copy: ChatCopy = defaultChatCopy,
+) {
   const root = element("section", "ae-message ae-message-" + data.sender);
   const name = element("p", "ae-message-name");
   const text = element("div", "ae-message-text");
-  root.append(name, text);
+  const actions = createMessageCopy(copy);
+  root.append(name, text, actions.element);
   const content = createStreamingMarkdown(text);
   let rendered: MessageViewData | undefined;
   const update = (next: MessageViewData) => {
     root.className = "ae-message ae-message-" + next.sender;
     name.textContent = next.name;
     text.hidden = !next.text;
+    actions.update(next.copyable === false ? "" : next.text);
     if (
       rendered?.text === next.text &&
       rendered.sender === next.sender &&
@@ -47,7 +55,14 @@ export function createMessage(data: MessageViewData) {
     else text.textContent = next.text;
   };
   update(data);
-  return { element: root, update, destroy: content.destroy };
+  return {
+    element: root,
+    update,
+    destroy() {
+      content.destroy();
+      actions.destroy();
+    },
+  };
 }
 export function createRunDetails(
   copy: ChatCopy = defaultChatCopy,
@@ -179,21 +194,28 @@ export function createMessageTimeline(
         if (!turn) {
           const container = element("article", "ae-turn");
           container.dataset.runId = run.id;
-          const user = createMessage({
-            sender: "self",
-            name: copy.self,
-            text: "",
-          });
-          const agent = createMessage({
-            sender: "agent",
-            name: copy.assistant,
-            text: "",
-          });
+          const user = createMessage(
+            {
+              sender: "self",
+              name: copy.self,
+              text: "",
+            },
+            copy,
+          );
+          const agent = createMessage(
+            {
+              sender: "agent",
+              name: copy.assistant,
+              text: "",
+            },
+            copy,
+          );
           const status = element("p", "ae-turn-state");
           const details = createRunDetails(copy);
           const process = createRunProcess(
             options.resolveInput,
             details.element,
+            copy,
           );
           const sources = element("nav", "ae-sources");
           sources.setAttribute("aria-label", "本条回答的参考资料");
@@ -272,6 +294,7 @@ export function createMessageTimeline(
             ? ""
             : run.output || (active ? run.draft || "正在准备回答…" : ""),
           streaming: active,
+          copyable: !!(run.output || run.draft),
         });
         turn.agent.element.hidden = !active && !run.output && !run.process;
         turn.process.update(run);

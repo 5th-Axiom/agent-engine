@@ -1,4 +1,10 @@
+const messageCopy = {
+  copyMessage: "复制",
+  messageCopied: "已复制",
+  messageCopyFailed: "复制失败，请选中文字复制",
+};
 export const defaultChatCopy = {
+  ...messageCopy,
   title: "AI 助手",
   launcherLabel: "打开聊天助手",
   close: "收起聊天",
@@ -26,7 +32,8 @@ export const defaultChatCopy = {
   debug: "查看 Debug",
   footnote: "AI 回答可能有误，请核对重要信息。",
 };
-export type ChatCopy = typeof defaultChatCopy;
+export type ChatCopy = Omit<typeof defaultChatCopy, keyof typeof messageCopy> &
+  Partial<typeof messageCopy>;
 export const runLabels: Record<string, string> = {
   queued: "排队中",
   running: "生成中",

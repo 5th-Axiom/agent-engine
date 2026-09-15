@@ -348,11 +348,14 @@ export function createChatPage(
     readImage: controller.transport.readImage?.bind(controller.transport),
   });
   const submission = element("article", "ae-submission");
-  const submittedMessage = createMessage({
-    sender: "self",
-    name: copy.self,
-    text: "",
-  });
+  const submittedMessage = createMessage(
+    {
+      sender: "self",
+      name: copy.self,
+      text: "",
+    },
+    copy,
+  );
   const submittedImages = element("p", "ae-submission-images");
   const submissionStatus = element("p", "ae-submission-status");
   submissionStatus.setAttribute("role", "status");
