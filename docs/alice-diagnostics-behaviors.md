@@ -17,6 +17,6 @@
 | DIAG-13 | 从实际完整部署 commit 生成资料清单，SHA-256 校验；在线版本观察新鲜度门禁 | 业务仍为 1f36c372；10 份文件校验通过；版本变化或观察过期时拒绝旧源码；不读取工作区 HEAD |
 | DIAG-14 | 每日 diagnostics-only 备份、唯一临时库恢复、14 份本机保留；可配置加密异地适配 | 实际 systemd 运行与 pg_restore/schema/记录复核通过，业务未重启；异地未配置时不发出外部请求且回执明确 not_configured |
 | DIAG-15 | 独立页面入口使用 SDK 语义色、44px 蓝色按钮、外链图标和键盘焦点，保留新标签页链接 | 1440/390px 合成浏览器检查：不溢出、对比度 7.21:1、Tab/Enter 打开独立页、noopener、0 次查询及 0 页面错误；构建通过。2026-09-15 Alice df7109e5，线上发布结果见实施计划 |
-| DIAG-16 | 宿主可显式关闭 Loop 累计上限；省略仍继承默认，有限 Policy 不允许 null 绕过 | SDK 合成运行完成 67 步/68 请求/66 能力调用、142,800 Token 和超过 120 秒的模拟活动时间；取消、有限 Override/Token Policy、PostgreSQL 故障恢复通过。Alice 接入及发布结果见实施计划 |
+| DIAG-16 | 宿主可显式关闭 Loop 累计上限；省略仍继承默认，有限 Policy 不允许 null 绕过 | SDK 合成运行完成 67 步/68 请求/66 能力调用、142,800 Token 和超过 120 秒的模拟活动时间；取消、有限 Override/Token Policy、PostgreSQL 故障恢复通过。Alice 49 项测试通过；736bed72 已部署，线上新会话实际四项 null/无 Token 预算，真实模型与范围工具成功，旧会话仍保留冻结配置；维护缺口见实施计划 |
 
 实现位于 Alice 仓库 diagnostics/，业务语义不进入 SDK。详细命令、数量、真实模型用量及待办以 Alice diagnostics/ACCEPTANCE.md 为准。没有把测试跳过或空接口计为完成。
