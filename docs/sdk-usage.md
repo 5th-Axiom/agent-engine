@@ -73,6 +73,8 @@ const result = await handle.result;
 
 不声明 `budgets`，且 Engine 默认/Policy 未设预算时，不限制累计 Token 或费用。`null` 只关闭对应 Loop 上限，不改变模型窗口、单次模型/执行器超时、有限重试、授权、并发与保留规则；用户仍可取消，用量仍完整记账。不能用 `null` 绕过有限 `policy.ceilings.loop`，Run override 可以从无限制收紧为有限值，不能将有限值变成无限制。Effective Config 和 PostgreSQL 恢复保留原始 `null` 及其来源。
 
+若希望整轮最多 5 分钟，同时允许单次模型请求持续到本轮截止，应设置 `loop.timeoutMs: 300000`，并为每个模型设置 `timeouts: { attemptMs: 300000, streamIdleMs: 300000 }`；工具可将 `execution.timeoutMs` 设为同一值。Engine 总是取单次时限和本轮剩余活动时间的较小值，重试/下一步不会重置整轮时钟。省略模型配置仍默认单次 60 秒、流等待 30 秒。模型阶段因 Run 截止而中断时报告不可重试的 `BUDGET_EXCEEDED`，不再误报 `MODEL_TIMEOUT` 或触发模型 fallback；独立模型/流超时仍报告 `MODEL_TIMEOUT`。
+
 该语义从 2026-09-15 的 SDK 实现起支持。已接受 Run 继续使用冻结配置；旧版本 SDK 不支持这些配置，回滚须使用兼容版本或匹配的升级前存储备份。
 
 ## 上下文、数据与维护

@@ -2165,20 +2165,13 @@ export class AgentEngine {
       });
       this.options.fault?.("model.before_send");
       let completed: ModelResponse | undefined;
+      const remainingRunMs =
+        (r.config.loop!.timeoutMs ?? Infinity) -
+        r.activeMs -
+        (r.lastActiveAt === undefined ? 0 : this.clock.now() - r.lastActiveAt);
+      const attemptMs = model.timeouts?.attemptMs ?? 60000;
       const timeout = AbortSignal.timeout(
-        Math.max(
-          1,
-          Math.floor(
-            Math.min(
-              model.timeouts?.attemptMs ?? 60000,
-              (r.config.loop!.timeoutMs ?? Infinity) -
-                r.activeMs -
-                (r.lastActiveAt === undefined
-                  ? 0
-                  : this.clock.now() - r.lastActiveAt),
-            ),
-          ),
-        ),
+        Math.max(1, Math.floor(Math.min(attemptMs, remainingRunMs))),
       );
       const combined = AbortSignal.any([signal, timeout]);
       try {
@@ -2395,9 +2388,13 @@ export class AgentEngine {
         const err =
           combined.aborted && !signal.aborted
             ? new AgentEngineError(
-                "MODEL_TIMEOUT",
-                "Model attempt expired",
-                true,
+                remainingRunMs <= attemptMs
+                  ? "BUDGET_EXCEEDED"
+                  : "MODEL_TIMEOUT",
+                remainingRunMs <= attemptMs
+                  ? "Run activity deadline expired"
+                  : "Model attempt expired",
+                remainingRunMs > attemptMs,
                 "safe",
               )
             : e instanceof AgentEngineError
@@ -2434,6 +2431,7 @@ export class AgentEngine {
         r = await this.owner.get(id);
         step = r.steps.at(-1)!;
         if (r.cancelRequested || signal.aborted) fail("RUN_CANCELLED");
+        if (err.code === "BUDGET_EXCEEDED") throw err;
         if (step.attempts.length > max) throw err;
         const category =
           err.code === "MODEL_RATE_LIMITED"
