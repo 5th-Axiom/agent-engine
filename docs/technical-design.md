@@ -930,6 +930,8 @@ const result = await session.run({ input });
 
 这些是新方案拟定值，不是 WorkBuddy 默认值；在 M0 固化后变更应记录配置版本。模型窗口和最大输出不能靠通用常量猜测：标准 Adapter 有可信模型元数据时可推导，否则要求 Session 显式填 `models[alias].limits`。其余参数支持范围与默认值随 Config Schema 一起发布。
 
+2026-09-15 按用户要求移除 Alice AI 诊断的固定累计运行上限，新增明确的可选语义：`loop.maxSteps/maxModelAttempts/maxCapabilityInvocations/timeoutMs` 可逐项设为 `null`，表示关闭该累计上限；省略仍继承上表默认值，不能用省略、0、极大数字或非 JSON 的 Infinity 伪装关闭。有限 Policy Ceiling 拒绝 `null`，Run Override 仅允许保持无限制或收窄；预算未配置且无默认/Policy 时不限制累计 Token/费用。授权、取消、用量记账、单请求/执行器有限超时、Retry/Repair、上下文容量及并发保护继续有效。序列化、恢复与来源记录保留 null，旧 Run 的冻结配置不变；这是有测试覆盖的显式扩展，未取消其他宿主的默认边界。
+
 Engine 级并发配置使用 `limits: { maxAcceptedRuns: 128, maxConcurrentModelRequests: 16, maxConcurrentCapabilityRequests: 32 }`，表中数值为首版拟定默认值。`maxAcceptedRuns` 限制所有非终态 Run（包括暂停态）的数量，满额时新请求在受理前返回 `ENGINE_BUSY`；已有 requestId 的幂等查询不受此限制。模型和能力信号量在本进程内有界等待，不新建分布式队列；等待也计入活动超时，取消可移除尚未派发的请求。恢复和审批唤醒使用已有 Run 名额，不能因限额已满而无法恢复。业务 Binding 不支持强制终止，同样必须协作处理 AbortSignal；超时不证明它停止产生副作用。
 
 ## 3. 流程图

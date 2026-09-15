@@ -17,6 +17,7 @@ Agent Engine 帮你把 AI 模型接进自己的程序：模型负责理解和回
 | 从零安装、启动项目             | [新手上手指南](docs/getting-started.md)             |
 | 聊天、测试工具、查看 Debug     | [测试页面操作手册](docs/local-playground.md)        |
 | 配置模型、更换 API Key         | [模型与凭据配置](docs/local-model-configuration.md) |
+| 关闭或收紧单轮累计运行上限 | [Loop 上限与显式 null](docs/sdk-usage.md#单轮运行上限) |
 | 启动失败、页面报错、回答不完整 | [常见问题与排查](docs/troubleshooting.md)           |
 | 写第一段调用引擎的代码         | [SDK 入门教程](docs/sdk-quickstart.md)              |
 | 查更多文档和技术约定           | [文档导航](docs/README.md)                          |

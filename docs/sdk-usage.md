@@ -56,6 +56,25 @@ const result = await handle.result;
 
 重试使用持久请求快照、有限次数和同一总预算。Fallback 只在声明类别上发生，受同一尝试数限制；含原生续接或工具历史的跨模型切换被拒绝。当前各次请求快照保存在 Step 的 `attemptRequests`。
 
+### 单轮运行上限
+
+`loop` 字段省略时仍继承库/Engine 默认限制。宿主需要关闭累计运行上限时，必须显式使用 `null`：
+
+```json
+{
+  "loop": {
+    "maxSteps": null,
+    "maxModelAttempts": null,
+    "maxCapabilityInvocations": null,
+    "timeoutMs": null
+  }
+}
+```
+
+不声明 `budgets`，且 Engine 默认/Policy 未设预算时，不限制累计 Token 或费用。`null` 只关闭对应 Loop 上限，不改变模型窗口、单次模型/执行器超时、有限重试、授权、并发与保留规则；用户仍可取消，用量仍完整记账。不能用 `null` 绕过有限 `policy.ceilings.loop`，Run override 可以从无限制收紧为有限值，不能将有限值变成无限制。Effective Config 和 PostgreSQL 恢复保留原始 `null` 及其来源。
+
+该语义从 2026-09-15 的 SDK 实现起支持。已接受 Run 继续使用冻结配置；旧版本 SDK 不支持这些配置，回滚须使用兼容版本或匹配的升级前存储备份。
+
 ## 上下文、数据与维护
 
 `context.toolResultMaxTokens` 是可选的工程裁剪授权，仅裁剪旧完整组的 Tool Result；原文及回执在有效期内保持不变。摘要分块和合并使用已声明模型及统一 Usage/预算。`Step.contextEstimate` 采用 UTF-8 字节保守上界，并列出消息、能力和输出预留；不是精确 Provider Tokenizer。

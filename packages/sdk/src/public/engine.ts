@@ -303,7 +303,7 @@ export class AgentEngine {
           if (r.lastActiveAt !== undefined) {
             r.activeMs += Math.min(
               Math.max(0, this.clock.now() - r.lastActiveAt),
-              r.config.loop!.timeoutMs!,
+              r.config.loop!.timeoutMs ?? Infinity,
             );
             delete r.lastActiveAt;
           }
@@ -985,13 +985,15 @@ export class AgentEngine {
         }
         if (o.loop)
           for (const [k, v] of Object.entries(o.loop)) {
+            const current =
+              config.loop![k as keyof NonNullable<typeof config.loop>];
             if (
-              typeof v !== "number" ||
-              v < 1 ||
-              v > config.loop![k as keyof NonNullable<typeof config.loop>]!
+              v === null
+                ? current !== null
+                : typeof v !== "number" || v < 1 || v > (current ?? Infinity)
             )
               fail("CONFIG_POLICY_VIOLATION");
-            (config.loop as Record<string, number>)[k] = v;
+            (config.loop as Record<string, number | null>)[k] = v;
           }
       }
       if (
@@ -1725,7 +1727,7 @@ export class AgentEngine {
       (r.lastActiveAt === undefined
         ? 0
         : Math.max(0, this.clock.now() - r.lastActiveAt));
-    if (elapsed > loop.timeoutMs!) fail("BUDGET_EXCEEDED");
+    if (elapsed > (loop.timeoutMs ?? Infinity)) fail("BUDGET_EXCEEDED");
     const used = r.usage.filter((u) => u.dispatchState !== "not_sent");
     const actualInput =
       used.reduce((a, u) => a + (u.tokens.input ?? u.reservation.input), 0) +
@@ -2021,7 +2023,8 @@ export class AgentEngine {
         ]!;
     let adapter = this.adapters[model.provider]!;
     if (!retrying) {
-      if (r.steps.length >= r.config.loop!.maxSteps!) fail("BUDGET_EXCEEDED");
+      if (r.steps.length >= (r.config.loop!.maxSteps ?? Infinity))
+        fail("BUDGET_EXCEEDED");
       const tools = r.compaction ? [] : this.contracts(r);
       for (const t of tools) await this.authorize("capability", t.name);
       const messages: ModelMessage[] = [
@@ -2096,7 +2099,7 @@ export class AgentEngine {
     while (step!.attempts.length <= max) {
       r = await this.owner.get(id);
       if (r.cancelRequested) fail("RUN_CANCELLED");
-      if (r.usage.length >= r.config.loop!.maxModelAttempts!)
+      if (r.usage.length >= (r.config.loop!.maxModelAttempts ?? Infinity))
         fail("BUDGET_EXCEEDED");
       await this.authorize("model", model.baseURL);
       await this.authorize("data", r.sessionId);
@@ -2168,7 +2171,7 @@ export class AgentEngine {
           Math.floor(
             Math.min(
               model.timeouts?.attemptMs ?? 60000,
-              r.config.loop!.timeoutMs! -
+              (r.config.loop!.timeoutMs ?? Infinity) -
                 r.activeMs -
                 (r.lastActiveAt === undefined
                   ? 0
@@ -2520,7 +2523,7 @@ export class AgentEngine {
         });
         const backoff = r.config.retry!.model!.backoff!;
         const remaining =
-          r.config.loop!.timeoutMs! -
+          (r.config.loop!.timeoutMs ?? Infinity) -
           r.activeMs -
           (r.lastActiveAt === undefined
             ? 0
@@ -2738,7 +2741,7 @@ export class AgentEngine {
           if (run.cancelRequested) fail("RUN_CANCELLED");
           if (
             run.capabilityInvocations >=
-            run.config.loop!.maxCapabilityInvocations!
+            (run.config.loop!.maxCapabilityInvocations ?? Infinity)
           )
             fail("BUDGET_EXCEEDED");
           run.capabilityInvocations++;
@@ -2769,7 +2772,7 @@ export class AgentEngine {
                 if (run.cancelRequested) fail("RUN_CANCELLED");
                 if (
                   run.capabilityInvocations >=
-                  run.config.loop!.maxCapabilityInvocations!
+                  (run.config.loop!.maxCapabilityInvocations ?? Infinity)
                 )
                   fail("BUDGET_EXCEEDED");
                 run.capabilityInvocations++;
@@ -3426,7 +3429,8 @@ export class AgentEngine {
           r = await this.owner.get(r.id);
           if (r.cancelRequested) fail("RUN_CANCELLED");
           if (
-            r.capabilityInvocations >= r.config.loop!.maxCapabilityInvocations!
+            r.capabilityInvocations >=
+            (r.config.loop!.maxCapabilityInvocations ?? Infinity)
           )
             fail("BUDGET_EXCEEDED");
           await this.options.store.assertHeld();
@@ -3997,7 +4001,7 @@ export class AgentEngine {
           if (run.cancelRequested) fail("RUN_CANCELLED");
           if (
             run.capabilityInvocations >=
-            run.config.loop!.maxCapabilityInvocations!
+            (run.config.loop!.maxCapabilityInvocations ?? Infinity)
           )
             fail("BUDGET_EXCEEDED");
           run.capabilityInvocations++;
@@ -4052,7 +4056,7 @@ export class AgentEngine {
         Math.floor(
           Math.min(
             e.timeoutMs ?? 10000,
-            r.config.loop!.timeoutMs! -
+            (r.config.loop!.timeoutMs ?? Infinity) -
               r.activeMs -
               (r.lastActiveAt === undefined
                 ? 0

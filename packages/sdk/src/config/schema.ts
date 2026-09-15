@@ -167,11 +167,12 @@ export const RetrySchema = z.strictObject({
   readonlyTool: z.strictObject({ maxRetries: count }).optional(),
   writeTool: z.strictObject({ maxRetries: count }).optional(),
 });
+/** Omitted fields inherit defaults; explicit null disables that cumulative Run limit. */
 export const LoopSchema = z.strictObject({
-  maxSteps: positive.optional(),
-  maxModelAttempts: positive.optional(),
-  maxCapabilityInvocations: positive.optional(),
-  timeoutMs: positive.optional(),
+  maxSteps: positive.nullable().optional(),
+  maxModelAttempts: positive.nullable().optional(),
+  maxCapabilityInvocations: positive.nullable().optional(),
+  timeoutMs: positive.nullable().optional(),
 });
 export const BudgetSchema = z.strictObject({
   perRun: z.strictObject({
@@ -544,7 +545,10 @@ export function effectiveConfig(
     if (c && typeof c === "object")
       for (const [k, x] of Object.entries(c))
         check((v as Record<string, unknown>)?.[k], x, `${path}.${k}`);
-    else if (typeof c === "number" && typeof v === "number" && v > c)
+    else if (
+      typeof c === "number" &&
+      (v === null || (typeof v === "number" && v > c))
+    )
       fail("CONFIG_POLICY_VIOLATION", `Policy ceiling exceeded: ${path}`);
     else if (path.endsWith(".maxEstimatedCost.currency") && v !== c)
       fail("CONFIG_POLICY_VIOLATION", "Policy cost currency mismatch");
